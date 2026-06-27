@@ -26,19 +26,14 @@ export default function CheckoutPage() {
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState<string>("");
-
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
 
-  // Fetch saved addresses and profile to get user's email
+  // Fetch saved addresses
   useEffect(() => {
-    const fetchAddressesAndProfile = async () => {
+    const fetchAddresses = async () => {
       try {
         setLoadingAddresses(true);
-        const [addrRes, profileRes] = await Promise.all([
-          apiFetch("/buyer/addresses"),
-          apiFetch("/buyer/profile")
-        ]);
+        const addrRes = await apiFetch("/buyer/addresses");
 
         if (addrRes.res.ok && addrRes.payload.addresses) {
           const list = addrRes.payload.addresses;
@@ -48,39 +43,18 @@ export default function CheckoutPage() {
             setSelectedAddressId(defaultAddress._id);
           }
         }
-
-        if (profileRes.res.ok && profileRes.payload.profile) {
-          setEmail(profileRes.payload.profile.email);
-        }
       } catch (err) {
         console.error("Error loading checkout details:", err);
       } finally {
         setLoadingAddresses(false);
       }
     };
-    fetchAddressesAndProfile();
+    fetchAddresses();
   }, []);
 
   // Calculate pricing
-  const uniqueFarmers = Array.from(new Set(items.map(item => item.farmerId || 'unknown')));
-  const deliveryFee = items.length > 0 ? uniqueFarmers.length * 1500 : 0;
   const serviceCharge = items.length > 0 ? 1200 : 0;
-  const total = totalPrice + deliveryFee + serviceCharge;
-
-  // Load Paystack Inline JS
-  const loadPaystackScript = () => {
-    return new Promise((resolve) => {
-      if ((window as any).PaystackPop) {
-        resolve(true);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://js.paystack.co/v1/inline.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
+  const totalBeforeTransport = totalPrice + serviceCharge;
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,70 +70,31 @@ export default function CheckoutPage() {
       return;
     }
 
-    const scriptLoaded = await loadPaystackScript();
-    if (!scriptLoaded) {
-      setError("Failed to load payment gateway. Please check your internet connection.");
-      return;
-    }
-
     setPlacingOrder(true);
 
     try {
-      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_4815a51356e4576307137f8d75e8db5ce8eb473f";
+      const orderPayload = {
+        items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        addressId: selectedAddressId,
+        paymentMethod: paymentMethod === "card" ? "card" : paymentMethod === "bank" ? "bank_transfer" : "mpesa",
+      };
 
-      const handler = (window as any).PaystackPop.setup({
-        key: paystackPublicKey,
-        email: email || "customer@kizfarm.com",
-        amount: Math.round(total * 100), // in kobo
-        currency: "NGN",
-        metadata: {
-          brand: "KIZ FARM",
-          custom_fields: [
-            {
-              display_name: "Merchant",
-              variable_name: "merchant",
-              value: "KIZ FARM",
-            },
-          ],
-        },
-        callback: function (response: any) {
-          const paymentRef = response.reference;
-
-          const orderPayload = {
-            items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
-            addressId: selectedAddressId,
-            paymentMethod: paymentMethod === "card" ? "card" : paymentMethod === "bank" ? "bank_transfer" : "mobile_money",
-            paymentReference: paymentRef,
-          };
-
-          apiFetch("/buyer/orders", {
-            method: "POST",
-            body: JSON.stringify(orderPayload),
-          }).then(({ res, payload }) => {
-            if (!res.ok) {
-              setError(payload?.error || "Payment succeeded, but order creation failed. Please contact support with reference: " + paymentRef);
-              setPlacingOrder(false);
-              return;
-            }
-
-            clearCart();
-            router.push("/buyer/orders");
-          }).catch(err => {
-            console.error("Order creation error after Paystack success:", err);
-            setError("Payment succeeded, but connection failed. Contact support with reference: " + paymentRef);
-            setPlacingOrder(false);
-          });
-        },
-        onClose: function () {
-          setPlacingOrder(false);
-          setError("Payment was cancelled.");
-        },
+      const { res, payload } = await apiFetch("/buyer/orders", {
+        method: "POST",
+        body: JSON.stringify(orderPayload),
       });
 
-      handler.openIframe();
+      if (!res.ok) {
+        setError(payload?.error || "Failed to submit order for transport fare review.");
+        return;
+      }
+
+      clearCart();
+      router.push("/buyer/orders");
     } catch (err) {
-      console.error("Paystack initialization error:", err);
-      setError("Failed to initialize payment gateway. Please try again.");
+      console.error("Transport fare request error:", err);
+      setError("Failed to submit your order. Please try again.");
+    } finally {
       setPlacingOrder(false);
     }
   };
@@ -325,7 +260,7 @@ export default function CheckoutPage() {
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">shield</span> Secured via Paystack
                       </p>
-                      <p className="text-xs text-slate-500">You will pay securely using your credit or debit card via Paystack's official popup interface.</p>
+                      <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
                   )}
                 </div>
@@ -349,7 +284,7 @@ export default function CheckoutPage() {
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">shield</span> Secured via Paystack
                       </p>
-                      <p className="text-xs text-slate-500">You will pay securely using direct bank transfer or USSD code via the Paystack popup.</p>
+                      <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
                   )}
                 </div>
@@ -373,7 +308,7 @@ export default function CheckoutPage() {
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">shield</span> Secured via Paystack
                       </p>
-                      <p className="text-xs text-slate-500">You will pay securely using OPAY, M-Pesa or other mobile money methods via the Paystack popup.</p>
+                      <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
                   )}
                 </div>
@@ -414,17 +349,26 @@ export default function CheckoutPage() {
                     <span>₦ {totalPrice.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-body-md text-body-md text-on-surface-variant">
-                    <span>Shipping Fee</span>
-                    <span>₦ {deliveryFee.toLocaleString()}</span>
+                    <span>Transport Fare</span>
+                    <span className="text-amber-700 font-semibold">Admin will contact you</span>
                   </div>
                   <div className="flex justify-between font-body-md text-body-md text-on-surface-variant">
                     <span>Service Charge</span>
                     <span>₦ {serviceCharge.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-headline-md text-headline-md text-on-surface pt-md border-t border-[#E5E7EB]">
-                    <span>Total</span>
-                    <span className="text-[#1B6D24] font-bold">₦ {total.toLocaleString()}</span>
+                    <span>Total before transport</span>
+                    <span className="text-[#1B6D24] font-bold">₦ {totalBeforeTransport.toLocaleString()}</span>
                   </div>
+                </div>
+                <div className="mx-md mb-md rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-bold flex items-center gap-2">
+                    <span className="material-symbols-outlined text-base">support_agent</span>
+                    Transport fare review required
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed">
+                    Submit this order and KIZ FARM admin will review the goods and delivery address, then contact you with the transport fare. Payment will open after the fare is added to your order summary.
+                  </p>
                 </div>
                 <div className="p-md">
                   <button 
@@ -437,11 +381,11 @@ export default function CheckoutPage() {
                     }`}
                   >
                     <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-                    {placingOrder ? "Placing Order..." : "Place Order Securely"}
+                    {placingOrder ? "Submitting..." : "Request Transport Fare Review"}
                   </button>
                   <p className="text-center font-label-xs text-label-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
-                    <span className="material-symbols-outlined text-xs">shield</span>
-                    AES-256 Encrypted Connection
+                    <span className="material-symbols-outlined text-xs">info</span>
+                    You will pay after admin adds the transport fare.
                   </p>
                 </div>
               </div>

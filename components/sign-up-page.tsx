@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAuthToken, setPendingVerificationEmail } from "@/lib/kizfarm/auth";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function SignUpPage() {
   // redirect away if already authenticated
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('kizfarm_token');
+    const token = getAuthToken();
     if (token) router.push('/public/home');
   }, [router]);
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +33,7 @@ export default function SignUpPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Signup failed");
       // keep pending email for OTP page
-      localStorage.setItem("kizfarm_pending_email", email);
+      setPendingVerificationEmail(email);
       router.push("/public/otp");
     } catch (err: any) {
       setError(err.message || "Signup failed");

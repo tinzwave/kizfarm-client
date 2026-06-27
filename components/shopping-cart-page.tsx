@@ -7,12 +7,8 @@ import { useCart } from "@/lib/kizfarm/cart-context";
 export default function ShoppingCartPage() {
   const { items, totalPrice, updateQuantity, removeItem } = useCart();
 
-  // Calculate delivery fee dynamically based on the number of unique farmers
-  // Backend charges 1,500 per farmer. If no farmerId, default to 1 farmer group.
-  const uniqueFarmers = Array.from(new Set(items.map(item => item.farmerId || 'unknown')));
-  const deliveryFee = items.length > 0 ? uniqueFarmers.length * 1500 : 0;
   const serviceCharge = items.length > 0 ? 1200 : 0;
-  const total = totalPrice + deliveryFee + serviceCharge;
+  const totalBeforeTransport = totalPrice + serviceCharge;
 
   return (
     <>
@@ -107,10 +103,8 @@ export default function ShoppingCartPage() {
                 <span className="text-on-surface">₦ {totalPrice.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-body-md text-secondary">
-                <span>Delivery Fee</span>
-                <span className="text-on-surface">
-                  {deliveryFee > 0 ? `₦ ${deliveryFee.toLocaleString()}` : "₦ 0"}
-                </span>
+                <span>Transport Fare</span>
+                <span className="text-amber-700 font-semibold">Quoted after checkout</span>
               </div>
               <div className="flex justify-between text-body-md text-secondary">
                 <span>Service Charge</span>
@@ -119,9 +113,12 @@ export default function ShoppingCartPage() {
                 </span>
               </div>
               <div className="pt-4 border-t border-outline-variant flex justify-between">
-                <span className="font-bold text-lg text-on-surface">Total</span>
-                <span className="font-bold text-lg text-[#1B6D24]">₦ {total.toLocaleString()}</span>
+                <span className="font-bold text-lg text-on-surface">Total before transport</span>
+                <span className="font-bold text-lg text-[#1B6D24]">₦ {totalBeforeTransport.toLocaleString()}</span>
               </div>
+            </div>
+            <div className="mb-lg rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+              Admin will review your goods and address, contact you with the transport fare, then payment will become available.
             </div>
             <div className="mb-lg">
               <div className="relative">

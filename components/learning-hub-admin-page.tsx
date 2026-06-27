@@ -57,6 +57,7 @@ export default function LearningHubAdminPage() {
   const [message, setMessage] = useState("");
   const [reviewingId, setReviewingId] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState<"approved" | "rejected" | "">("");
+  const [releasingPayoutId, setReleasingPayoutId] = useState("");
   const [reviewForm, setReviewForm] = useState({ commission: "", rejectionReason: "" });
 
   const [tutorForm, setTutorForm] = useState({
@@ -197,17 +198,30 @@ export default function LearningHubAdminPage() {
   }
 
   async function releasePayout(purchase: CoursePurchase) {
+    if (purchase.payoutStatus === "released" || releasingPayoutId) return;
     setMessage("");
-    const { res, payload } = await apiFetch(`/learning/admin/course-purchases/${purchase._id}/release-payout`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-      setMessage(payload?.error || "Could not release payout.");
-      return;
+    setReleasingPayoutId(purchase._id);
+    try {
+      const { res, payload } = await apiFetch(`/learning/admin/course-purchases/${purchase._id}/release-payout`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        setMessage(payload?.error || "Could not release payout.");
+        return;
+      }
+      setPurchases((current) =>
+        current.map((item) =>
+          item._id === purchase._id
+            ? { ...item, payoutStatus: "released", releasedAt: new Date().toISOString() }
+            : item,
+        ),
+      );
+      setMessage("Course creator payout released.");
+      await loadData();
+    } finally {
+      setReleasingPayoutId("");
     }
-    setMessage("Course creator payout released.");
-    await loadData();
   }
 
   const statusClass = (status?: Course["status"]) => {
@@ -255,7 +269,12 @@ export default function LearningHubAdminPage() {
           ))}
         </div>
 
-        {activeTab === "tutors" ? (
+        {loading ? (
+          <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+            <span className="material-symbols-outlined animate-spin text-3xl text-green-800">autorenew</span>
+            <p className="mt-3 text-sm font-semibold">Loading learning management data...</p>
+          </div>
+        ) : activeTab === "tutors" ? (
           <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
             <form onSubmit={submitTutor} className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold">Add New Tutor</h2>
@@ -365,9 +384,18 @@ export default function LearningHubAdminPage() {
                     <div className="flex items-center gap-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${purchase.payoutStatus === "released" ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-700"}`}>{purchase.payoutStatus ?? "pending"}</span>
                       {purchase.payoutStatus === "released" ? (
-                        <span className="text-sm text-slate-500">{purchase.releasedAt ? new Date(purchase.releasedAt).toLocaleDateString() : "Released"}</span>
+                        <span className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-bold text-green-800">
+                          Funds released{purchase.releasedAt ? ` · ${new Date(purchase.releasedAt).toLocaleDateString()}` : ""}
+                        </span>
                       ) : (
-                        <button type="button" onClick={() => releasePayout(purchase)} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">Release Payout</button>
+                        <button
+                          type="button"
+                          onClick={() => releasePayout(purchase)}
+                          disabled={releasingPayoutId === purchase._id}
+                          className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {releasingPayoutId === purchase._id ? "Releasing..." : "Release Payout"}
+                        </button>
                       )}
                     </div>
                   </div>

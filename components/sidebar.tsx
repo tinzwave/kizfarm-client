@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { clearAuth, getAuthToken, getStoredUser, isAdminUser, parseJwt } from "@/lib/kizfarm/auth";
 
 type NavItem = { name: string; href: string };
 type NavGroup = { label: string; items: NavItem[] };
@@ -97,34 +98,15 @@ export default function Sidebar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  function parseJwt(token: string | null) {
-    if (!token) return null;
-    try {
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map(function (c) {
-            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          })
-          .join(""),
-      );
-      return JSON.parse(jsonPayload);
-    } catch (e) {
-      return null;
-    }
-  }
-
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("kizfarm_token");
-    const user = localStorage.getItem("kizfarm_user");
+    const token = getAuthToken();
+    const user = getStoredUser();
     setLoggedIn(!!token);
     try {
-      setUserEmail(user ? JSON.parse(user).email : null);
+      setUserEmail(user?.email ?? null);
       const payload = parseJwt(token);
-      setIsAdmin(payload && payload.role === "admin");
+      setIsAdmin(isAdminUser(payload) || isAdminUser(user));
     } catch {
       setUserEmail(null);
       setIsAdmin(false);
@@ -133,13 +115,13 @@ export default function Sidebar() {
 
   useEffect(() => {
     const updateFromStorage = () => {
-      const token = localStorage.getItem("kizfarm_token");
-      const user = localStorage.getItem("kizfarm_user");
+      const token = getAuthToken();
+      const user = getStoredUser();
       setLoggedIn(!!token);
       try {
-        setUserEmail(user ? JSON.parse(user).email : null);
+        setUserEmail(user?.email ?? null);
         const payload = parseJwt(token);
-        setIsAdmin(payload && payload.role === "admin");
+        setIsAdmin(isAdminUser(payload) || isAdminUser(user));
       } catch {
         setUserEmail(null);
         setIsAdmin(false);
@@ -158,16 +140,9 @@ export default function Sidebar() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("kizfarm_token");
-    localStorage.removeItem("kizfarm_user");
+    clearAuth();
     // refresh sidebar state and navigate to home
     setLoggedIn(false);
-    // notify other parts of the app
-    try {
-      window.dispatchEvent(new Event("kizfarm_auth_changed"));
-    } catch (e) {
-      /* ignore */
-    }
     router.push("/public/home");
   };
 

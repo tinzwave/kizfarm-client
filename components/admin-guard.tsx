@@ -2,41 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
-function parseJwt(token: string | null) {
-  if (!token) return null;
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(base64Url.length / 4) * 4, "=");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map(function (c) {
-          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-}
-
-function parseStoredUser() {
-  try {
-    const user = localStorage.getItem("kizfarm_user");
-    return user ? JSON.parse(user) : null;
-  } catch {
-    return null;
-  }
-}
-
-function isAdminUser(value: any) {
-  return value?.role === "admin" || value?.isAdmin === true || value?.type === "admin";
-}
+import { getAdminToken, getStoredUser, isAdminUser, parseJwt } from "@/lib/kizfarm/auth";
 
 export default function AdminGuard({
   children,
@@ -48,11 +14,11 @@ export default function AdminGuard({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("kizfarm_token");
+    const token = getAdminToken();
     const payload = parseJwt(token);
-    const storedUser = parseStoredUser();
+    const storedUser = getStoredUser();
 
-    if (isAdminUser(payload) || isAdminUser(storedUser)) {
+    if (token && (isAdminUser(payload) || isAdminUser(storedUser))) {
       setAuthorized(true);
       return;
     }

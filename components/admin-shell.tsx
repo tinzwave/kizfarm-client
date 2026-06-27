@@ -78,6 +78,17 @@ export default function AdminShell({
               Courses & Tutors
             </span>
           </Link>
+          <Link
+            href="/admin/blog"
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 scale-100 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined" data-icon="article">
+              article
+            </span>
+            <span className="font-inter text-sm antialiased">
+              Blogs
+            </span>
+          </Link>
 
           {/* Assign Driver */}
           <Link

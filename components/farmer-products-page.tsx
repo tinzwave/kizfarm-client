@@ -11,6 +11,8 @@ type FarmerProduct = {
   title?: string;
   description?: string;
   price?: number | string;
+  quantity?: number | string | null;
+  unit?: string;
   images?: string[];
   imageUrls?: string[];
   status?: string;
@@ -159,6 +161,9 @@ export default function FarmerProductsPage() {
                         ₦{String(p.price)}
                       </div>
                     ) : null}
+                    <div className="text-xs font-semibold text-zinc-500">
+                      Stock: {p.quantity === null || p.quantity === undefined ? "Not set" : `${p.quantity}${p.unit ? ` ${p.unit}` : ""}`}
+                    </div>
                   </div>
                 </Link>
               );
@@ -169,4 +174,3 @@ export default function FarmerProductsPage() {
     </div>
   );
 }
-

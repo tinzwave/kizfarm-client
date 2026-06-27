@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveAdminAuth } from "@/lib/kizfarm/auth";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -23,10 +24,7 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Admin login failed");
-      if (data.token) localStorage.setItem("kizfarm_token", data.token);
-      if (data.admin)
-        localStorage.setItem("kizfarm_user", JSON.stringify(data.admin));
-      try { window.dispatchEvent(new Event('kizfarm_auth_changed')); } catch(e) {}
+      if (data.token && data.admin) saveAdminAuth(data.token, data.admin);
       router.push("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "Admin login failed");

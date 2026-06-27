@@ -32,7 +32,10 @@ interface Order {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
+  serviceFee?: number;
   total: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
   status: string;
   createdAt: string;
   adminNotes?: string;
@@ -52,6 +55,8 @@ export default function TrackOrderPage() {
   const [driverRating, setDriverRating] = useState<number>(5);
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [ratingLoading, setRatingLoading] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Read order ID from URL query parameters client-side
   useEffect(() => {
@@ -129,6 +134,88 @@ export default function TrackOrderPage() {
     }
   };
 
+  const loadPaystackScript = () => {
+    return new Promise((resolve) => {
+      if ((window as any).PaystackPop) {
+        resolve(true);
+        return;
+      }
+      const existingScript = document.querySelector<HTMLScriptElement>(
+        'script[src="https://js.paystack.co/v1/inline.js"]',
+      );
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(!!(window as any).PaystackPop), { once: true });
+        existingScript.addEventListener("error", () => resolve(false), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
+      script.onload = () => resolve(!!(window as any).PaystackPop);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayNow = async () => {
+    if (!order || !orderId) return;
+    setPaymentError(null);
+    setPaying(true);
+    const scriptLoaded = await loadPaystackScript();
+    if (!scriptLoaded || !(window as any).PaystackPop) {
+      setPaymentError("Failed to load payment gateway. Please check your internet connection.");
+      setPaying(false);
+      return;
+    }
+
+    try {
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_4815a51356e4576307137f8d75e8db5ce8eb473f";
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackPublicKey,
+        email: "customer@kizfarm.com",
+        amount: Math.round(order.total * 100),
+        currency: "NGN",
+        metadata: {
+          brand: "KIZ FARM",
+          orderId: order._id,
+        },
+        callback: function (response: any) {
+          const method = order.paymentMethod === "bank_transfer" ? "bank_transfer" : order.paymentMethod === "mpesa" ? "mpesa" : "card";
+          apiFetch(`/buyer/orders/${orderId}/pay`, {
+              method: "POST",
+              body: JSON.stringify({
+                paymentReference: response.reference,
+                paymentMethod: method,
+              }),
+            })
+            .then(async ({ res, payload }) => {
+            if (!res.ok) {
+              setPaymentError(payload?.error || "Payment succeeded, but order activation failed. Please contact support.");
+              setPaying(false);
+              return;
+            }
+            await fetchOrderDetails(orderId);
+            })
+            .catch(() => {
+              setPaymentError("Payment succeeded, but connection failed. Please contact support with your reference.");
+            })
+            .finally(() => {
+              setPaying(false);
+            });
+        },
+        onClose: () => {
+          setPaying(false);
+          setPaymentError("Payment was cancelled.");
+        },
+      });
+
+      handler.openIframe();
+    } catch (err) {
+      console.error("Paystack initialization error:", err);
+      setPaymentError("Failed to initialize payment gateway. Please try again.");
+      setPaying(false);
+    }
+  };
+
   if (!orderId) {
     return (
       <div className="min-h-screen bg-background p-12 text-center">
@@ -167,7 +254,7 @@ export default function TrackOrderPage() {
   const isCancelled = status === "cancelled";
 
   // Check which steps are completed/active based on status order
-  const stepOrder = ["pending", "accepted_by_farmer", "confirmed", "packed", "assigned", "in_transit", "delivered", "receipt_confirmed", "completed"];
+  const stepOrder = ["awaiting_transport_quote", "awaiting_payment", "pending", "accepted_by_farmer", "confirmed", "packed", "assigned", "in_transit", "delivered", "receipt_confirmed", "completed"];
   const currentStepIndex = stepOrder.indexOf(status);
 
   const isStepDone = (stepName: string) => {
@@ -178,6 +265,8 @@ export default function TrackOrderPage() {
 
   const getStatusDisplay = (s: string) => {
     switch (s) {
+      case "awaiting_transport_quote": return "Transport Review";
+      case "awaiting_payment": return "Ready for Payment";
       case "pending": return "Placed";
       case "accepted_by_farmer": return "Accepted by Farmer";
       case "confirmed": return "Confirmed by Farmer";
@@ -229,6 +318,51 @@ export default function TrackOrderPage() {
             </div>
           </div>
         </div>
+
+        {/* Transport Fare / Payment Gate */}
+        {status === "awaiting_transport_quote" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            <div>
+              <h3 className="font-bold text-amber-900 text-lg flex items-center gap-2">
+                <span className="material-symbols-outlined">support_agent</span>
+                Transport fare is being reviewed
+              </h3>
+              <p className="text-sm text-amber-800 mt-1">
+                Admin will contact you with the transport fare for moving these goods to your address. Payment will open once the fare is added.
+              </p>
+            </div>
+            <span className="px-4 py-2 rounded-full bg-white border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider">
+              Awaiting Quote
+            </span>
+          </div>
+        )}
+
+        {status === "awaiting_payment" && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-8 shadow-sm">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-green-900 text-lg flex items-center gap-2">
+                  <span className="material-symbols-outlined">payments</span>
+                  Transport fare added
+                </h3>
+                <p className="text-sm text-green-700 mt-1">
+                  Your order total now includes the transport fare. Complete payment to send the order to the farmer.
+                </p>
+                {paymentError && (
+                  <p className="mt-3 text-sm font-semibold text-red-600">{paymentError}</p>
+                )}
+              </div>
+              <button
+                onClick={handlePayNow}
+                disabled={paying}
+                className="bg-[#1B6D24] text-white font-bold px-6 py-3 rounded-xl hover:bg-primary transition-all active:scale-95 duration-150 flex items-center gap-2 disabled:opacity-60"
+              >
+                {paying ? "Processing..." : `Pay ₦${order.total.toLocaleString()}`}
+                <span className="material-symbols-outlined">lock</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Delivery Confirmation Gate */}
         {status === "delivered" && (
@@ -515,8 +649,14 @@ export default function TrackOrderPage() {
                     <span className="text-on-surface">₦{order.subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Delivery Fee</span>
-                    <span className="text-on-surface">₦{order.deliveryFee.toLocaleString()}</span>
+                    <span>Service Fee</span>
+                    <span className="text-on-surface">₦{(order.serviceFee || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Transport Fare</span>
+                    <span className="text-on-surface">
+                      {order.deliveryFee > 0 ? `₦${order.deliveryFee.toLocaleString()}` : "Pending"}
+                    </span>
                   </div>
                 </div>
                 

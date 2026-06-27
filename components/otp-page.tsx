@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { clearPendingVerificationEmail, getAuthToken, getPendingVerificationEmail } from "@/lib/kizfarm/auth";
 
 export default function OtpPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -10,7 +11,7 @@ export default function OtpPage() {
   const search = useSearchParams();
   const pendingEmail =
     typeof window !== "undefined"
-      ? localStorage.getItem("kizfarm_pending_email") || search?.get("email")
+      ? getPendingVerificationEmail() || search?.get("email")
       : null;
   const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export default function OtpPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "OTP verification failed");
       // on success, clear pending and go to login
-      localStorage.removeItem("kizfarm_pending_email");
+      clearPendingVerificationEmail();
       router.push("/public/login");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
@@ -67,7 +68,7 @@ export default function OtpPage() {
   // redirect away if already authenticated
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('kizfarm_token');
+    const token = getAuthToken();
     if (token) router.push('/public/home');
   }, [router]);
 

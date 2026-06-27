@@ -59,6 +59,14 @@ export default function FarmerSidebar({
         {!linksCollapsed && "Learning"}
       </Link>
       <Link
+        href="/farmer/blog"
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/blog") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+      >
+        <span className="material-symbols-outlined">article</span>
+        {!linksCollapsed && "Blogs"}
+      </Link>
+      <Link
         href="/farmer/products/add-product"
         onClick={onClick}
         className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/products/add-product") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}

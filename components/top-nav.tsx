@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { clearAuth, getAuthToken, getStoredUser } from "@/lib/kizfarm/auth";
 
 export default function TopNav() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -11,23 +12,15 @@ export default function TopNav() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("kizfarm_token");
-    const user = localStorage.getItem("kizfarm_user");
+    const token = getAuthToken();
+    const user = getStoredUser();
     setLoggedIn(!!token);
-    try {
-      setUserEmail(user ? JSON.parse(user).email : null);
-    } catch {
-      setUserEmail(null);
-    }
+    setUserEmail(user?.email ?? null);
     const onAuth = () => {
-      const t = localStorage.getItem("kizfarm_token");
-      const u = localStorage.getItem("kizfarm_user");
+      const t = getAuthToken();
+      const u = getStoredUser();
       setLoggedIn(!!t);
-      try {
-        setUserEmail(u ? JSON.parse(u).email : null);
-      } catch {
-        setUserEmail(null);
-      }
+      setUserEmail(u?.email ?? null);
     };
     window.addEventListener("storage", onAuth);
     window.addEventListener("kizfarm_auth_changed", onAuth as EventListener);
@@ -41,11 +34,7 @@ export default function TopNav() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("kizfarm_token");
-    localStorage.removeItem("kizfarm_user");
-    try {
-      window.dispatchEvent(new Event("kizfarm_auth_changed"));
-    } catch {}
+    clearAuth();
     setLoggedIn(false);
     router.push("/public/home");
   };

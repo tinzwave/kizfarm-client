@@ -24,7 +24,9 @@ interface Order {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
+  serviceFee?: number;
   total: number;
+  paymentStatus?: string;
   status: string;
   createdAt: string;
 }
@@ -58,6 +60,10 @@ export default function MyOrdersPage() {
 
   const getStatusLabelAndStyle = (status: string) => {
     switch (status.toLowerCase()) {
+      case "awaiting_transport_quote":
+        return { label: "Transport Review", style: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" };
+      case "awaiting_payment":
+        return { label: "Ready to Pay", style: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" };
       case "pending":
         return { label: "Pending", style: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" };
       case "accepted_by_farmer":
@@ -84,7 +90,7 @@ export default function MyOrdersPage() {
   const filteredOrders = orders.filter((order) => {
     const s = order.status?.toLowerCase();
     if (activeFilter === "all") return true;
-    if (activeFilter === "processing") return ["pending", "accepted_by_farmer", "confirmed", "packed"].includes(s);
+    if (activeFilter === "processing") return ["awaiting_transport_quote", "awaiting_payment", "pending", "accepted_by_farmer", "confirmed", "packed"].includes(s);
     if (activeFilter === "shipped") return ["assigned", "in_transit"].includes(s);
     if (activeFilter === "delivered") return ["delivered", "receipt_confirmed", "cancelled"].includes(s);
     return true;
@@ -213,7 +219,12 @@ export default function MyOrdersPage() {
                     </div>
                   </div>
                   <div className="pt-md border-t border-gray-100 flex justify-between items-center">
-                    <p className="font-headline-md text-headline-md text-[#1B6D24]">₦{order.total.toLocaleString()}</p>
+                    <div>
+                      <p className="font-headline-md text-headline-md text-[#1B6D24]">₦{order.total.toLocaleString()}</p>
+                      {order.status === "awaiting_transport_quote" && (
+                        <p className="text-[10px] text-amber-700 font-semibold">Transport fare pending</p>
+                      )}
+                    </div>
                     <Link href={`/buyer/track-order?id=${order._id}`} className="text-primary font-label-sm text-label-sm flex items-center gap-1 hover:underline">
                       Details <span className="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span>
                     </Link>

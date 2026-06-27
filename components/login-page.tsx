@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getAuthToken, saveUserAuth, setPendingVerificationEmail } from "@/lib/kizfarm/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,7 +16,7 @@ export default function LoginPage() {
   // redirect away if already authenticated
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const token = localStorage.getItem('kizfarm_token');
+    const token = getAuthToken();
     if (token) router.push('/public/home');
   }, [router]);
   const handleSubmit = (e: React.FormEvent) => {
@@ -30,13 +31,15 @@ export default function LoginPage() {
           body: JSON.stringify({ email, password }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Login failed");
-        // save token and user
-        if (data.token) localStorage.setItem("kizfarm_token", data.token);
-        if (data.user)
-          localStorage.setItem("kizfarm_user", JSON.stringify(data.user));
-        // notify sidebar and other listeners in same tab
-        try { window.dispatchEvent(new Event('kizfarm_auth_changed')); } catch(e) {}
+        if (!res.ok) {
+          if (res.status === 403 && data.needsVerification && data.email) {
+            setPendingVerificationEmail(data.email);
+            router.push("/public/otp");
+            return;
+          }
+          throw new Error(data.error || "Login failed");
+        }
+        if (data.token && data.user) saveUserAuth(data.token, data.user);
         
         const role = data.user?.role || "user";
         if (role === "farmer") {

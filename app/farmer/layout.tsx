@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FarmerSidebar from "@/components/farmer-sidebar";
 import { usePathname, useRouter } from "next/navigation";
+import { getAuthToken } from "@/lib/kizfarm/auth";
 
 export default function FarmerLayout({
   children,
@@ -12,6 +13,7 @@ export default function FarmerLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -45,12 +47,11 @@ export default function FarmerLayout({
     // - Farmer not approved -> /farmer/verify
     // - Approved -> allow dashboard routes
     async function checkStatus() {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("kizfarm_token")
-          : null;
+      setCheckingAccess(true);
+      const token = getAuthToken();
       if (!token) {
         if (pathname !== "/public/login") router.replace("/public/login");
+        setCheckingAccess(false);
         return;
       }
 
@@ -63,6 +64,7 @@ export default function FarmerLayout({
         });
         if (!res.ok) {
           if (pathname !== "/public/login") router.replace("/public/login");
+          setCheckingAccess(false);
           return;
         }
         const json = await res.json();
@@ -72,23 +74,34 @@ export default function FarmerLayout({
         // If user hasn't registered as a farmer yet, keep them on /farmer/become.
         if (!farmer) {
           if (!isBecome) router.replace("/farmer/become");
+          setCheckingAccess(false);
           return;
         }
 
         // If farmer exists but not yet approved, send them to verification flow.
         if (status !== "approved") {
           if (!isVerify) router.replace("/farmer/verify");
+          setCheckingAccess(false);
           return;
         }
 
         // Approved farmer shouldn't be stuck in onboarding routes.
         if (isBecome || isVerify) router.replace("/farmer/dashboard");
+        setCheckingAccess(false);
       } catch {
-        // If API is unreachable, don't loop between pages; keep user on current page.
+        setCheckingAccess(false);
       }
     }
     checkStatus();
   }, [router, pathname]);
+
+  if (checkingAccess) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-sm text-zinc-500">
+        Loading seller portal...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-on-background font-body-md overflow-x-hidden">

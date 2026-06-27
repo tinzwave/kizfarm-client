@@ -1,14 +1,7 @@
+import { getAuthToken } from "./auth";
+
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-export function getAuthToken() {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem("kizfarm_token");
-  } catch {
-    return null;
-  }
-}
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;

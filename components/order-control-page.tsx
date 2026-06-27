@@ -38,6 +38,7 @@ interface Order {
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
+  serviceFee?: number;
   total: number;
   paymentMethod: string;
   paymentReference: string | null;
@@ -60,6 +61,7 @@ interface Order {
   receiptConfirmedAt: string | null;
   cancelledAt: string | null;
   createdAt: string;
+  updatedAt?: string;
   masterOrderId?: string | null;
   subOrderIndex?: number;
   subOrderCount?: number;
@@ -69,6 +71,8 @@ interface Order {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, string> = {
+  awaiting_transport_quote: "Awaiting Transport Fare",
+  awaiting_payment: "Awaiting Buyer Payment",
   pending: "Pending",
   accepted_by_farmer: "Accepted by Farmer",
   confirmed: "Confirmed by Farmer",
@@ -81,6 +85,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  awaiting_transport_quote: "bg-amber-50 text-amber-700 border-amber-200",
+  awaiting_payment: "bg-emerald-50 text-emerald-700 border-emerald-200",
   pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
   accepted_by_farmer: "bg-cyan-50 text-cyan-700 border-cyan-200",
   confirmed: "bg-blue-50 text-blue-700 border-blue-200",
@@ -93,6 +99,18 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const TIMELINE_STEPS = [
+  {
+    key: "awaiting_transport_quote",
+    label: "Transport Review",
+    icon: "support_agent",
+    dateKey: "createdAt",
+  },
+  {
+    key: "awaiting_payment",
+    label: "Fare Added",
+    icon: "payments",
+    dateKey: "updatedAt",
+  },
   {
     key: "pending",
     label: "Order Placed",
@@ -139,6 +157,8 @@ const TIMELINE_STEPS = [
 ];
 
 const STATUS_ORDER = [
+  "awaiting_transport_quote",
+  "awaiting_payment",
   "pending",
   "accepted_by_farmer",
   "confirmed",
@@ -178,6 +198,13 @@ export default function OrderControlPage() {
   const [statusNote, setStatusNote] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState("");
+
+  // Transport fare modal
+  const [showTransportModal, setShowTransportModal] = useState(false);
+  const [transportFare, setTransportFare] = useState("");
+  const [transportNote, setTransportNote] = useState("");
+  const [savingTransportFare, setSavingTransportFare] = useState(false);
+  const [transportError, setTransportError] = useState("");
 
   // Driver assignment modal
   const [showDriverModal, setShowDriverModal] = useState(false);
@@ -270,6 +297,48 @@ export default function OrderControlPage() {
   }
 
   // ── Driver assignment ───────────────────────────────────────────────────────
+  function openTransportModal() {
+    setTransportFare(selected?.deliveryFee ? String(selected.deliveryFee) : "");
+    setTransportNote(selected?.adminNotes ?? "");
+    setTransportError("");
+    setShowTransportModal(true);
+  }
+
+  async function submitTransportFare() {
+    if (!selected) return;
+    const amount = Number(transportFare);
+    if (!Number.isFinite(amount) || amount < 0) {
+      setTransportError("Enter a valid transport fare.");
+      return;
+    }
+
+    setSavingTransportFare(true);
+    setTransportError("");
+    try {
+      const { res, payload } = await apiFetch(
+        `/admin/orders/${selected._id}/transport-fare`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            transportFare: amount,
+            notes: transportNote || undefined,
+          }),
+        },
+      );
+      if (!res.ok) {
+        setTransportError(payload?.error ?? "Failed to save transport fare.");
+        return;
+      }
+      setShowTransportModal(false);
+      await fetchOrders();
+      await selectOrder(selected._id);
+    } catch {
+      setTransportError("Network error. Please try again.");
+    } finally {
+      setSavingTransportFare(false);
+    }
+  }
+
   async function openDriverModal() {
     setDriverError("");
     setShowDriverModal(true);
@@ -327,6 +396,12 @@ export default function OrderControlPage() {
     o: Order,
   ): { label: string; status?: string; special?: string; danger?: boolean }[] {
     switch (o.status) {
+      case "awaiting_transport_quote":
+      case "awaiting_payment":
+        return [
+          { label: o.status === "awaiting_payment" ? "Update Transport Fare" : "Add Transport Fare", special: "transport_fare" },
+          { label: "Cancel Order", status: "cancelled", danger: true },
+        ];
       case "pending":
         return [{ label: "Cancel Order", status: "cancelled", danger: true }];
       case "accepted_by_farmer":
@@ -431,6 +506,74 @@ export default function OrderControlPage() {
       )}
 
       {/* ── Driver Assignment Modal ── */}
+      {showTransportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                Add Transport Fare
+              </h3>
+              <button
+                onClick={() => setShowTransportModal(false)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            {transportError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+                {transportError}
+              </div>
+            )}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Transport Fare (NGN)
+              </label>
+              <input
+                type="number"
+                min="0"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-amber-600 outline-none"
+                placeholder="e.g. 5000"
+                value={transportFare}
+                onChange={(e) => setTransportFare(e.target.value)}
+              />
+              {selected && (
+                <p className="mt-2 text-xs text-slate-500">
+                  New total: {fmt(selected.subtotal + (selected.serviceFee || 0) + (Number(transportFare) || 0))}
+                </p>
+              )}
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Buyer Note (optional)
+              </label>
+              <textarea
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-amber-600 outline-none resize-none"
+                placeholder="Example: Transport fare includes delivery to the selected address."
+                value={transportNote}
+                onChange={(e) => setTransportNote(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowTransportModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitTransportFare}
+                disabled={savingTransportFare}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 bg-amber-600 text-white hover:bg-amber-700"
+              >
+                {savingTransportFare ? "Saving..." : "Save Fare"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDriverModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-8 max-h-[80vh] flex flex-col">
@@ -590,6 +733,8 @@ export default function OrderControlPage() {
               <div className="flex gap-2 flex-wrap">
                 {[
                   "all",
+                  "awaiting_transport_quote",
+                  "awaiting_payment",
                   "pending",
                   "accepted_by_farmer",
                   "confirmed",
@@ -730,6 +875,8 @@ export default function OrderControlPage() {
                               if (isCancelDisabled) return;
                               if (action.special === "assign_driver") {
                                 openDriverModal();
+                              } else if (action.special === "transport_fare") {
+                                openTransportModal();
                               } else if (action.status) {
                                 openStatusModal(action.status);
                               }
@@ -743,6 +890,8 @@ export default function OrderControlPage() {
                                   ? "border border-red-300 text-red-600 hover:bg-red-50"
                                   : action.special === "assign_driver"
                                     ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    : action.special === "transport_fare"
+                                      ? "bg-amber-600 text-white hover:bg-amber-700"
                                     : "bg-green-800 text-white hover:bg-green-900"
                             }`}
                           >
@@ -871,7 +1020,11 @@ export default function OrderControlPage() {
                           <span>{fmt(selected.subtotal)}</span>
                         </div>
                         <div className="flex justify-between w-44 text-slate-500 text-sm">
-                          <span>Delivery:</span>
+                          <span>Service:</span>
+                          <span>{fmt(selected.serviceFee || 0)}</span>
+                        </div>
+                        <div className="flex justify-between w-44 text-slate-500 text-sm">
+                          <span>Transport:</span>
                           <span>{fmt(selected.deliveryFee)}</span>
                         </div>
                         <div className="flex justify-between w-44 font-bold text-slate-900 text-base pt-2 border-t border-slate-200">

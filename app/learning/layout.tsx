@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import AdminGuard from "@/components/admin-guard";
 import AdminShell from "@/components/admin-shell";
+import AuthGuard from "@/components/auth-guard";
 import BuyerBottomNav from "@/components/buyer-bottom-nav";
 import BuyerSidebar from "@/components/buyer-sidebar";
 import FarmerSidebar from "@/components/farmer-sidebar";
@@ -67,23 +68,27 @@ export default function LearningLayout({
 
   if (isBuyerLearning) {
     return (
-      <div className="min-h-screen bg-white pb-20 transition-[padding] duration-300 lg:pb-0 lg:pl-64">
-        <BuyerSidebar />
-        <div className="min-h-screen">{children}</div>
-        <BuyerBottomNav />
-      </div>
+      <AuthGuard>
+        <div className="min-h-screen bg-white pb-20 transition-[padding] duration-300 lg:pb-0 lg:pl-64">
+          <BuyerSidebar />
+          <div className="min-h-screen">{children}</div>
+          <BuyerBottomNav />
+        </div>
+      </AuthGuard>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-on-background font-body-md overflow-x-hidden">
-      <FarmerSidebar
-        collapsed={collapsed}
-        onToggleCollapsed={toggleCollapsed}
-      />
-      <div className={`${contentPaddingClass} pt-16 md:pt-0`}>
-        <main className="min-h-screen w-full">{children}</main>
+    <AuthGuard>
+      <div className="min-h-screen bg-background text-on-background font-body-md overflow-x-hidden">
+        <FarmerSidebar
+          collapsed={collapsed}
+          onToggleCollapsed={toggleCollapsed}
+        />
+        <div className={`${contentPaddingClass} pt-16 md:pt-0`}>
+          <main className="min-h-screen w-full">{children}</main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }
