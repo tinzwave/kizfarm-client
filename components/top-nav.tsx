@@ -51,22 +51,28 @@ export default function TopNav() {
             />
             <span className="font-bold text-lg text-emerald-900">KizFarm</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-4 ml-6">
+          <nav className="hidden md:flex items-center gap-6 ml-6">
             <Link
               href="/public/home"
-              className="text-sm text-gray-700 hover:text-emerald-700"
+              className="text-sm text-gray-700 hover:text-emerald-700 transition-colors"
             >
               Home
             </Link>
             <Link
               href="/public/about"
-              className="text-sm text-gray-700 hover:text-emerald-700"
+              className="text-sm text-gray-700 hover:text-emerald-700 transition-colors"
             >
               About
             </Link>
             <Link
+              href="/public/blog"
+              className="text-sm text-gray-700 hover:text-emerald-700 font-semibold transition-colors"
+            >
+              Blog
+            </Link>
+            <Link
               href="/public/contact"
-              className="text-sm text-gray-700 hover:text-emerald-700"
+              className="text-sm text-gray-700 hover:text-emerald-700 transition-colors"
             >
               Contact
             </Link>
@@ -76,7 +82,7 @@ export default function TopNav() {
           {!loggedIn ? (
             <Link
               href="/public/login"
-              className="px-4 py-2 text-sm bg-emerald-700 text-white rounded-lg"
+              className="px-4 py-2 text-sm bg-emerald-700 text-white rounded-lg hover:bg-emerald-800 transition-colors"
             >
               Login
             </Link>
@@ -85,7 +91,7 @@ export default function TopNav() {
               <span className="text-sm text-gray-700">{userEmail}</span>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1 text-sm bg-gray-100 rounded"
+                className="px-3 py-1 text-sm bg-gray-100 rounded hover:bg-gray-200 transition-colors"
               >
                 Logout
               </button>

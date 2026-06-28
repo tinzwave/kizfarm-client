@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/top-nav";
@@ -17,14 +17,24 @@ interface Product {
   farmerId?: { farmName?: string; location?: string };
 }
 
+interface BlogPost {
+  _id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  coverImage?: string;
+  category: string;
+  readTime: number;
+  createdAt: string;
+}
+
 const money = (value = 0) => `NGN ${Number(value).toLocaleString()}`;
-
-
 
 export default function HomePage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -82,6 +92,18 @@ export default function HomePage() {
       }
     }
     loadProducts();
+  }, []);
+
+  useEffect(() => {
+    async function loadBlogs() {
+      try {
+        const { payload } = await apiFetch("/blog");
+        if (payload?.ok) setBlogPosts((payload.posts ?? []).slice(0, 3));
+      } catch {
+        setBlogPosts([]);
+      }
+    }
+    loadBlogs();
   }, []);
 
   const handleLogout = () => {
@@ -280,6 +302,75 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Blog Preview Section */}
+      {blogPosts.length > 0 && (
+        <section className="py-20 bg-[#f9fafb]">
+          <div className="max-w-[1280px] mx-auto px-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+              <div>
+                <span className="inline-block px-3 py-1 mb-4 text-xs font-bold tracking-widest uppercase bg-emerald-50 text-[#1B6D24] rounded-full">
+                  KizFarm Insights
+                </span>
+                <h2 className="text-3xl font-bold text-zinc-900">
+                  Latest from the Blog
+                </h2>
+                <p className="text-zinc-500 mt-2">
+                  Expert agronomy updates, agri-tech news, and farming tips.
+                </p>
+              </div>
+              <Link
+                className="text-[#1B6D24] font-bold flex items-center gap-2 hover:underline whitespace-nowrap"
+                href="/public/blog"
+              >
+                View All Articles{" "}
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {blogPosts.map((post) => (
+                <Link
+                  key={post._id}
+                  href={`/public/blog/${post.slug}`}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-lg hover:border-emerald-600 transition-all duration-300"
+                >
+                  {post.coverImage ? (
+                    <div className="h-48 overflow-hidden">
+                      <img
+                        src={post.coverImage}
+                        alt={post.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-48 bg-gradient-to-br from-emerald-900 to-green-700 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white/30 text-[80px]">article</span>
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col p-6 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#1B6D24] bg-emerald-50 px-2 py-0.5 rounded">
+                        {post.category}
+                      </span>
+                      <span className="text-xs text-zinc-400">{post.readTime} min read</span>
+                    </div>
+                    <h3 className="text-base font-bold text-zinc-900 group-hover:text-[#1B6D24] transition-colors line-clamp-2 leading-snug">
+                      {post.title}
+                    </h3>
+                    <p className="text-zinc-500 text-sm leading-relaxed line-clamp-2 flex-1">
+                      {post.summary || "Click to read this article."}
+                    </p>
+                    <div className="pt-3 flex items-center justify-between border-t border-zinc-100 text-xs font-bold text-[#1B6D24]">
+                      <span>Read Article</span>
+                      <span className="material-symbols-outlined text-[16px] transition-transform group-hover:translate-x-1">arrow_forward</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Stats Section */}
       <section className="py-20 bg-[#FFFFFF]">
