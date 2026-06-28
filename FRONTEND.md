@@ -14,10 +14,10 @@ This is a Next.js application for the KIZ FARM buyer, seller/farmer, admin, and 
 
 ## App Areas
 
-- `app/public/*`: public pages, signup, login, OTP.
-- `app/buyer/*`: buyer dashboard, marketplace, cart, checkout, orders, refunds, chat, profile.
-- `app/farmer/*`: seller/farmer dashboard, products, orders, chats, payouts, profile, verification.
-- `app/admin/*`: admin shell, dashboard, users, farmers, products, orders, drivers, escrow, refunds.
+- `app/public/*`: public pages, signup, login, OTP, and public blogs index/details.
+- `app/buyer/*`: buyer dashboard, marketplace, cart, checkout, orders, refunds, chat, profile, and buyer blogs directory.
+- `app/farmer/*`: seller/farmer dashboard, products, orders, chats, payouts, profile, verification, and farmer blogs directory.
+- `app/admin/*`: admin shell, dashboard, users, farmers, products, orders, drivers, escrow, refunds, and admin blogs panel.
 - `app/learning/*`: course marketplace, checkout, subscriptions, and admin course management.
 
 ## Authentication
@@ -33,12 +33,42 @@ Authentication tokens come from the backend JWT login endpoints.
 
 If an unverified user tries to log in, the backend returns `needsVerification`, the frontend stores the pending email, and sends the user back to `/public/otp`.
 
+## Dynamic Blog System
+
+We have implemented a dynamic blog system across the platform:
+
+### 1. Structure & Pages
+- **Public Blog**:
+  - `/public/blog`: Displays a beautiful featured banner article and a list of published blogs with category selectors and keyword search filters.
+  - `/public/blog/[slug]`: Displays the full blog post dynamically to search engines and non-logged-in users.
+- **Buyer & Farmer Portals**:
+  - `/buyer/blog` & `/farmer/blog`: Displays the interactive blogs index right within the respective dashboard layout.
+  - `/buyer/blog/[slug]` & `/farmer/blog/[slug]`: Displays the full post contents directly inside the dashboard viewport.
+- **Admin Console**:
+  - `/admin/blog`: Admin dashboard to view, edit, or delete existing posts, including publishing status (published vs draft).
+  - `/admin/blog/new`: Dynamic block editor to compose a new post.
+  - `/admin/blog/edit/[id]`: Pre-populated block editor to modify posts.
+
+### 2. Interactive Block Builder Editor (`components/admin-blog-editor.tsx`)
+Rather than typing unconstrained HTML, admins compose articles using structured **Content Blocks**. They can add, delete, and drag/reorder:
+- **Heading Block**: Configurable H1, H2, or H3 tags.
+- **Paragraph Block**: Standard formatted text areas.
+- **Image Block**: Click to upload image files directly from their local PC. The file is sent to the backend `/blog/upload` route, uploaded to Cloudinary, and previewed in real-time.
+- **YouTube Video Block**: Enter any YouTube link. The editor validates and extracts the YouTube Video ID to display an embed player preview.
+
+### 3. Rendering Engine (`components/blog-detail.tsx`)
+Deserializes the JSON block array from the database and renders standard, accessible HTML:
+- Headings render as specific `<h1/h2/h3>` tags with premium typography.
+- Paragraphs render with readable text leading.
+- Images render in full-width containers with rounded corners and dropshadows.
+- YouTube videos render inside responsive `iframe` player wrappers.
+
 ## State Management
 
 - Global cart state lives in `CartProvider`.
 - Auth helpers are centralized in `lib/kizfarm/auth.ts`.
 - Most page data is fetched inside page components and held in local component state.
-- Admin and dashboard loading states should render loading panels until data is fetched, instead of blank content.
+- Admin and dashboard loading states render dynamic loaders and spinners until data is fetched, instead of blank content.
 
 ## Order Flow
 
