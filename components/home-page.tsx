@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/top-nav";
+import SiteFooter from "@/components/site-footer";
 import { apiFetch } from "@/lib/kizfarm/api";
 
 interface Product {
@@ -117,13 +118,16 @@ export default function HomePage() {
   };
 
   return (
+    <>
     <main className="pt-16">
       <TopNav />
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-[#FFFFFF] py-20 md:py-32">
-        <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-1 md:grid-cols-2 items-center gap-12 lg:gap-20">
+      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/60 via-white to-white py-20 md:py-32">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-[#1B6D24]/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative max-w-[1280px] mx-auto px-6 grid grid-cols-1 md:grid-cols-2 items-center gap-12 lg:gap-20">
           <div className="z-10 order-2 md:order-1">
-            <span className="inline-block px-3 py-1 mb-6 text-xs font-bold tracking-widest uppercase bg-[#a2f4b5] text-[#002108] rounded-full">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-6 text-xs font-bold tracking-widest uppercase bg-[#a2f4b5] text-[#002108] rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1B6D24]"></span>
               Farm to Table Delivery
             </span>
             <h1 className="text-display-xl font-bold text-on-background mb-6 max-w-xl text-5xl leading-tight">
@@ -133,7 +137,7 @@ export default function HomePage() {
               Connecting farmers and buyers with fast delivery and reliable
               tracking. Experience the taste of precision-grown agriculture.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 mb-12">
               <Link
                 href="/buyer/marketplace"
                 className="px-8 py-4 bg-[#1B6D24] text-white font-bold text-sm rounded-xl hover:brightness-110 transition-all active:scale-95 soil-shadow inline-block text-center"
@@ -156,14 +160,28 @@ export default function HomePage() {
                 </Link>
               )}
             </div>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
+                <span className="material-symbols-outlined text-[#1B6D24] text-[20px]">verified_user</span>
+                Verified Farmers
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
+                <span className="material-symbols-outlined text-[#1B6D24] text-[20px]">bolt</span>
+                Fast Delivery
+              </div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-on-surface-variant">
+                <span className="material-symbols-outlined text-[#1B6D24] text-[20px]">lock</span>
+                Secure Payments
+              </div>
+            </div>
           </div>
           <div className="relative order-1 md:order-2">
             <div className="absolute -top-12 -right-12 w-64 h-64 bg-[#1B6D24]/10 rounded-full blur-3xl"></div>
             <div className="relative rounded-2xl overflow-hidden shadow-2xl transform rotate-1">
               <img
-                alt="Fresh vegetables in a basket"
+                alt="Fresh produce on display"
                 className="w-full h-[500px] object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqnL0LI9lEm3Z8y6c39xYOuNsKMm98c3zSduhiDfpQjv7soxdm42bDvCy0pJ_StXswHWjQuWFiGy4qVI2JPdU6N8-7DbcjfQgJ2R-vtWv1QC7cu-ULI09spxyeleFHZRq5C0scGs5pYOQlB5ZKTUIrA5UAgI5ZUUioaMrZIiWzJC3yS5ql946BON9XV7IuqEW-1vVUrn0DDMgWyaiKoIEgobuPqmuInDFEo-cqC4xm3B6ltJA_Z2D-L9iRmpK-Tv7kPURENm7Ynh8"
+                src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=1200&q=80"
               />
             </div>
             <div className="absolute -bottom-6 -left-6 bg-white p-6 rounded-xl soil-shadow max-w-[200px]">
@@ -293,9 +311,9 @@ export default function HomePage() {
             </div>
             <div className="hidden lg:block lg:w-1/3 min-h-[600px] relative">
               <img
-                alt="Professional Farmer"
+                alt="Farmer partnership handshake in a field"
                 className="absolute inset-0 w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD60xlDNOf-3oMdQ6goJaeitBYChf3-ze5byUTyHN3nKaX5sKI2QtYuRHjlPyySTIQEChDhEd0b-MP7KnprgX2IEtZwJAvEes9Rdmj7w-rH4ycnoL6dmA2kksvZHZPNQSIrKeuh81AZX9ya48Tc0WXDFzZPMAJ5FikpSl-Mg01l7wZKjNIj_RHTyY4aFyzavTUok1jmn-uGZTNMk18r5I6ikoI397L2I8-Z6r-_O1U4k9eR1j5EaZBmUX87Snk1HBXmvLD2KCQSu2w"
+                src="https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1200&q=80"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-[#1B6D24] to-transparent opacity-40"></div>
             </div>
@@ -404,5 +422,7 @@ export default function HomePage() {
         </div>
       </section>
     </main>
+      <SiteFooter />
+    </>
   );
 }

@@ -43,13 +43,12 @@ export default function TopNav() {
     <header className="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-100">
       <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/public/home" className="flex items-center gap-2">
+          <Link href="/public/home" className="flex items-center">
             <img
-              src="/logo.jpeg"
+              src="/logo-mark.png"
               alt="KizFarm"
-              className="w-8 h-8 object-contain"
+              className="h-14 w-auto object-contain"
             />
-            <span className="font-bold text-lg text-emerald-900">KizFarm</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 ml-6">
             <Link
