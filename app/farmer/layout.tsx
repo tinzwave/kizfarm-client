@@ -58,7 +58,7 @@ export default function FarmerLayout({
       const isBecome = pathname === "/farmer/become";
       const isVerify = pathname === "/farmer/verify";
       try {
-        const res = await fetch("http://localhost:4000/farmer/status", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
           cache: "no-store",
           headers: { Authorization: `Bearer ${token}` },
         });

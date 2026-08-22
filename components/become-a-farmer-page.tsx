@@ -68,7 +68,7 @@ export default function BecomeAFarmerPage() {
         setFullName("");
       }
       try {
-        const res = await fetch("http://localhost:4000/farmer/status", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
@@ -124,7 +124,7 @@ export default function BecomeAFarmerPage() {
     }
 
     try {
-      const res = await fetch("http://localhost:4000/farmer/register", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

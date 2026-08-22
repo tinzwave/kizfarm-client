@@ -70,7 +70,7 @@ export default function IdentityVerificationPage() {
       return;
     }
     try {
-      const res = await fetch("http://localhost:4000/farmer/status", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -180,7 +180,7 @@ export default function IdentityVerificationPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch("http://localhost:4000/farmer/verify", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/verify`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
