@@ -57,7 +57,7 @@ export default function OtpPage() {
       if (!res.ok) throw new Error(data.error || "OTP verification failed");
       // on success, clear pending and go to login
       clearPendingVerificationEmail();
-      router.push("/public/login");
+      router.push("/login");
     } catch (err: any) {
       setError(err.message || "OTP verification failed");
     } finally {
@@ -69,7 +69,7 @@ export default function OtpPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = getAuthToken();
-    if (token) router.push('/public/home');
+    if (token) router.push('/');
   }, [router]);
 
   const handleResend = async () => {

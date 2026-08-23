@@ -18,7 +18,7 @@ export default function SignUpPage() {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = getAuthToken();
-    if (token) router.push('/public/home');
+    if (token) router.push('/');
   }, [router]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ export default function SignUpPage() {
       if (!res.ok) throw new Error(data.error || "Signup failed");
       // keep pending email for OTP page
       setPendingVerificationEmail(email);
-      router.push("/public/otp");
+      router.push("/otp");
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {

@@ -17,7 +17,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = getAuthToken();
-    if (token) router.push('/public/home');
+    if (token) router.push('/');
   }, [router]);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +34,7 @@ export default function LoginPage() {
         if (!res.ok) {
           if (res.status === 403 && data.needsVerification && data.email) {
             setPendingVerificationEmail(data.email);
-            router.push("/public/otp");
+            router.push("/otp");
             return;
           }
           throw new Error(data.error || "Login failed");
@@ -188,7 +188,7 @@ export default function LoginPage() {
               New to the platform?{" "}
               <a
                 className="text-primary font-semibold hover:underline"
-                href="/public/signup"
+                href="/signup"
               >
                 Sign Up
               </a>

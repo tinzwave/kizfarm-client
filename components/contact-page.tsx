@@ -1,24 +1,34 @@
 "use client";
 
 import TopNav from "@/components/top-nav";
+import SiteFooter from "@/components/site-footer";
 
 export default function ContactPage() {
   return (
     <>
       <TopNav />
 
-      <main className="pt-32 pb-xl bg-white">
-        <div className="max-w-[1280px] mx-auto px-6">
-          <div className="mb-lg">
-            <h1 className="font-display-xl text-display-xl text-primary mb-xs">
+      <main className="pt-16 pb-xl bg-white">
+        <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/60 via-white to-white py-16 md:py-20">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[900px] bg-[#1B6D24]/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="relative max-w-[1280px] mx-auto px-6 text-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 mb-5 text-xs font-bold tracking-widest uppercase bg-[#a2f4b5] text-[#002108] rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1B6D24]"></span>
+              We&apos;d Love to Hear From You
+            </span>
+            <h1 className="font-display-xl text-display-xl text-primary mb-4">
               Cultivate a Connection
             </h1>
-            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+            <p className="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
               Have questions about our sustainable farming practices or looking
               for precision agricultural systems? Our team is ready to assist
               you in the field.
             </p>
           </div>
+        </section>
+
+        <div className="max-w-[1280px] mx-auto px-6 mt-lg">
+
 
           {/* Bento Layout for Contact Content */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
@@ -197,51 +207,7 @@ export default function ContactPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t bg-white border-slate-200 dark:border-slate-800">
-        <div className="max-w-[1280px] mx-auto py-12 px-6 flex flex-col md:flex-row justify-between items-center gap-8">
-          <div className="flex flex-col gap-2 items-center md:items-start">
-            <span className="text-lg font-bold text-primary dark:text-emerald-100">
-              KIZ FARM
-            </span>
-            <p className="font-sans text-xs uppercase tracking-widest text-slate-500">
-              © 2024 KIZ FARM. Precision Agricultural Systems.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-8">
-            <a
-              className="font-sans text-xs uppercase tracking-widest text-slate-500 hover:text-primary transition-opacity"
-              href="#"
-            >
-              Products
-            </a>
-            <a
-              className="font-sans text-xs uppercase tracking-widest text-slate-500 hover:text-primary transition-opacity"
-              href="#"
-            >
-              Become a Farmer
-            </a>
-            <a
-              className="font-sans text-xs uppercase tracking-widest text-slate-500 hover:text-primary transition-opacity"
-              href="#"
-            >
-              Sustainability
-            </a>
-            <a
-              className="font-sans text-xs uppercase tracking-widest text-primary underline underline-offset-4"
-              href="#"
-            >
-              Contact
-            </a>
-            <a
-              className="font-sans text-xs uppercase tracking-widest text-slate-500 hover:text-primary transition-opacity"
-              href="#"
-            >
-              Privacy
-            </a>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

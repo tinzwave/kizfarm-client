@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/kizfarm/api";
+import { DEMO_BLOG_POSTS } from "@/lib/kizfarm/demo-content";
 
 interface Block {
   type: "heading" | "paragraph" | "image" | "video";
@@ -35,6 +36,12 @@ export default function BlogDetail({ slug, onBack }: { slug: string; onBack?: ()
 
   useEffect(() => {
     async function loadPost() {
+      const demo = DEMO_BLOG_POSTS.find((p) => p.slug === slug);
+      if (demo) {
+        setPost(demo);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const { res, payload } = await apiFetch(`/blog/${slug}`);
@@ -162,11 +169,11 @@ export default function BlogDetail({ slug, onBack }: { slug: string; onBack?: ()
   };
 
   return (
-    <article className="max-w-3xl mx-auto px-4 py-8">
+    <article className="max-w-3xl mx-auto">
       {onBack && (
         <button
           onClick={onBack}
-          className="mb-8 inline-flex items-center gap-2 text-zinc-500 hover:text-[#1B6D24] font-semibold text-sm transition-colors group"
+          className="mb-6 inline-flex items-center gap-2 text-zinc-500 hover:text-[#1B6D24] font-semibold text-sm transition-colors group"
         >
           <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-x-1">
             arrow_back
@@ -175,46 +182,53 @@ export default function BlogDetail({ slug, onBack }: { slug: string; onBack?: ()
         </button>
       )}
 
-      {/* Header Info */}
-      <div className="space-y-4 mb-8">
-        <span className="inline-block px-3 py-1 rounded-full bg-emerald-50 text-[#1B6D24] text-xs font-bold uppercase tracking-wider">
-          {post.category}
-        </span>
-        <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-zinc-900 leading-tight tracking-tight">
-          {post.title}
-        </h1>
-        <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500 font-medium">
-          <span>{post.author}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
-          <span>{formattedDate}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
-          <span className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[16px]">schedule</span>
-            {post.readTime} min read
+      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm p-6 md:p-12">
+        {/* Header Info */}
+        <div className="space-y-4 mb-8">
+          <span className="inline-block px-3 py-1 rounded-full bg-emerald-50 text-[#1B6D24] text-xs font-bold uppercase tracking-wider">
+            {post.category}
           </span>
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-zinc-900 leading-tight tracking-tight">
+            {post.title}
+          </h1>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-zinc-500 font-medium">
+            <span className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-[#1B6D24] text-white text-[11px] font-bold flex items-center justify-center">
+                {post.author?.[0]?.toUpperCase() || "K"}
+              </span>
+              {post.author}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+            <span>{formattedDate}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">schedule</span>
+              {post.readTime} min read
+            </span>
+          </div>
         </div>
+
+        {/* Cover Image */}
+        {post.coverImage && (
+          <div className="aspect-[21/9] w-full rounded-2xl overflow-hidden shadow-md mb-10 border border-zinc-100">
+            <img
+              src={post.coverImage}
+              alt={post.title}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
+        {/* Excerpt Summary */}
+        {post.summary && (
+          <p className="text-lg md:text-xl text-zinc-600 font-medium italic border-l-4 border-emerald-500 pl-4 py-1 mb-8 leading-relaxed">
+            {post.summary}
+          </p>
+        )}
+
+        {/* Blog Body Blocks */}
+        <div className="prose max-w-none text-zinc-800">{renderBlocks()}</div>
       </div>
-
-      {/* Cover Image */}
-      {post.coverImage && (
-        <div className="aspect-[21/9] w-full rounded-3xl overflow-hidden shadow-lg mb-10 border border-zinc-100">
-          <img
-            src={post.coverImage}
-            alt={post.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
-
-      {/* Excerpt Summary */}
-      {post.summary && (
-        <p className="text-lg md:text-xl text-zinc-600 font-medium italic border-l-4 border-emerald-500 pl-4 py-1 mb-8 leading-relaxed">
-          {post.summary}
-        </p>
-      )}
-
-      {/* Blog Body Blocks */}
-      <div className="prose max-w-none text-zinc-800">{renderBlocks()}</div>
     </article>
   );
 }

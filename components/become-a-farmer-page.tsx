@@ -57,7 +57,7 @@ export default function BecomeAFarmerPage() {
           ? localStorage.getItem("kizfarm_token")
           : null;
       if (!token) {
-        router.replace("/public/login");
+        router.replace("/login");
         return;
       }
       try {
@@ -94,7 +94,7 @@ export default function BecomeAFarmerPage() {
         : null;
     if (!token) {
       // redirect to login
-      router.push("/public/login");
+      router.push("/login");
       return;
     }
 
@@ -168,7 +168,7 @@ export default function BecomeAFarmerPage() {
         </div>
         <a
           className="text-primary font-label-sm hover:underline decoration-2 underline-offset-4"
-          href="/public/login"
+          href="/login"
         >
           Sign In
         </a>

@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import TopNav from "@/components/top-nav";
+import SiteFooter from "@/components/site-footer";
 
 export default function AboutPage() {
   return (
+    <>
     <main className="pt-20">
       <TopNav />
       {/* Hero Section */}
@@ -62,9 +65,9 @@ export default function AboutPage() {
           <div className="md:col-span-5 relative">
             <div className="aspect-[4/5] rounded-xl overflow-hidden soil-shadow">
               <img
-                alt="An experienced farmer examining a healthy leaf in a sun-drenched vegetable field"
+                alt="A farmer standing beside sacks of freshly harvested grain in an open field"
                 className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDj8ynajIvaxS453wAuqoqX0Lb_WXph7QL6U-MbAyY0rSYqBJZFWdkkVorIJLJOAimuylfDBUj-Kz9Wok-XdWB9k5L327dNdteGU-i9oGIa5La4PxVrjw51037cz9fkrhG2HdL7vuEKcTmjPeLUnCRL63HQqo9DQiyX3koLeLuK8FUQIamriEKUopyYx5ScLVmUn9zgpyEi3382HmGSj6b9_qUNRRYWN9A7a0OhPyVXqywxoWdbonicPneY7TW3vnzdRecvR0-soXU"
+                src="/about-images/farmer-portrait.jpg"
               />
             </div>
             <div className="absolute -bottom-8 -left-8 p-6 bg-white rounded-lg soil-shadow hidden lg:block border border-outline-variant/30">
@@ -194,9 +197,9 @@ export default function AboutPage() {
             </div>
             <div className="aspect-[4/5] rounded-xl overflow-hidden soil-shadow">
               <img
-                alt="Community of farmers working together in a large scale sustainable greenhouse"
+                alt="A farmer winnowing freshly harvested grain by hand in an open field"
                 className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuArQJztrDQuifspMHMxGri-6Hii45t56LcJezMJCFw8kpkDdCPrlO0kojhrprp2VO0Zb2K6HnfSnHilOY2Pp19xVUDLUtVvIeU3wOE8i0Aa7EEiNNmr9Pn3eSZGuWZESvGWOGYbkaHWbVEdl7GphOz_wPRb4H7WaT1Bg22HZ4VI0QTXSa_DBh8zSxSiC6viDqZ0GSeuDE0fj5GVhXkd-mIOx1JX8zBiSpENbk2a1wFY0H-NX14OOmUN4jsdJ4xkGtLe8QEX1QHl6v8"
+                src="/about-images/farmer-harvest.jpg"
               />
             </div>
           </div>
@@ -214,15 +217,23 @@ export default function AboutPage() {
             in food security, there is a place for you at KIZ FARM.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <button className="px-8 py-4 rounded-lg bg-white text-primary font-bold text-lg hover:bg-slate-50 transition-all active:scale-95">
+            <Link
+              href="/farmer/become"
+              className="px-8 py-4 rounded-lg bg-white text-primary font-bold text-lg hover:bg-slate-50 transition-all active:scale-95 inline-block"
+            >
               Become a Farmer
-            </button>
-            <button className="px-8 py-4 rounded-lg border-2 border-white text-white font-bold text-lg hover:bg-white/10 transition-all active:scale-95">
+            </Link>
+            <Link
+              href="/buyer/marketplace"
+              className="px-8 py-4 rounded-lg border-2 border-white text-white font-bold text-lg hover:bg-white/10 transition-all active:scale-95 inline-block"
+            >
               View Products
-            </button>
+            </Link>
           </div>
         </div>
       </section>
     </main>
+      <SiteFooter />
+    </>
   );
 }

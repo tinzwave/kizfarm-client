@@ -12,19 +12,19 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Public",
     items: [
-      { name: "Home", href: "/public/home" },
-      { name: "About", href: "/public/about" },
-      { name: "Contact", href: "/public/contact" },
-      { name: "Login", href: "/public/login" },
-      { name: "OTP Verification", href: "/public/otp" },
-      { name: "Sign Up", href: "/public/signup" },
+      { name: "Home", href: "/" },
+      { name: "About", href: "/about" },
+      { name: "Contact", href: "/contact" },
+      { name: "Login", href: "/login" },
+      { name: "OTP Verification", href: "/otp" },
+      { name: "Sign Up", href: "/signup" },
     ],
   },
   {
     label: "Buyer",
     items: [
       { name: "Catalog", href: "/buyer/catalog" },
-      { name: "Blog", href: "/public/blog" },
+      { name: "Blog", href: "/blog" },
       { name: "Chat", href: "/buyer/chat" },
       { name: "Chat Detail", href: "/buyer/chat-detail" },
       { name: "Wishlist", href: "/buyer/wishlist" },
@@ -143,13 +143,13 @@ export default function Sidebar() {
     clearAuth();
     // refresh sidebar state and navigate to home
     setLoggedIn(false);
-    router.push("/public/home");
+    router.push("/");
   };
 
   const isActive = (href: string) => {
     if (
-      href === "/public/home" &&
-      (pathname === "/" || pathname === "/public/home")
+      href === "/" &&
+      pathname === "/"
     )
       return true;
     return pathname === href || pathname.startsWith(href + "/");
@@ -253,9 +253,9 @@ export default function Sidebar() {
                       // hide auth links when user is logged in
                       if (
                         loggedIn &&
-                        (item.href === "/public/login" ||
-                          item.href === "/public/signup" ||
-                          item.href === "/public/otp")
+                        (item.href === "/login" ||
+                          item.href === "/signup" ||
+                          item.href === "/otp")
                       ) {
                         return null;
                       }

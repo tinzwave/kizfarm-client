@@ -42,7 +42,7 @@ export default function FarmerLayout({
 
   useEffect(() => {
     // Client-side guard:
-    // - Not logged in -> /public/login
+    // - Not logged in -> /login
     // - No farmer registration -> /farmer/become
     // - Farmer not approved -> /farmer/verify
     // - Approved -> allow dashboard routes
@@ -50,7 +50,7 @@ export default function FarmerLayout({
       setCheckingAccess(true);
       const token = getAuthToken();
       if (!token) {
-        if (pathname !== "/public/login") router.replace("/public/login");
+        if (pathname !== "/login") router.replace("/login");
         setCheckingAccess(false);
         return;
       }
@@ -63,7 +63,7 @@ export default function FarmerLayout({
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
-          if (pathname !== "/public/login") router.replace("/public/login");
+          if (pathname !== "/login") router.replace("/login");
           setCheckingAccess(false);
           return;
         }

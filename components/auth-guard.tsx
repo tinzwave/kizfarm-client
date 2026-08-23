@@ -17,7 +17,7 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
     const token = getAuthToken();
     if (!token) {
       setAuthorized(false);
-      router.replace("/public/login");
+      router.replace("/login");
       return;
     }
 

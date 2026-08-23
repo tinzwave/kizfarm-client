@@ -66,7 +66,7 @@ export default function IdentityVerificationPage() {
         ? localStorage.getItem("kizfarm_token")
         : null;
     if (!token) {
-      router.push("/public/login");
+      router.push("/login");
       return;
     }
     try {
@@ -145,7 +145,7 @@ export default function IdentityVerificationPage() {
     if (!farmer) return;
     if (!allowEdit) return;
     const token = localStorage.getItem("kizfarm_token");
-    if (!token) return router.push("/public/login");
+    if (!token) return router.push("/login");
 
     const farmerImage = selectedFiles.farmerImage;
     const validIdImage = selectedFiles.validIdImage;

@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import HomePage from "@/components/home-page";
 
 export default function Page() {
-  // Redirect root to grouped public home route
-  redirect('/public/home');
+  return <HomePage />;
 }
