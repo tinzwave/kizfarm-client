@@ -7,7 +7,7 @@ import { useCart } from "@/lib/kizfarm/cart-context";
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: "home" },
   { name: "Marketplace", href: "/buyer/marketplace", icon: "storefront" },
-  { name: "Courses", href: "/buyer/courses", icon: "school" },
+  { name: "Courses", href: "/learning", icon: "school" },
   { name: "Blogs", href: "/buyer/blog", icon: "article" },
   { name: "Cart", href: "/buyer/cart", icon: "shopping_cart" },
   { name: "Orders", href: "/buyer/orders", icon: "shopping_bag" },

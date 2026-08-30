@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { getCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
+import { getCurrentProfile, redirectPathForRole } from "@/lib/kizfarm/supabase-auth";
 
 interface Tutor {
   _id: string;
@@ -35,16 +36,23 @@ export default function LearningHubPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [dashboardHref, setDashboardHref] = useState("/buyer/dashboard");
+  const [role, setRole] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
     try {
-      const [coursesRes, subsRes] = await Promise.all([
+      const [coursesRes, subsRes, profile] = await Promise.all([
         getCourses({ audience: "farmer" }),
         getMySubscriptions(),
+        getCurrentProfile(),
       ]);
       if (coursesRes.payload?.ok) setCourses(coursesRes.payload.courses ?? []);
       if (subsRes.payload?.ok) setSubscriptions(subsRes.payload.subscriptions ?? []);
+      if (profile) {
+        setRole(profile.role);
+        setDashboardHref(redirectPathForRole(profile.role));
+      }
     } finally {
       setLoading(false);
     }
@@ -75,7 +83,7 @@ export default function LearningHubPage() {
             <h1 className="text-xl font-bold text-green-900">Learning Hub</h1>
             <p className="text-xs text-slate-500">Expert-led courses for modern farmers</p>
           </div>
-          <Link href="/farmer/dashboard" className="text-sm font-semibold text-green-800 hover:underline">Farmer Dashboard</Link>
+          <Link href={dashboardHref} className="text-sm font-semibold text-green-800 hover:underline">Dashboard</Link>
         </div>
       </header>
 
@@ -94,6 +102,18 @@ export default function LearningHubPage() {
             </div>
           </div>
         </section>
+
+        {role !== "farmer" && (
+          <div className="flex items-center justify-between rounded-xl border border-green-100 bg-green-50 p-4">
+            <div>
+              <p className="text-sm font-bold text-green-900">Know something worth teaching?</p>
+              <p className="text-sm text-green-800">Create your own course and sell it to other buyers, reviewed by an admin before it goes live.</p>
+            </div>
+            <Link href="/buyer/courses" className="whitespace-nowrap rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+              Create a Course
+            </Link>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 rounded-xl bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex gap-2">
