@@ -32,11 +32,8 @@ export default function BuyerSidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-gray-200 bg-white px-4 py-5 shadow-sm lg:flex dark:border-zinc-800 dark:bg-zinc-950">
       <Link href="/" className="mb-8 flex items-center gap-3 px-2">
-        <img alt="KIZ FARM Logo" className="h-10 w-10 rounded-md object-cover" src="/logo.jpeg" />
-        <div>
-          <p className="text-base font-black tracking-tight text-[#1B6D24]">KIZ FARM</p>
-          <p className="text-xs font-medium text-gray-500">Buyer Portal</p>
-        </div>
+        <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
+        <p className="text-xs font-medium text-gray-500">Buyer Portal</p>
       </Link>
 
       <nav className="flex flex-1 flex-col gap-1">

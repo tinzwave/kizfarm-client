@@ -142,14 +142,10 @@ export default function BecomeAFarmerPage() {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-zinc-200 px-4 h-16 w-full flex items-center justify-between">
         <div className="flex items-center gap-base">
           <img
-            alt="KIZ FARM logo"
-            className="h-8 w-auto object-contain"
-            data-alt="minimalist professional logo for an agricultural technology company with modern typography and leaf motifs in deep green"
+            alt="KIZ FARM"
+            className="h-10 w-auto object-contain"
             src="/logo.jpeg"
           />
-          <span className="text-lg font-black tracking-tighter text-[#1B6D24] uppercase font-headline-md">
-            KIZ FARM
-          </span>
         </div>
         <a
           className="text-primary font-label-sm hover:underline decoration-2 underline-offset-4"

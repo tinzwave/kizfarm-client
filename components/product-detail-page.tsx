@@ -64,6 +64,7 @@ export default function ProductDetailPage({ productId }: Props) {
   const [addedToCart, setAddedToCart] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
   const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -95,6 +96,7 @@ export default function ProductDetailPage({ productId }: Props) {
         }
 
         setProduct(payload?.product || null);
+        setSelectedImageIndex(0);
       } catch (err) {
         console.error("Error fetching product:", err);
         setError("Failed to load product details");
@@ -266,13 +268,11 @@ export default function ProductDetailPage({ productId }: Props) {
     );
   }
 
-  const mainImage = product.images && product.images.length > 0
-    ? product.images[0]
-    : "https://via.placeholder.com/600x400?text=No+Image";
+  const galleryImages = product.images && product.images.length > 0
+    ? product.images
+    : ["https://via.placeholder.com/600x400?text=No+Image"];
 
-  const thumbnailImages = product.images && product.images.length > 1
-    ? product.images.slice(0, 4)
-    : [mainImage];
+  const mainImage = galleryImages[selectedImageIndex] || galleryImages[0];
 
   const alreadyInCart = isInCart(product._id);
 
@@ -338,23 +338,28 @@ export default function ProductDetailPage({ productId }: Props) {
                 src={mainImage}
               />
             </div>
-            <div className="grid grid-cols-4 gap-xs md:gap-base">
-              {thumbnailImages.map((img, idx) => (
-                <button key={idx} className="aspect-square rounded-lg overflow-hidden border-2 border-primary hover:opacity-80 transition-opacity">
-                  <img
-                    alt={`${product.name} - ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    src={img}
-                  />
-                </button>
-              ))}
-              {product.images && product.images.length > 4 && (
-                <button className="aspect-square rounded-lg overflow-hidden bg-surface-container-highest relative group">
-                  <img alt="More Images" className="w-full h-full object-cover opacity-40" src={product.images[4]} />
-                  <div className="absolute inset-0 flex items-center justify-center font-headline-md text-primary">+{product.images.length - 4}</div>
-                </button>
-              )}
-            </div>
+            {galleryImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-xs md:gap-base">
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImageIndex(idx)}
+                    aria-label={`View image ${idx + 1}`}
+                    className={`aspect-square rounded-lg overflow-hidden border-2 transition-opacity ${
+                      idx === selectedImageIndex
+                        ? "border-primary"
+                        : "border-transparent opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      alt={`${product.name} - ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      src={img}
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info Section */}

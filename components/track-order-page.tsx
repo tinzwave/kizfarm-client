@@ -303,9 +303,8 @@ export default function TrackOrderPage() {
       <header className="bg-white dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center w-full px-6 py-3 h-16 sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <Link href="/buyer/orders" className="cursor-pointer flex items-center">
-            <img alt="KIZ FARM Logo" className="w-8 h-8 object-contain" src="/logo.jpeg" />
+            <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
           </Link>
-          <span className="font-inter antialiased text-sm font-medium text-xl font-extrabold tracking-tight text-[#1B6D24] dark:text-green-500">KIZ FARM</span>
         </div>
         <div className="flex items-center gap-4">
           <Link href="/buyer/orders" className="text-sm font-semibold text-primary hover:underline">Back to Orders</Link>

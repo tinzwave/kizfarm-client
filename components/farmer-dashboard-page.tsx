@@ -82,8 +82,7 @@ export default function FarmerDashboardPage() {
     <div className="bg-background text-on-background font-body-md">
       <header className="sticky top-0 z-50 flex items-center justify-between px-4 h-16 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-2">
-          <img alt="KIZ FARM logo" className="w-8 h-8 rounded-lg" src="/logo.jpeg" />
-          <span className="text-lg font-black tracking-tighter text-[#1B6D24] uppercase">KIZ FARM</span>
+          <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
         </div>
         <div className="hidden md:flex gap-6">
           <Link className="text-[#1B6D24] font-bold text-sm" href="/farmer/dashboard">Dashboard</Link>

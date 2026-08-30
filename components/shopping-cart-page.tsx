@@ -16,8 +16,7 @@ export default function ShoppingCartPage() {
       <header className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
         <div className="flex justify-between items-center px-6 h-16 w-full max-w-[1440px] mx-auto">
           <div className="flex items-center gap-3">
-            <img alt="KIZ FARM" className="h-10 object-contain w-auto" data-alt="high-quality minimalist logo for a modern agriculture company featuring a stylized green leaf and modern clean typography" src="/logo.jpeg" />
-            <h1 className="text-xl font-extrabold tracking-tight text-[#1B6D24]">KIZ FARM</h1>
+            <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
           </div>
           <div className="flex items-center gap-4">
             <button className="material-symbols-outlined text-gray-500 hover:bg-gray-50 p-2 rounded-full transition-colors" data-icon="notifications">notifications</button>

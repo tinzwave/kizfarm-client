@@ -9,10 +9,7 @@ export default function SearchResultsPage() {
       <header className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-50">
         <div className="flex justify-between items-center px-6 h-16 w-full max-w-[1440px] mx-auto">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden bg-white">
-              <img alt="KIZ FARM Official Logo" className="w-full h-full object-contain" src="/logo.jpeg" />
-            </div>
-            <h1 className="text-xl font-extrabold tracking-tight text-[#1B6D24] font-['Inter'] antialiased">KIZ FARM</h1>
+            <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
           </div>
           {/* Desktop Search Bar Integrated into Header */}
           <div className="hidden md:flex flex-1 max-w-xl mx-8">

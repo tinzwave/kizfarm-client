@@ -102,10 +102,9 @@ export default function MyOrdersPage() {
       <header className="bg-white dark:bg-zinc-950 border-b border-gray-200 dark:border-zinc-800 shadow-none sticky top-0 z-50">
         <div className="flex justify-between items-center w-full px-6 py-3 h-16 max-w-[1440px] mx-auto">
           <div className="flex items-center gap-3">
-            <Link href="/buyer/marketplace" className="h-8 rounded-lg overflow-hidden flex-shrink-0 w-10 cursor-pointer">
-              <img alt="KIZ FARM Official Logo" className="w-full h-full object-contain" data-alt="Minimalist agricultural logo with a stylized green leaf and modern geometric structure, professional branding" src="/logo.jpeg" />
+            <Link href="/buyer/marketplace" className="h-10 flex-shrink-0 cursor-pointer">
+              <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
             </Link>
-            <h1 className="font-inter antialiased text-sm font-medium font-extrabold tracking-tight text-[#1B6D24] dark:text-green-500 text-xl">KIZ FARM</h1>
           </div>
           <div className="flex items-center gap-4">
             <button className="text-gray-500 dark:text-zinc-400 hover:opacity-80 transition-opacity active:scale-95 duration-150">

@@ -139,7 +139,9 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
     <div className="bg-surface text-on-surface" style={{ backgroundColor: "#fbf9f8", fontFamily: "'Inter', sans-serif" }}>
       {!hideSidebar && (
         <aside className="fixed left-0 top-0 h-screen w-[280px] bg-white border-r border-gray-100 flex flex-col py-4 gap-2 z-50">
-          <div className="text-2xl font-black text-[#1B6D24] p-6">KIZ FARM</div>
+          <div className="p-6">
+            <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
+          </div>
           <nav className="flex flex-col px-4 gap-1">
             <a className="flex items-center gap-3 px-4 py-3 font-label-sm text-label-sm transition-all hover:bg-gray-50 text-gray-600" href="/farmer/dashboard">
               <span className="material-symbols-outlined">dashboard</span>

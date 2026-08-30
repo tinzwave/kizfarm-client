@@ -13,8 +13,7 @@ export default function PaymentPage() {
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
             <div className="flex items-center gap-2">
-              <img alt="KIZ FARM logo" className="h-8 w-8 object-contain" data-alt="Official KIZ FARM logo" src="/logo.jpeg" />
-              <span className="text-xl font-extrabold tracking-tight text-[#1B6D24] dark:text-green-500 font-inter antialiased">KIZ FARM</span>
+              <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
             </div>
           </div>
           <div className="flex items-center gap-4">

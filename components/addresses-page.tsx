@@ -150,8 +150,7 @@ export default function AddressesPage() {
         <div className="flex justify-between items-center w-full px-6 py-3 h-16 max-w-[1440px] mx-auto">
           <div className="flex items-center gap-3">
             <Link href="/buyer/marketplace" className="cursor-pointer flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#1B6D24]" data-icon="agriculture">agriculture</span>
-              <span className="font-inter antialiased text-sm font-medium text-xl font-extrabold tracking-tight text-[#1B6D24] dark:text-green-500">KIZ FARM</span>
+              <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
             </Link>
           </div>
           <div className="flex items-center gap-4">

@@ -191,13 +191,10 @@ export default function IdentityVerificationPage() {
       <header className="sticky top-0 z-50 flex items-center justify-between px-4 h-16 w-full bg-white/90 backdrop-blur-md border-b border-zinc-200">
         <div className="flex items-center gap-2">
           <img
-            alt="KIZ FARM logo"
-            className="h-8 w-auto"
+            alt="KIZ FARM"
+            className="h-10 w-auto object-contain"
             src="/logo.jpeg"
           />
-          <span className="text-lg font-black tracking-tighter text-[#1B6D24] uppercase">
-            KIZ FARM
-          </span>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 rounded-xl border">
           <span

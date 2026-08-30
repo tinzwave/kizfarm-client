@@ -105,7 +105,6 @@ export default function UserDashboardPage() {
       <header className="bg-white dark:bg-slate-950 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center px-6 h-16 w-full max-w-[1440px] mx-auto z-50 sticky top-0">
         <div className="flex items-center gap-4">
           <img className="h-10 w-auto object-contain" alt="KIZ FARM" src="/logo.jpeg" />
-          <span className="text-xl font-extrabold tracking-tight text-[#1B6D24]">KIZ FARM</span>
         </div>
         <div className="flex items-center gap-4">
           {showBecomeFarmer && (

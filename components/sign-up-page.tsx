@@ -57,15 +57,11 @@ export default function SignUpPage() {
         <div className="relative z-20 flex flex-col justify-between h-full p-xl text-on-tertiary">
           <div>
             <div className="flex items-center gap-base">
-              <span
-                className="material-symbols-outlined text-[40px]"
-                data-icon="agriculture"
-              >
-                agriculture
-              </span>
-              <span className="font-headline-md text-headline-md tracking-tighter">
-                KIZ FARM
-              </span>
+              <img
+                alt="KIZ FARM"
+                className="h-10 w-auto object-contain rounded-lg bg-white/90 px-2 py-1"
+                src="/logo.jpeg"
+              />
             </div>
           </div>
           <div className="max-w-md">

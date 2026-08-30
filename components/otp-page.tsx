@@ -112,15 +112,7 @@ export default function OtpPage() {
     <div className="bg-white font-body-md text-on-surface flex flex-col min-h-screen">
       <header className="fixed top-0 w-full z-50 bg-white border-b border-gray-100 flex justify-between items-center px-6 h-16 max-w-[1440px] mx-auto">
         <div className="flex items-center gap-2">
-          <span
-            className="material-symbols-outlined text-primary"
-            data-icon="agriculture"
-          >
-            agriculture
-          </span>
-          <span className="text-xl font-black text-green-900 tracking-tighter">
-            KIZ FARM
-          </span>
+          <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
         </div>
       </header>
 
@@ -225,7 +217,7 @@ export default function OtpPage() {
       <footer className="w-full rounded-none border-t border-gray-100 bg-white">
         <div className="flex flex-col md:flex-row justify-between items-center py-12 px-8 w-full max-w-[1440px] mx-auto gap-8">
           <div className="flex flex-col gap-2">
-            <div className="font-bold text-green-900">KIZ FARM</div>
+            <img alt="KIZ FARM" className="h-8 w-auto object-contain" src="/logo.jpeg" />
             <p className="font-['Inter'] text-xs font-normal uppercase tracking-widest text-gray-400">
               © 2024 KIZ FARM. Digital Agronomy.
             </p>

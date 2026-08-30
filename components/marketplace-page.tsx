@@ -86,8 +86,7 @@ export default function MarketplacePage() {
       <header className="bg-white dark:bg-slate-950 docked full-width top-0 border-b border-gray-200 dark:border-gray-800 flat no shadows sticky z-50">
         <div className="flex justify-between items-center px-6 h-16 w-full max-w-[1440px] mx-auto">
           <div className="flex items-center gap-4">
-            <img alt="KIZ FARM Official Logo" className="h-8 object-contain w-12" data-alt="KIZ FARM Official Logo featuring a stylized 'K' and brand name in green and red" src="/logo.jpeg" />
-            <h1 className="text-xl font-extrabold tracking-tight text-[#1B6D24] font-['Inter'] antialiased">KIZ FARM</h1>
+            <img alt="KIZ FARM" className="h-10 w-auto object-contain" src="/logo.jpeg" />
           </div>
           <div className="hidden md:flex flex-1 max-w-xl mx-8">
             <div className="relative w-full">
