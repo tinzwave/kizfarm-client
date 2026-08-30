@@ -7,7 +7,7 @@ import TopNav from "@/components/top-nav";
 import SiteFooter from "@/components/site-footer";
 import { getMarketplaceProducts, getBlogPosts, getCourses } from "@/lib/kizfarm/supabase-data";
 import { createClient } from "@/lib/kizfarm/supabase-client";
-import { getCurrentProfile, redirectPathForRole } from "@/lib/kizfarm/supabase-auth";
+import { getCurrentProfile, redirectPathForRole, signOut } from "@/lib/kizfarm/supabase-auth";
 
 interface Product {
   _id: string;
@@ -83,10 +83,20 @@ export default function HomePage() {
       if (cancelled) return;
 
       if (session) {
+        // getSession() only reads the local token; it doesn't confirm the
+        // session is still valid server-side. getCurrentProfile() does,
+        // via a real getUser() call. A null profile here means the local
+        // session is stale (expired/revoked) -- redirecting anyway sent
+        // the user into a dashboard whose own guard immediately bounced
+        // them back here, causing a fast home -> dashboard -> login loop.
         const profile = await getCurrentProfile();
         if (cancelled) return;
-        router.push(redirectPathForRole(profile?.role));
-        return;
+        if (profile) {
+          router.push(redirectPathForRole(profile.role));
+          return;
+        }
+        await signOut();
+        if (cancelled) return;
       }
       setLoggedIn(false);
       setUserEmail(null);

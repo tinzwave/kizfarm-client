@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/kizfarm/supabase-client";
-import { getCurrentProfile, getSession, redirectPathForRole, setPendingVerificationEmail } from "@/lib/kizfarm/supabase-auth";
+import { getCurrentProfile, getSession, redirectPathForRole, setPendingVerificationEmail, signOut } from "@/lib/kizfarm/supabase-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,9 +15,26 @@ export default function LoginPage() {
 
   // redirect away if already authenticated
   useEffect(() => {
-    getSession().then((session) => {
-      if (session) router.push("/");
+    let cancelled = false;
+    getSession().then(async (session) => {
+      if (!session) return;
+      // getSession() only reads the local token; getCurrentProfile() does
+      // a real server-side check via getUser(). A stale-but-present local
+      // session with no valid profile used to bounce straight to "/",
+      // which itself would try to bounce back to the dashboard and land
+      // right back on this guard -- a fast home <-> dashboard <-> login
+      // loop. Clear the dead session instead of redirecting on it.
+      const profile = await getCurrentProfile();
+      if (cancelled) return;
+      if (profile) {
+        router.push("/");
+      } else {
+        await signOut();
+      }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const handleSubmit = (e: React.FormEvent) => {

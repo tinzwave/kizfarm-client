@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentProfile, getSession } from "@/lib/kizfarm/supabase-auth";
+import { getCurrentProfile, getSession, signOut } from "@/lib/kizfarm/supabase-auth";
 
 type AuthGuardProps = {
   children: React.ReactNode;
@@ -32,6 +32,9 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
       // the buyer stuck on a blank dashboard instead of being sent to log
       // back in.
       if (!profile) {
+        // Clear the dead local session so /login and "/" don't see a
+        // truthy getSession() and try to bounce back in here.
+        await signOut();
         if (!cancelled) setAuthorized(false);
         router.replace("/login");
         return;
