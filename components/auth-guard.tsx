@@ -24,7 +24,20 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
       }
 
       const profile = await getCurrentProfile();
-      if (profile?.role === "admin") {
+      // getSession() only reads the local token and doesn't confirm it's
+      // still valid server-side; getCurrentProfile() does a real check via
+      // supabase.auth.getUser(). A null profile here means the session has
+      // actually expired (e.g. after a long time away) -- without this
+      // check, that case fell through to authorized=true below, leaving
+      // the buyer stuck on a blank dashboard instead of being sent to log
+      // back in.
+      if (!profile) {
+        if (!cancelled) setAuthorized(false);
+        router.replace("/login");
+        return;
+      }
+
+      if (profile.role === "admin") {
         if (!cancelled) setAuthorized(false);
         router.replace("/admin/dashboard");
         return;
