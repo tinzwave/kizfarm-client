@@ -913,6 +913,29 @@ export async function submitReview(productId: string, input: { rating: number; c
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
+export async function saveCreatorBankDetails(input: {
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      bank_name: input.bankName,
+      account_holder_name: input.accountHolderName,
+      account_number: input.accountNumber,
+    })
+    .eq("id", user.id);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true } };
+}
+
 export async function submitCourseReview(courseId: string, input: { rating: number; comment?: string }) {
   const supabase = createClient();
   const {

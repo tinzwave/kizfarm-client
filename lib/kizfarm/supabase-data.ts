@@ -1012,16 +1012,33 @@ export async function getAdminBuyerCourses() {
 
 export async function getAdminCoursePurchases() {
   const supabase = createClient();
+  // Deliberately not reusing COURSE_SELECT here -- it's shared with
+  // buyer-facing course fetches, and this admin-only payout view needs the
+  // creator's bank details, which must never ship through a public query.
   const { data, error } = await supabase
     .from("subscriptions")
-    .select(`*, courses(${COURSE_SELECT}), profiles!user_id(id, name, email)`)
+    .select(
+      "*, courses(*, tutors(*), profiles!creator_id(id, name, email, bank_name, account_holder_name, account_number)), profiles!user_id(id, name, email)",
+    )
     .eq("source", "buyer")
     .eq("status", "active")
     .order("created_at", { ascending: false });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   const purchases = (data || []).map((p: any) => ({
     _id: p.id,
-    course: toCourse(p.courses),
+    course: {
+      ...toCourse(p.courses),
+      creator: p.courses?.profiles
+        ? {
+            _id: p.courses.profiles.id,
+            name: p.courses.profiles.name,
+            email: p.courses.profiles.email,
+            bankName: p.courses.profiles.bank_name,
+            accountHolderName: p.courses.profiles.account_holder_name,
+            accountNumber: p.courses.profiles.account_number,
+          }
+        : undefined,
+    },
     buyer: p.profiles ? { name: p.profiles.name, email: p.profiles.email } : undefined,
     amount: p.amount,
     creatorAmount: p.creator_amount,

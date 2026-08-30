@@ -29,6 +29,9 @@ interface Course {
     _id: string;
     name?: string;
     email?: string;
+    bankName?: string;
+    accountHolderName?: string;
+    accountNumber?: string;
   };
 }
 
@@ -369,6 +372,17 @@ export default function LearningHubAdminPage() {
                         <span>Creator payout: NGN {(purchase.creatorAmount ?? purchase.course?.price ?? 0).toLocaleString()}</span>
                         <span>Commission: NGN {(purchase.commission ?? 0).toLocaleString()}</span>
                       </div>
+                      {purchase.payoutStatus !== "released" && (
+                        purchase.course?.creator?.bankName && purchase.course?.creator?.accountNumber ? (
+                          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            Pay to: <span className="font-bold">{purchase.course.creator.accountHolderName}</span> · {purchase.course.creator.bankName} · {purchase.course.creator.accountNumber}
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                            Creator hasn&apos;t added bank details yet -- can&apos;t be paid out until they do.
+                          </div>
+                        )
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${purchase.payoutStatus === "released" ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-700"}`}>{purchase.payoutStatus ?? "pending"}</span>

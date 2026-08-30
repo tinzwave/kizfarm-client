@@ -3,7 +3,8 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
-import { createBuyerCourse, updateBuyerCourse } from "@/lib/kizfarm/supabase-mutations";
+import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
+import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 
 type ReviewStatus = "draft" | "pending" | "approved" | "rejected";
@@ -45,17 +46,30 @@ export default function BuyerCoursesPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [bankForm, setBankForm] = useState({ bankName: "", accountHolderName: "", accountNumber: "" });
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankMessage, setBankMessage] = useState("");
+  const hasBankDetails = !!(bankForm.bankName && bankForm.accountHolderName && bankForm.accountNumber);
+
   async function loadData() {
     setLoading(true);
     try {
-      const [coursesRes, mineRes, subsRes] = await Promise.all([
+      const [coursesRes, mineRes, subsRes, profile] = await Promise.all([
         getBuyerBrowseCourses(),
         getMyCreatedCourses(),
         getMySubscriptions({ source: "buyer" }),
+        getCurrentProfile(),
       ]);
       if (coursesRes.payload?.ok) setCourses(coursesRes.payload.courses ?? []);
       if (mineRes.payload?.ok) setMyCourses(mineRes.payload.courses ?? []);
       if (subsRes.payload?.ok) setSubscriptions(subsRes.payload.subscriptions ?? []);
+      if (profile) {
+        setBankForm({
+          bankName: (profile as any).bank_name || "",
+          accountHolderName: (profile as any).account_holder_name || "",
+          accountNumber: (profile as any).account_number || "",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -64,6 +78,17 @@ export default function BuyerCoursesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  async function saveBankDetails() {
+    setBankSaving(true);
+    setBankMessage("");
+    try {
+      const { res, payload } = await saveCreatorBankDetails(bankForm);
+      setBankMessage(res.ok ? "Bank details saved." : payload?.error || "Could not save bank details.");
+    } finally {
+      setBankSaving(false);
+    }
+  }
 
   const subscribedIds = useMemo(
     () => new Set(subscriptions.map((sub) => sub.course?._id).filter(Boolean)),
@@ -271,6 +296,48 @@ export default function BuyerCoursesPage() {
         )}
 
         {activeTab === "create" && (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Payout Bank Details</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Where we send your earnings when an admin releases a payout after someone subscribes to your course.
+              </p>
+              {!hasBankDetails && (
+                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Add your bank details before submitting a course, so we can pay you once it earns.
+                </p>
+              )}
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <input
+                  value={bankForm.bankName}
+                  onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                  className="rounded-lg border border-gray-300 px-4 py-2"
+                  placeholder="Bank name (e.g. Opay)"
+                />
+                <input
+                  value={bankForm.accountHolderName}
+                  onChange={(e) => setBankForm({ ...bankForm, accountHolderName: e.target.value })}
+                  className="rounded-lg border border-gray-300 px-4 py-2"
+                  placeholder="Account holder name"
+                />
+                <input
+                  value={bankForm.accountNumber}
+                  onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                  className="rounded-lg border border-gray-300 px-4 py-2"
+                  placeholder="Account number"
+                />
+              </div>
+              {bankMessage && <p className="mt-2 text-sm text-slate-600">{bankMessage}</p>}
+              <button
+                type="button"
+                onClick={saveBankDetails}
+                disabled={bankSaving}
+                className="mt-3 rounded-lg border border-green-800 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50 disabled:opacity-60"
+              >
+                {bankSaving ? "Saving..." : "Save Bank Details"}
+              </button>
+            </div>
+
           <form onSubmit={submitCourse} className="space-y-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
             <div>
               <h2 className="text-lg font-bold">{editingCourse ? "Edit Course" : "Create Course"}</h2>
@@ -289,6 +356,7 @@ export default function BuyerCoursesPage() {
               )}
             </div>
           </form>
+          </div>
         )}
       </main>
     </div>
