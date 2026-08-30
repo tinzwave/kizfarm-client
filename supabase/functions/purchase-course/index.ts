@@ -2,6 +2,7 @@
 // verify-and-pay-order: verify with Paystack directly, never trust the
 // client, then hand off to the activate_subscription RPC.
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
+import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
 import {
   notifyEmail,
   sendCoursePurchaseBuyerEmail,
@@ -25,20 +26,23 @@ async function verifyPaystackPayment(reference: string) {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return jsonResponse({ error: "Method not allowed" }, { status: 405 });
   }
 
   try {
     const { courseId, paymentReference } = await req.json();
     if (!courseId || !paymentReference) {
-      return new Response(JSON.stringify({ error: "courseId and paymentReference are required." }), { status: 400 });
+      return jsonResponse({ error: "courseId and paymentReference are required." }, { status: 400 });
     }
 
     const caller = callerClient(req);
     const { data: { user } } = await caller.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+      return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { data: course, error: courseErr } = await caller
@@ -48,24 +52,24 @@ Deno.serve(async (req) => {
       .single();
 
     if (courseErr || !course) {
-      return new Response(JSON.stringify({ error: "Course not found" }), { status: 404 });
+      return jsonResponse({ error: "Course not found" }, { status: 404 });
     }
     if (!course.is_published) {
-      return new Response(JSON.stringify({ error: "Course is not available for purchase" }), { status: 400 });
+      return jsonResponse({ error: "Course is not available for purchase" }, { status: 400 });
     }
     if (course.source === "buyer" && course.creator_id === user.id) {
-      return new Response(JSON.stringify({ error: "You cannot subscribe to a course you created" }), { status: 400 });
+      return jsonResponse({ error: "You cannot subscribe to a course you created" }, { status: 400 });
     }
 
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);
 
     const verification = await verifyPaystackPayment(paymentReference);
     if (!verification.success) {
-      return new Response(JSON.stringify({ error: verification.message || "Payment verification failed." }), { status: 400 });
+      return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }
     if (Math.abs(verification.amount! - payableAmount) > 10) {
-      return new Response(
-        JSON.stringify({ error: `Payment amount mismatch. Expected: NGN${payableAmount}, Paid: NGN${verification.amount}` }),
+      return jsonResponse(
+        { error: `Payment amount mismatch. Expected: NGN${payableAmount}, Paid: NGN${verification.amount}` },
         { status: 400 },
       );
     }
@@ -77,7 +81,7 @@ Deno.serve(async (req) => {
       p_payment_reference: paymentReference,
     });
     if (subErr) {
-      return new Response(JSON.stringify({ error: subErr.message }), { status: 500 });
+      return jsonResponse({ error: subErr.message }, { status: 500 });
     }
 
     const buyerEmail = user.email;
@@ -92,11 +96,9 @@ Deno.serve(async (req) => {
     }
     notifyEmail("Admin course purchase notification", sendAdminCoursePurchaseEmail(course.title, subscription.amount));
 
-    return new Response(JSON.stringify({ ok: true, subscription }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ ok: true, subscription });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: "Server error" }), { status: 500 });
+    return jsonResponse({ error: "Server error" }, { status: 500 });
   }
 });

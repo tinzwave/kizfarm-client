@@ -3,6 +3,7 @@
 // with Paystack itself (never trusts the client's say-so), then hands off
 // to the pay_order RPC for the atomic state change.
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
+import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
 import {
   notifyEmail,
   sendBuyerPaymentSuccessfulEmail,
@@ -28,20 +29,23 @@ async function verifyPaystackPayment(reference: string) {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return jsonResponse({ error: "Method not allowed" }, { status: 405 });
   }
 
   try {
     const { orderId, paymentReference, paymentMethod } = await req.json();
     if (!orderId || !paymentReference) {
-      return new Response(JSON.stringify({ error: "orderId and paymentReference are required." }), { status: 400 });
+      return jsonResponse({ error: "orderId and paymentReference are required." }, { status: 400 });
     }
 
     const caller = callerClient(req);
     const { data: { user } } = await caller.auth.getUser();
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+      return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
     // RLS (orders_select) ensures this only returns a row if the caller is
@@ -54,28 +58,28 @@ Deno.serve(async (req) => {
       .single();
 
     if (orderErr || !order) {
-      return new Response(JSON.stringify({ error: "Order not found" }), { status: 404 });
+      return jsonResponse({ error: "Order not found" }, { status: 404 });
     }
     if (order.buyer_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Order not found" }), { status: 404 });
+      return jsonResponse({ error: "Order not found" }, { status: 404 });
     }
     if (order.status !== "awaiting_payment") {
-      return new Response(JSON.stringify({ error: "Order is not ready for payment." }), { status: 400 });
+      return jsonResponse({ error: "Order is not ready for payment." }, { status: 400 });
     }
     if (order.delivery_fee <= 0) {
-      return new Response(JSON.stringify({ error: "Transport fare has not been added yet." }), { status: 400 });
+      return jsonResponse({ error: "Transport fare has not been added yet." }, { status: 400 });
     }
     if (order.payment_status === "paid") {
-      return new Response(JSON.stringify({ error: "Order has already been paid." }), { status: 400 });
+      return jsonResponse({ error: "Order has already been paid." }, { status: 400 });
     }
 
     const verification = await verifyPaystackPayment(paymentReference);
     if (!verification.success) {
-      return new Response(JSON.stringify({ error: verification.message || "Payment verification failed." }), { status: 400 });
+      return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }
     if (Math.abs(verification.amount! - order.total) > 10) {
-      return new Response(
-        JSON.stringify({ error: `Payment amount mismatch. Expected: NGN${order.total}, Paid: NGN${verification.amount}` }),
+      return jsonResponse(
+        { error: `Payment amount mismatch. Expected: NGN${order.total}, Paid: NGN${verification.amount}` },
         { status: 400 },
       );
     }
@@ -87,7 +91,7 @@ Deno.serve(async (req) => {
       p_payment_method: paymentMethod ?? null,
     });
     if (payErr) {
-      return new Response(JSON.stringify({ error: payErr.message }), { status: 500 });
+      return jsonResponse({ error: payErr.message }, { status: 500 });
     }
 
     const [{ data: buyer }, { data: farmer }] = await Promise.all([
@@ -105,11 +109,9 @@ Deno.serve(async (req) => {
     }
     notifyEmail("Admin order paid notification", sendAdminOrderPaidEmail(updatedOrder));
 
-    return new Response(JSON.stringify({ ok: true, order: updatedOrder }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ ok: true, order: updatedOrder });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: "Server error" }), { status: 500 });
+    return jsonResponse({ error: "Server error" }, { status: 500 });
   }
 });

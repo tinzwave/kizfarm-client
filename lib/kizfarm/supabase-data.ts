@@ -958,15 +958,18 @@ export async function getCourseAccess(courseId: string, opts: { source?: string 
   } = await supabase.auth.getUser();
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
-  let query = supabase
+  // Note: course_id alone already pins down a specific course (and therefore
+  // its real source) -- deliberately not filtering by opts.source here too.
+  // That URL-supplied hint can be wrong (e.g. a buyer-sourced course reached
+  // through a listing that doesn't thread the param through), which used to
+  // make a real, active subscription look unsubscribed right after payment.
+  const { data, error } = await supabase
     .from("subscriptions")
     .select(`*, courses(${COURSE_SELECT})`)
     .eq("user_id", user.id)
     .eq("course_id", courseId)
-    .eq("status", "active");
-  if (opts.source === "buyer" || opts.source === "admin") query = query.eq("source", opts.source);
-
-  const { data, error } = await query.maybeSingle();
+    .eq("status", "active")
+    .maybeSingle();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: "Course is not subscribed" } };
   return {
     res: { ok: true } as Response,
