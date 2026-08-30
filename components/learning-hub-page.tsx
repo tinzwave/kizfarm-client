@@ -19,6 +19,7 @@ interface Course {
   description: string;
   price: number;
   content: string;
+  coverImage?: string;
   tutor?: Tutor;
 }
 
@@ -110,7 +111,14 @@ export default function LearningHubPage() {
               </div>
             ) : visibleCourses.map((course) => (
               <article key={course._id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="h-36 bg-gradient-to-br from-green-800 to-lime-700 p-5 text-white">
+                <div
+                  className={`h-36 bg-cover bg-center p-5 text-white ${course.coverImage ? "" : "bg-gradient-to-br from-green-800 to-lime-700"}`}
+                  style={
+                    course.coverImage
+                      ? { backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.15)), url(${course.coverImage})` }
+                      : undefined
+                  }
+                >
                   <p className="text-xs font-bold uppercase tracking-widest opacity-80">Course</p>
                   <h3 className="mt-4 line-clamp-2 text-xl font-bold">{course.title}</h3>
                 </div>

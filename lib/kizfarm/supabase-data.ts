@@ -83,6 +83,27 @@ export async function getProductReviews(productId: string) {
   return { res: { ok: true } as Response, payload: { ok: true, reviews, count, avg } };
 }
 
+export async function getCourseReviews(courseId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("course_reviews")
+    .select("*")
+    .eq("course_id", courseId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  const reviews = (data || []).map((r) => ({
+    _id: r.id,
+    buyerName: r.buyer_name,
+    rating: r.rating,
+    comment: r.comment,
+    createdAt: r.created_at,
+  }));
+  const count = reviews.length;
+  const avg = count > 0 ? Number((reviews.reduce((s, r) => s + r.rating, 0) / count).toFixed(1)) : 0;
+  return { res: { ok: true } as Response, payload: { ok: true, reviews, count, avg } };
+}
+
 export async function getFarmerStatus() {
   const supabase = createClient();
   const {
@@ -850,6 +871,7 @@ function toCourse(c: any) {
     finalPrice: c.final_price,
     commission: c.commission,
     content: c.content,
+    coverImage: c.cover_image,
     source: c.source,
     audience: c.audience,
     status: c.status,

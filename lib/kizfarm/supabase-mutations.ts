@@ -913,6 +913,32 @@ export async function submitReview(productId: string, input: { rating: number; c
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
+export async function submitCourseReview(courseId: string, input: { rating: number; comment?: string }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
+
+  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
+
+  const { error } = await supabase
+    .from("course_reviews")
+    .upsert(
+      {
+        course_id: courseId,
+        buyer_id: user.id,
+        rating: input.rating,
+        comment: input.comment || "",
+        buyer_name: profile?.name || "Anonymous",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "course_id,buyer_id" },
+    );
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true } };
+}
+
 export async function saveFarmerBankDetails(input: {
   bankName: string;
   accountHolderName: string;

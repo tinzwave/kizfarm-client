@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { getCourseAccess, getCourseById } from "@/lib/kizfarm/supabase-data";
+import { getCourseAccess, getCourseById, getCourseReviews } from "@/lib/kizfarm/supabase-data";
+import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
 
 interface Tutor {
   name: string;
@@ -20,8 +21,33 @@ interface Course {
   price: number;
   finalPrice?: number;
   content: string;
+  coverImage?: string;
   source?: "admin" | "buyer";
   tutor?: Tutor;
+}
+
+interface Review {
+  _id: string;
+  buyerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+function Stars({ rating, size = "text-[18px]" }: { rating: number; size?: string }) {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <span
+          key={i}
+          className={`material-symbols-outlined ${size} text-amber-500`}
+          style={{ fontVariationSettings: i < Math.round(rating) ? "'FILL' 1" : "'FILL' 0" }}
+        >
+          star
+        </span>
+      ))}
+    </>
+  );
 }
 
 export default function CourseDetailPage() {
@@ -34,6 +60,14 @@ export default function CourseDetailPage() {
   const [hasAccess, setHasAccess] = useState(wantsAccess);
   const [showCoach, setShowCoach] = useState(false);
   const [error, setError] = useState("");
+
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsAvg, setReviewsAvg] = useState(0);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [newRating, setNewRating] = useState(5);
+  const [newComment, setNewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   useEffect(() => {
     async function loadCourse() {
@@ -55,6 +89,40 @@ export default function CourseDetailPage() {
     }
     loadCourse();
   }, [courseId, source, wantsAccess]);
+
+  useEffect(() => {
+    async function loadReviews() {
+      if (!courseId) return;
+      const { res, payload } = await getCourseReviews(courseId);
+      if (res.ok) {
+        setReviews((payload.reviews as Review[]) || []);
+        setReviewsAvg(payload.avg || 0);
+      }
+    }
+    loadReviews();
+  }, [courseId]);
+
+  async function handleSubmitReview() {
+    if (!courseId) return;
+    setSubmittingReview(true);
+    setReviewError("");
+    try {
+      const { res, payload } = await submitCourseReview(courseId, { rating: newRating, comment: newComment });
+      if (!res.ok) {
+        setReviewError(payload?.error || "Failed to submit review.");
+        return;
+      }
+      setShowReviewForm(false);
+      setNewComment("");
+      const refreshed = await getCourseReviews(courseId);
+      if (refreshed.res.ok) {
+        setReviews((refreshed.payload.reviews as Review[]) || []);
+        setReviewsAvg(refreshed.payload.avg || 0);
+      }
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
 
   if (!courseId) {
     return <div className="p-8 text-sm text-slate-600">Choose a course from the learning hub.</div>;
@@ -87,11 +155,26 @@ export default function CourseDetailPage() {
       <main className="mx-auto max-w-7xl px-4 py-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <section className="lg:col-span-8">
-            <div className="overflow-hidden rounded-xl bg-green-900 text-white shadow-sm">
-              <div className="min-h-72 bg-gradient-to-br from-green-950 via-green-800 to-lime-700 p-8">
+            <div
+              className="relative overflow-hidden rounded-xl bg-green-900 text-white shadow-sm bg-cover bg-center"
+              style={course.coverImage ? { backgroundImage: `url(${course.coverImage})` } : undefined}
+            >
+              <div
+                className={`min-h-72 p-8 ${
+                  course.coverImage
+                    ? "bg-gradient-to-t from-black/80 via-black/40 to-black/10 flex flex-col justify-end"
+                    : "bg-gradient-to-br from-green-950 via-green-800 to-lime-700"
+                }`}
+              >
                 <p className="text-xs font-bold uppercase tracking-widest text-green-200">Course Detail</p>
                 <h1 className="mt-5 max-w-3xl text-4xl font-bold">{course.title}</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-green-50">{course.description}</p>
+                {reviews.length > 0 && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <Stars rating={reviewsAvg} />
+                    <span className="text-sm font-semibold text-green-50">{reviewsAvg} ({reviews.length} review{reviews.length === 1 ? "" : "s"})</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -107,6 +190,77 @@ export default function CourseDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Reviews */}
+            <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">Reviews</h2>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Stars rating={reviewsAvg} />
+                    <span className="text-sm text-slate-500">{reviewsAvg > 0 ? `${reviewsAvg} / 5.0` : "No ratings yet"}</span>
+                  </div>
+                </div>
+                {hasAccess && (
+                  <button
+                    onClick={() => setShowReviewForm((p) => !p)}
+                    className="text-sm font-semibold text-green-800 hover:underline"
+                  >
+                    {showReviewForm ? "Cancel" : "Write a Review"}
+                  </button>
+                )}
+              </div>
+
+              {showReviewForm && (
+                <div className="mt-4 rounded-lg border border-gray-100 bg-slate-50 p-4">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button key={n} onClick={() => setNewRating(n)} type="button">
+                        <span
+                          className="material-symbols-outlined text-2xl text-amber-500"
+                          style={{ fontVariationSettings: n <= newRating ? "'FILL' 1" : "'FILL' 0" }}
+                        >
+                          star
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Share what you thought of this course..."
+                    rows={3}
+                    className="mt-3 w-full rounded-lg border border-gray-200 p-3 text-sm"
+                  />
+                  {reviewError && <p className="mt-2 text-sm text-red-600">{reviewError}</p>}
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={submittingReview}
+                    className="mt-3 rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900 disabled:opacity-60"
+                  >
+                    {submittingReview ? "Submitting..." : "Submit Review"}
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-4 divide-y divide-gray-100">
+                {reviews.length === 0 ? (
+                  <p className="py-4 text-sm text-slate-500">No reviews yet.</p>
+                ) : (
+                  reviews.map((r) => (
+                    <div key={r._id} className="py-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800">{r.buyerName}</span>
+                        <div className="flex items-center">
+                          <Stars rating={r.rating} size="text-[16px]" />
+                        </div>
+                      </div>
+                      {r.comment && <p className="mt-2 text-sm text-slate-600">{r.comment}</p>}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
 
