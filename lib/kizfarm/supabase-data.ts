@@ -157,7 +157,7 @@ export async function getBuyerDashboard() {
   } = await supabase.auth.getUser();
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
-  const [productsRes, ordersRes, cartRes, orderCountRes] = await Promise.all([
+  const [productsRes, ordersRes, cartRes, orderCountRes, coursesRes] = await Promise.all([
     supabase.from("products").select("*").neq("quantity", 0).order("created_at", { ascending: false }).limit(8),
     supabase
       .from("orders")
@@ -167,6 +167,13 @@ export async function getBuyerDashboard() {
       .limit(4),
     supabase.from("carts").select("items").eq("user_id", user.id).single(),
     supabase.from("orders").select("id", { count: "exact", head: true }).eq("buyer_id", user.id),
+    supabase
+      .from("courses")
+      .select(COURSE_SELECT)
+      .eq("is_published", true)
+      .or("source.eq.admin,and(source.eq.buyer,status.eq.approved)")
+      .order("created_at", { ascending: false })
+      .limit(4),
   ]);
 
   // cartRes uses .single() and legitimately errors (no rows) for a buyer who
@@ -193,12 +200,15 @@ export async function getBuyerDashboard() {
     };
   });
 
+  const courses = (coursesRes.data || []).map((c: any) => toCourse(c));
+
   return {
     res: { ok: true } as Response,
     payload: {
       ok: true,
       products,
       recentOrders,
+      courses,
       stats: {
         totalOrders: orderCountRes.count || 0,
         cartItems: (cartRes.data?.items || []).length,
@@ -246,7 +256,7 @@ export async function getFarmerDashboard() {
   const { data: farmer } = await supabase.from("farmers").select("*").eq("user_id", user.id).single();
   if (!farmer) return { res: { ok: false } as Response, payload: { error: "Farmer record not found" } };
 
-  const [productsRes, ordersRes, totalOrdersRes, activeOrdersRes, deliveredOrdersRes, paidOrdersRes] = await Promise.all([
+  const [productsRes, ordersRes, totalOrdersRes, activeOrdersRes, deliveredOrdersRes, paidOrdersRes, coursesRes] = await Promise.all([
     supabase.from("products").select("*").eq("farmer_id", farmer.id).order("created_at", { ascending: false }).limit(6),
     supabase
       .from("orders")
@@ -266,6 +276,13 @@ export async function getFarmerDashboard() {
       .eq("farmer_id", farmer.id)
       .in("status", ["delivered", "receipt_confirmed"]),
     supabase.from("orders").select("total").eq("farmer_id", farmer.id).eq("payment_status", "paid").neq("status", "cancelled"),
+    supabase
+      .from("courses")
+      .select(COURSE_SELECT)
+      .eq("is_published", true)
+      .or("source.eq.admin,and(source.eq.buyer,status.eq.approved)")
+      .order("created_at", { ascending: false })
+      .limit(4),
   ]);
 
   const firstError = [productsRes, ordersRes, totalOrdersRes, activeOrdersRes, deliveredOrdersRes, paidOrdersRes].find(
@@ -284,6 +301,7 @@ export async function getFarmerDashboard() {
     buyerId: o.profiles ? { name: o.profiles.name, email: o.profiles.email } : null,
   }));
   const totalSales = (paidOrdersRes.data || []).reduce((s, o: any) => s + Number(o.total || 0), 0);
+  const courses = (coursesRes.data || []).map((c: any) => toCourse(c));
 
   return {
     res: { ok: true } as Response,
@@ -299,6 +317,7 @@ export async function getFarmerDashboard() {
       },
       products,
       recentOrders,
+      courses,
     },
   };
 }

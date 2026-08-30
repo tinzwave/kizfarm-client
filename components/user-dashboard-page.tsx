@@ -26,9 +26,19 @@ interface Order {
   farmerId?: { farmName?: string; location?: string };
 }
 
+interface Course {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  coverImage?: string;
+  tutor?: { name: string; imageUrl?: string };
+}
+
 interface BuyerDashboard {
   products: Product[];
   recentOrders: Order[];
+  courses: Course[];
   stats: {
     totalOrders: number;
     cartItems: number;
@@ -237,6 +247,43 @@ export default function UserDashboardPage() {
             ))}
             {!loading && (data?.products ?? []).length === 0 && (
               <div className="lg:col-span-4 rounded-xl border border-dashed border-gray-200 p-10 text-center text-sm text-slate-500">No products available yet.</div>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-lg">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="font-headline-lg text-on-surface">Courses for You</h2>
+              <p className="text-on-surface-variant font-body-md">Practical training from KIZ FARM's learning hub</p>
+            </div>
+            <Link className="text-primary font-semibold flex items-center gap-2 hover:underline" href="/learning">
+              View All <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {(data?.courses ?? []).map((course) => (
+              <Link key={course._id} href="/learning" className="group bg-white border border-outline-variant rounded-2xl overflow-hidden hover:shadow-xl transition-all">
+                <div className="h-32 overflow-hidden relative bg-gradient-to-br from-emerald-900 to-green-700 flex items-center justify-center">
+                  {course.coverImage ? (
+                    <img
+                      src={course.coverImage}
+                      alt={course.title}
+                      className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-white/30 text-[40px]">school</span>
+                  )}
+                </div>
+                <div className="p-4">
+                  <h3 className="font-headline-md mb-1 line-clamp-1">{course.title}</h3>
+                  <p className="text-label-sm text-on-surface-variant mb-3 line-clamp-2">{course.description}</p>
+                  <span className="text-headline-md font-bold text-on-surface">{money(course.price)}</span>
+                </div>
+              </Link>
+            ))}
+            {!loading && (data?.courses ?? []).length === 0 && (
+              <div className="lg:col-span-4 rounded-xl border border-dashed border-gray-200 p-10 text-center text-sm text-slate-500">No courses available yet.</div>
             )}
           </div>
         </section>
