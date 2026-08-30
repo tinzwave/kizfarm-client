@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken, saveUserAuth, setPendingVerificationEmail } from "@/lib/kizfarm/auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { getCurrentProfile, getSession, redirectPathForRole, setPendingVerificationEmail } from "@/lib/kizfarm/supabase-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,45 +11,34 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const router = useRouter();
 
   // redirect away if already authenticated
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const token = getAuthToken();
-    if (token) router.push('/');
+    getSession().then((session) => {
+      if (session) router.push("/");
+    });
   }, [router]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
     (async () => {
       try {
-        const res = await fetch(`${API}/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 403 && data.needsVerification && data.email) {
-            setPendingVerificationEmail(data.email);
+        const supabase = createClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          if (/confirm/i.test(signInError.message)) {
+            setPendingVerificationEmail(email);
             router.push("/otp");
             return;
           }
-          throw new Error(data.error || "Login failed");
+          throw new Error(signInError.message);
         }
-        if (data.token && data.user) saveUserAuth(data.token, data.user);
-        
-        const role = data.user?.role || "user";
-        if (role === "farmer") {
-          router.push("/farmer/dashboard");
-        } else if (role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/buyer/dashboard");
-        }
+
+        const profile = await getCurrentProfile();
+        router.push(redirectPathForRole(profile?.role));
       } catch (err: any) {
         setError(err.message || "Login failed");
       } finally {

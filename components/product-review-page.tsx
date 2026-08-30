@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminReviews } from "@/lib/kizfarm/supabase-data";
+import { deleteAdminReview } from "@/lib/kizfarm/supabase-mutations";
 
 interface Review {
   _id: string;
@@ -36,14 +36,10 @@ export default function ProductReviewPage() {
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/reviews?limit=100`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setReviews(data.reviews || []);
-        setTotal(data.total || 0);
+      const { res, payload } = await getAdminReviews({ limit: 100 });
+      if (res.ok) {
+        setReviews(payload.reviews || []);
+        setTotal(payload.total || 0);
       }
     } catch (err) {
       console.error("Fetch reviews failed:", err);
@@ -61,16 +57,11 @@ export default function ProductReviewPage() {
     )
       return;
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/reviews/${review._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await deleteAdminReview(review._id);
+      if (res.ok) {
         fetchReviews();
       } else {
-        alert(data.error || "Failed to delete review");
+        alert(payload?.error || "Failed to delete review");
       }
     } catch (err) {
       console.error("Delete review failed:", err);

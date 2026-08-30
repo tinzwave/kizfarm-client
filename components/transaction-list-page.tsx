@@ -11,7 +11,7 @@ export default function TransactionListPage() {
           <img alt="KizFarm Logo" className="w-10 h-10 object-contain rounded-lg" src="/logo.jpeg" />
           <div>
             <h1 className="text-xl font-black tracking-tight text-[#1B6D24]">KizFarm</h1>
-            <p className="text-xs text-secondary font-medium uppercase tracking-widest">Admin Console</p>
+            <p className="text-xs text-on-surface-variant font-medium uppercase tracking-widest">Admin Console</p>
           </div>
         </div>
         <nav className="flex-1 space-y-1">
@@ -92,13 +92,13 @@ export default function TransactionListPage() {
           {/* Header Section */}
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
             <div>
-              <nav className="flex items-center gap-2 text-secondary mb-2">
+              <nav className="flex items-center gap-2 text-on-surface-variant mb-2">
                 <span className="font-label-sm text-label-sm">Financials</span>
                 <span className="material-symbols-outlined text-xs" data-icon="chevron_right">chevron_right</span>
                 <span className="font-label-sm text-label-sm text-primary font-bold">Transactions</span>
               </nav>
               <h2 className="font-h1 text-h1 text-on-surface">Admin Transactions</h2>
-              <p className="text-secondary font-body-sm text-body-sm mt-1">Manage and monitor all financial activities across KizFarm ecosystem.</p>
+              <p className="text-on-surface-variant font-body-sm text-body-sm mt-1">Manage and monitor all financial activities across KizFarm ecosystem.</p>
             </div>
             <div className="flex gap-3">
               <button className="flex items-center gap-2 px-4 py-2 border border-outline-variant bg-white text-on-surface rounded-lg font-label-md text-label-md hover:bg-gray-50 transition-all">
@@ -124,7 +124,7 @@ export default function TransactionListPage() {
                   12.5%
                 </span>
               </div>
-              <p className="text-secondary font-label-sm text-label-sm">Total Revenue</p>
+              <p className="text-on-surface-variant font-label-sm text-label-sm">Total Revenue</p>
               <h3 className="text-h2 font-h2 mt-1">$428,500.00</h3>
             </div>
             <div className="bg-white p-lg rounded-xl border border-[#EAECF0] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -137,7 +137,7 @@ export default function TransactionListPage() {
                   8.2%
                 </span>
               </div>
-              <p className="text-secondary font-label-sm text-label-sm">Active Invoices</p>
+              <p className="text-on-surface-variant font-label-sm text-label-sm">Active Invoices</p>
               <h3 className="text-h2 font-h2 mt-1">1,284</h3>
             </div>
             <div className="bg-white p-lg rounded-xl border border-[#EAECF0] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -150,7 +150,7 @@ export default function TransactionListPage() {
                   3.1%
                 </span>
               </div>
-              <p className="text-secondary font-label-sm text-label-sm">Pending Payments</p>
+              <p className="text-on-surface-variant font-label-sm text-label-sm">Pending Payments</p>
               <h3 className="text-h2 font-h2 mt-1">$24,105.00</h3>
             </div>
             <div className="bg-white p-lg rounded-xl border border-[#EAECF0] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
@@ -163,7 +163,7 @@ export default function TransactionListPage() {
                   24%
                 </span>
               </div>
-              <p className="text-secondary font-label-sm text-label-sm">Transacting Users</p>
+              <p className="text-on-surface-variant font-label-sm text-label-sm">Transacting Users</p>
               <h3 className="text-h2 font-h2 mt-1">852</h3>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function TransactionListPage() {
                 Clear all filters
               </button>
             </div>
-            <div className="text-secondary text-sm font-medium">
+            <div className="text-on-surface-variant text-sm font-medium">
               Showing <span className="text-on-surface">1,284</span> results
             </div>
           </div>
@@ -208,17 +208,17 @@ export default function TransactionListPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-[#EAECF0]">
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
                       <div className="flex items-center gap-2">
                         Transaction ID
                         <span className="material-symbols-outlined text-xs" data-icon="arrow_downward">arrow_downward</span>
                       </div>
                     </th>
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">User</th>
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Amount</th>
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">User</th>
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Date</th>
                     <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
@@ -233,7 +233,7 @@ export default function TransactionListPage() {
                         <img className="w-8 h-8 rounded-full" data-alt="Portrait of a male farmer with a friendly expression, outdoor natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDWeSnA4QoTD234h75GP9uAc3ZcUsqElFk3_IQZokY4QIb3uJ1zl-N5JZHji1uinenQUEZPvg33LyWdpOWTRT_gc0pWWdoykgHtgKmMQPSb83nxVZJtpgOWL9chlErxDNWLKUjjL-guQoXVX9Ldu-bnx8sXBJXP33xagm3JxxWakoGgQmg-ApjLE0D3OblPeqwC9rcMNmbnxKuToyrh3Mhtdut9D2hkwyOP6Yf4Kcl48f2EITMwsAfu_TYdW94waTEShsULMxlFcY" />
                         <div>
                           <div className="text-sm font-semibold text-on-surface">Marcus Thorne</div>
-                          <div className="text-xs text-secondary">m.thorne@agri.com</div>
+                          <div className="text-xs text-on-surface-variant">m.thorne@agri.com</div>
                         </div>
                       </div>
                     </td>
@@ -242,7 +242,7 @@ export default function TransactionListPage() {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Paid</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-secondary">Oct 24, 2023</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">Oct 24, 2023</td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-gray-400 hover:text-primary transition-colors">
                         <span className="material-symbols-outlined" data-icon="more_vert">more_vert</span>
@@ -259,7 +259,7 @@ export default function TransactionListPage() {
                         <img className="w-8 h-8 rounded-full" data-alt="Close up portrait of a female agriculturist, thoughtful gaze, soft afternoon light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJrqc_U_uZaPNrkQM8WyFaUEQayhcQklVqYhfDM19q1x_wHXjpHv2RIo2UxhL839YteBQlJYCxWxo0QOPCPzjWgLSBANwjsBC6jsYoQK13ZEb_ABOmZVCAs66oyGJ4lLnk21BBTN9XDW2qcZJ-N45aheW8x_NGfa5Dnw_yQbn26VNOpXyp0b1Ym-zlljQDoK_InP4i8jH-8EeJ8ZG5G3Ix6vqmjKKZZdaNaI7VUsjugCkysSEQ9wobQCVYdx0-eMkx8PoLqpG9wFM" />
                         <div>
                           <div className="text-sm font-semibold text-on-surface">Sarah Jenkins</div>
-                          <div className="text-xs text-secondary">s.jenkins@farm.net</div>
+                          <div className="text-xs text-on-surface-variant">s.jenkins@farm.net</div>
                         </div>
                       </div>
                     </td>
@@ -268,7 +268,7 @@ export default function TransactionListPage() {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Pending</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-secondary">Oct 23, 2023</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">Oct 23, 2023</td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-gray-400 hover:text-primary transition-colors">
                         <span className="material-symbols-outlined" data-icon="more_vert">more_vert</span>
@@ -285,7 +285,7 @@ export default function TransactionListPage() {
                         <img className="w-8 h-8 rounded-full" data-alt="Profile of an older male farmer with weathered features, gentle smile, sunlit background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAH1EUW8FlcQKMgK7h1D3H_kSagt-6DWVznpLVjqwDumJUryYap2fqY2HDjLB0TZm5bnb4U5W7T4OuUZzq1iayYDKLIt_Bz8HfANgD8AgxfgHstDqcrC2BbYEbymd9QTlXGWY3gnGDWGd-OSEk_3ftBBDePUIJPfrp_Uk7U0Be5jZf1Rzl8rLN9qDfZdDca_GSxQgRTNjX4ZCtTiglXStaXjNxuopaySt4oncb066NJyFiwt6Dusy3_DQneJdugBktoFYMm9naP-DQ" />
                         <div>
                           <div className="text-sm font-semibold text-on-surface">Robert Millon</div>
-                          <div className="text-xs text-secondary">rob.m@millonfarms.org</div>
+                          <div className="text-xs text-on-surface-variant">rob.m@millonfarms.org</div>
                         </div>
                       </div>
                     </td>
@@ -294,7 +294,7 @@ export default function TransactionListPage() {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Failed</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-secondary">Oct 23, 2023</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">Oct 23, 2023</td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-gray-400 hover:text-primary transition-colors">
                         <span className="material-symbols-outlined" data-icon="more_vert">more_vert</span>
@@ -311,7 +311,7 @@ export default function TransactionListPage() {
                         <img className="w-8 h-8 rounded-full" data-alt="Portrait of a young female agribusiness professional in a bright greenhouse, vibrant green surroundings" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_tNMij4nEL3GfkgUrxQyHS6SphsJ4_iIbliBcpFRoZaaxr5PlGpoxKBEtUTsUytegbZfJYgH7NsSHdkxcYnCelnTZvb_SR-wqdYiahgch04tb2eDOT2nuVtijYtqgy-8s92WqDPUWQvRou1pnqGOMkpPacZm9noTKUn7WEPrXNDFL62BMra45swPXoZFDjtzquZhdsd6ArIjz8kOWLr1jGiaF2rLDp_nEXKIiUrS7bfz99oGFLTTf6k_EoqNn_KQp5IU7rzmyoMs" />
                         <div>
                           <div className="text-sm font-semibold text-on-surface">Elena Rodriguez</div>
-                          <div className="text-xs text-secondary">elena.r@kiz-ops.com</div>
+                          <div className="text-xs text-on-surface-variant">elena.r@kiz-ops.com</div>
                         </div>
                       </div>
                     </td>
@@ -320,7 +320,7 @@ export default function TransactionListPage() {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Paid</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-secondary">Oct 22, 2023</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">Oct 22, 2023</td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-gray-400 hover:text-primary transition-colors">
                         <span className="material-symbols-outlined" data-icon="more_vert">more_vert</span>
@@ -337,7 +337,7 @@ export default function TransactionListPage() {
                         <img className="w-8 h-8 rounded-full" data-alt="Portrait of a male technical specialist in a modern farm office, high-key lighting, professional vibe" src="https://lh3.googleusercontent.com/aida-public/AB6AXuADdMWH1exchDtCBpRBP5Qu6Hev0qABh3eO5_G66gPCGfd1oOuJ6WZmXl6UoBzaaqUDFkRDcouHOSRItncy46Yql1qJOrEp-zgIEt1p54hv-zEco7OkvAX7v7dH4h59GyEyJbMON8DnzYjpaEBRKbkUJKHiBvejA0JUGC6nJyg4jb-vyii-LTge30In3RlcFtCxbpCeHzK9BEWRVBPoLjdYJAZNCDLsRM5SC3o6ocFzllsG9uUgjO4qdJ-wDuGyNbZzcDU_ij2jjLw" />
                         <div>
                           <div className="text-sm font-semibold text-on-surface">Liam Watson</div>
-                          <div className="text-xs text-secondary">l.watson@agrotech.io</div>
+                          <div className="text-xs text-on-surface-variant">l.watson@agrotech.io</div>
                         </div>
                       </div>
                     </td>
@@ -346,7 +346,7 @@ export default function TransactionListPage() {
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">Paid</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-secondary">Oct 22, 2023</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">Oct 22, 2023</td>
                     <td className="px-6 py-4 text-right">
                       <button className="text-gray-400 hover:text-primary transition-colors">
                         <span className="material-symbols-outlined" data-icon="more_vert">more_vert</span>
@@ -358,17 +358,17 @@ export default function TransactionListPage() {
             </div>
             {/* Pagination */}
             <div className="px-6 py-4 flex items-center justify-between border-t border-[#EAECF0] bg-gray-50">
-              <button className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-secondary hover:bg-white transition-all disabled:opacity-50">
+              <button className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-on-surface-variant hover:bg-white transition-all disabled:opacity-50">
                 Previous
               </button>
               <div className="flex gap-1">
                 <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-primary text-white text-sm font-medium">1</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-secondary text-sm font-medium">2</button>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-secondary text-sm font-medium">3</button>
-                <span className="px-2 text-secondary">...</span>
-                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-secondary text-sm font-medium">12</button>
+                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-on-surface-variant text-sm font-medium">2</button>
+                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-on-surface-variant text-sm font-medium">3</button>
+                <span className="px-2 text-on-surface-variant">...</span>
+                <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white text-on-surface-variant text-sm font-medium">12</button>
               </div>
-              <button className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-secondary hover:bg-white transition-all">
+              <button className="px-4 py-2 border border-outline-variant rounded-lg text-sm font-medium text-on-surface-variant hover:bg-white transition-all">
                 Next
               </button>
             </div>
@@ -376,7 +376,7 @@ export default function TransactionListPage() {
         </div>
 
         {/* Footer Info */}
-        <footer className="mt-auto px-margin py-lg bg-white border-t border-gray-100 flex flex-col md:flex-row justify-between items-center text-xs text-secondary gap-4">
+        <footer className="mt-auto px-margin py-lg bg-white border-t border-gray-100 flex flex-col md:flex-row justify-between items-center text-xs text-on-surface-variant gap-4">
           <div className="flex items-center gap-6">
             <span>© 2023 KizFarm. All rights reserved.</span>
             <a className="hover:text-primary transition-colors" href="#">Privacy Policy</a>

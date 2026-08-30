@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { clearPendingVerificationEmail, getAuthToken, getPendingVerificationEmail } from "@/lib/kizfarm/auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { clearPendingVerificationEmail, getPendingVerificationEmail, getSession } from "@/lib/kizfarm/supabase-auth";
 
 export default function OtpPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -13,7 +14,6 @@ export default function OtpPage() {
     typeof window !== "undefined"
       ? getPendingVerificationEmail() || search?.get("email")
       : null;
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -48,14 +48,17 @@ export default function OtpPage() {
     const otpCode = otp.join("");
     if (!pendingEmail) return setError("No pending email to verify");
     try {
-      const res = await fetch(`${API}/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: pendingEmail, code: otpCode }),
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: pendingEmail,
+        token: otpCode,
+        type: "signup",
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "OTP verification failed");
-      // on success, clear pending and go to login
+      if (verifyError) throw new Error(verifyError.message);
+      // verifyOtp establishes a session automatically -- sign back out so
+      // the user lands on the login screen and logs in explicitly, same
+      // as the original flow.
+      await supabase.auth.signOut();
       clearPendingVerificationEmail();
       router.push("/login");
     } catch (err: any) {
@@ -67,9 +70,9 @@ export default function OtpPage() {
 
   // redirect away if already authenticated
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const token = getAuthToken();
-    if (token) router.push('/');
+    getSession().then((session) => {
+      if (session) router.push("/");
+    });
   }, [router]);
 
   const handleResend = async () => {
@@ -77,12 +80,9 @@ export default function OtpPage() {
     if (resendCooldown > 0 || isResending) return;
     setIsResending(true);
     try {
-      const res = await fetch(`${API}/auth/resend-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: pendingEmail }),
-      });
-      if (!res.ok) throw new Error("Resend failed");
+      const supabase = createClient();
+      const { error: resendError } = await supabase.auth.resend({ type: "signup", email: pendingEmail });
+      if (resendError) throw new Error(resendError.message);
       // start cooldown
       setResendCooldown(30);
       cooldownRef.current = window.setInterval(() => {

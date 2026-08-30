@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminEscrowById } from "@/lib/kizfarm/supabase-data";
+import { releaseEscrowToFarmer, adminCancelOrder } from "@/lib/kizfarm/supabase-mutations";
 
 interface OrderMetrics {
   _id: string;
@@ -127,20 +127,11 @@ export default function EscrowDetailPage() {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/escrow/${escrowId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const { res, payload } = await getAdminEscrowById(escrowId!);
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to load escrow details");
+        throw new Error(payload?.error || "Failed to load escrow details");
       }
-
-      const data = await res.json();
-      if (data.success) {
-        setEscrow(data.escrow);
-      }
+      setEscrow(payload.escrow as Escrow);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load escrow details",
@@ -157,22 +148,13 @@ export default function EscrowDetailPage() {
     setReleaseError(null);
 
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/escrow/${escrow._id}/release`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          releaseNotes: `Released by admin on ${new Date().toLocaleDateString()}`,
-        }),
-      });
-
-      const data = await res.json();
+      const { res, payload } = await releaseEscrowToFarmer(
+        escrow._id,
+        `Released by admin on ${new Date().toLocaleDateString()}`,
+      );
 
       if (!res.ok) {
-        setReleaseError(data.error || "Failed to release funds");
+        setReleaseError(payload?.error || "Failed to release funds");
         return;
       }
 
@@ -196,25 +178,13 @@ export default function EscrowDetailPage() {
     setCancelling(true);
 
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(
-        `${API_URL}/admin/orders/${escrow.orderId._id}/cancel`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            reason: cancellationReason || "Cancelled by admin",
-          }),
-        },
+      const { res, payload } = await adminCancelOrder(
+        escrow.orderId._id,
+        cancellationReason || "Cancelled by admin",
       );
 
-      const data = await res.json();
-
       if (!res.ok) {
-        setReleaseError(data.error || "Failed to cancel order");
+        setReleaseError(payload?.error || "Failed to cancel order");
         return;
       }
 

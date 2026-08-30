@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getMyFullProfile } from "@/lib/kizfarm/supabase-data";
+import { updateMyFullProfile } from "@/lib/kizfarm/supabase-mutations";
 
 interface FarmerProfile {
   user: {
@@ -51,24 +51,41 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/farmer/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && data.profile) {
-        setProfile(data.profile);
-        setFormData({
-          name: data.profile.user?.name || "",
-          phone: data.profile.user?.phone || "",
-          address: data.profile.user?.address || "",
-          city: data.profile.user?.city || "",
-          state: data.profile.user?.state || "",
-          country: data.profile.user?.country || "",
-          farmName: data.profile.farmer?.farmName || "",
-          farmType: data.profile.farmer?.farmType || "",
-          location: data.profile.farmer?.location || "",
+      const { res, payload } = await getMyFullProfile();
+      if (res.ok && payload.profile) {
+        const p = payload.profile;
+        setProfile({
+          user: {
+            name: p.name,
+            email: p.email,
+            phone: p.phone,
+            address: p.address,
+            city: p.city,
+            state: p.state,
+            country: p.country,
+            profileImage: p.profileImage,
+          },
+          farmer: {
+            farmName: p.farmName,
+            farmType: p.farmType,
+            location: p.location,
+            isVerified: p.isVerified,
+          },
         });
+        setFormData({
+          name: p.name || "",
+          phone: p.phone || "",
+          address: p.address || "",
+          city: p.city || "",
+          state: p.state || "",
+          country: p.country || "",
+          farmName: p.farmName || "",
+          farmType: p.farmType || "",
+          location: p.location || "",
+        });
+      } else {
+        setMessage(payload?.error || "Failed to load profile");
+        setMessageType("error");
       }
     } catch (err) {
       console.error("Fetch profile failed:", err);
@@ -85,25 +102,15 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
     setMessage("");
 
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/farmer/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await updateMyFullProfile(formData);
+      if (res.ok) {
         setMessageType("success");
         setMessage("Profile updated successfully!");
         setShowEditModal(false);
         fetchProfile();
       } else {
         setMessageType("error");
-        setMessage(data.error || "Failed to update profile");
+        setMessage(payload?.error || "Failed to update profile");
       }
     } catch (err) {
       setMessageType("error");

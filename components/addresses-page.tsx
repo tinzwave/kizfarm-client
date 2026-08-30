@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAddresses, createAddress, updateAddress, deleteAddress } from "@/lib/kizfarm/supabase-mutations";
 
 interface AddressItem {
   _id: string;
@@ -38,7 +38,7 @@ export default function AddressesPage() {
     try {
       setLoading(true);
       setError(null);
-      const { res, payload } = await apiFetch("/buyer/addresses");
+      const { res, payload } = await getAddresses();
       if (!res.ok) {
         setError(payload?.error || "Failed to fetch addresses");
         return;
@@ -96,13 +96,9 @@ export default function AddressesPage() {
       setError(null);
 
       const bodyData = { label, street, city, state, country, phone, isDefault };
-      const endpoint = isEditing ? `/buyer/addresses/${editingAddressId}` : "/buyer/addresses";
-      const method = isEditing ? "PUT" : "POST";
-
-      const { res, payload } = await apiFetch(endpoint, {
-        method,
-        body: JSON.stringify(bodyData)
-      });
+      const { res, payload } = isEditing
+        ? await updateAddress(editingAddressId!, bodyData)
+        : await createAddress(bodyData);
 
       if (!res.ok) {
         setError(payload?.error || "Failed to save address.");
@@ -122,9 +118,7 @@ export default function AddressesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this address?")) return;
     try {
-      const { res, payload } = await apiFetch(`/buyer/addresses/${id}`, {
-        method: "DELETE"
-      });
+      const { res, payload } = await deleteAddress(id);
       if (!res.ok) {
         alert(payload?.error || "Failed to delete address");
         return;
@@ -138,10 +132,7 @@ export default function AddressesPage() {
 
   const handleSetDefault = async (id: string) => {
     try {
-      const { res, payload } = await apiFetch(`/buyer/addresses/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ isDefault: true })
-      });
+      const { res, payload } = await updateAddress(id, { isDefault: true });
       if (!res.ok) {
         alert(payload?.error || "Failed to set default address");
         return;
@@ -174,7 +165,7 @@ export default function AddressesPage() {
           {/* Header Section */}
           <div className="flex flex-col gap-2 mb-xl">
             <h1 className="font-headline-lg text-headline-lg text-on-surface font-extrabold text-2xl">Saved Addresses</h1>
-            <p className="font-body-md text-body-md text-secondary">Manage your delivery locations for fresh farm produce deliveries.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">Manage your delivery locations for fresh farm produce deliveries.</p>
           </div>
 
           {/* Loading state */}
@@ -197,7 +188,7 @@ export default function AddressesPage() {
             <div className="bg-white border border-[#E5E7EB] rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[300px] mb-8">
               <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">home_pin</span>
               <h3 className="text-lg font-bold text-on-surface mb-1">No addresses saved</h3>
-              <p className="text-sm text-secondary mb-6">You need to save at least one delivery address to place orders.</p>
+              <p className="text-sm text-on-surface-variant mb-6">You need to save at least one delivery address to place orders.</p>
               <button 
                 onClick={openAddModal}
                 className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold hover:bg-primary transition-colors flex items-center gap-2"
@@ -267,7 +258,7 @@ export default function AddressesPage() {
                       {address.country}
                     </p>
                     {address.phone && (
-                      <p className="font-label-sm text-label-sm text-secondary mt-4 flex items-center gap-2">
+                      <p className="font-label-sm text-label-sm text-on-surface-variant mt-4 flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px]" data-icon="call">call</span>
                         {address.phone}
                       </p>

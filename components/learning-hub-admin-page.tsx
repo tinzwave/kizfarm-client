@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases } from "@/lib/kizfarm/supabase-data";
+import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 
 interface Tutor {
@@ -79,14 +80,14 @@ export default function LearningHubAdminPage() {
     setLoading(true);
     try {
       const [tutorRes, courseRes] = await Promise.all([
-        apiFetch("/learning/tutors"),
-        apiFetch("/learning/courses?source=admin"),
+        getTutors(),
+        getCourses({ source: "admin" }),
       ]);
       if (tutorRes.payload?.ok) setTutors(tutorRes.payload.tutors ?? []);
       if (courseRes.payload?.ok) setCourses(courseRes.payload.courses ?? []);
       const [buyerCourseRes, purchasesRes] = await Promise.all([
-        apiFetch("/learning/admin/buyer-courses"),
-        apiFetch("/learning/admin/course-purchases"),
+        getAdminBuyerCourses(),
+        getAdminCoursePurchases(),
       ]);
       if (buyerCourseRes.payload?.ok) setBuyerCourses(buyerCourseRes.payload.courses ?? []);
       if (purchasesRes.payload?.ok) setPurchases(purchasesRes.payload.purchases ?? []);
@@ -116,16 +117,12 @@ export default function LearningHubAdminPage() {
       return;
     }
 
-    const body = new FormData();
-    body.set("name", tutorForm.name);
-    body.set("description", tutorForm.description);
-    body.set("phone", tutorForm.phone);
-    body.set("whatsapp", tutorForm.whatsapp);
-    body.set("image", tutorForm.image);
-
-    const { res, payload } = await apiFetch("/learning/tutors", {
-      method: "POST",
-      body,
+    const { res, payload } = await createTutor({
+      name: tutorForm.name,
+      description: tutorForm.description,
+      phone: tutorForm.phone,
+      whatsapp: tutorForm.whatsapp,
+      imageFile: tutorForm.image,
     });
     if (!res.ok) {
       setMessage(payload?.error || "Could not save tutor.");
@@ -140,15 +137,12 @@ export default function LearningHubAdminPage() {
   async function submitCourse(e: React.FormEvent) {
     e.preventDefault();
     setMessage("");
-    const { res, payload } = await apiFetch("/learning/courses", {
-      method: "POST",
-      body: JSON.stringify({
-        title: courseForm.title,
-        description: courseForm.description,
-        price: Number(courseForm.price),
-        tutor: courseForm.tutor,
-        content: courseForm.content,
-      }),
+    const { res, payload } = await createAdminCourse({
+      title: courseForm.title,
+      description: courseForm.description,
+      price: Number(courseForm.price),
+      tutorId: courseForm.tutor,
+      content: courseForm.content,
     });
     if (!res.ok) {
       setMessage(payload?.error || "Could not publish course.");
@@ -176,14 +170,12 @@ export default function LearningHubAdminPage() {
 
     setReviewSubmitting(status);
     try {
-      const { res, payload } = await apiFetch(`/learning/admin/buyer-courses/${course._id}/review`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          status,
-          commission,
-          rejectionReason: reviewForm.rejectionReason.trim() || "Rejected by admin. Please update the course and resubmit.",
-        }),
-      });
+      const { res, payload } = await adminReviewBuyerCourse(
+        course._id,
+        status === "approved",
+        commission,
+        reviewForm.rejectionReason.trim() || "Rejected by admin. Please update the course and resubmit.",
+      );
       if (!res.ok) {
         setMessage(payload?.error || "Could not update buyer course review.");
         return;
@@ -202,10 +194,7 @@ export default function LearningHubAdminPage() {
     setMessage("");
     setReleasingPayoutId(purchase._id);
     try {
-      const { res, payload } = await apiFetch(`/learning/admin/course-purchases/${purchase._id}/release-payout`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
+      const { res, payload } = await releaseCoursePayout(purchase._id);
       if (!res.ok) {
         setMessage(payload?.error || "Could not release payout.");
         return;

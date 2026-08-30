@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerPayoutHistory } from "@/lib/kizfarm/supabase-data";
 
 interface ReleasedFund {
   orderId: string;
@@ -31,15 +31,15 @@ export default function FarmerPayoutHistoryPage() {
       setLoading(true);
       setError("");
       try {
-        const { res, payload } = await apiFetch("/farmer/payout-history");
+        const { res, payload } = await getFarmerPayoutHistory();
         if (!res.ok) {
           setError(payload?.error || "Could not load payout history.");
           return;
         }
         setData({
-          accountBalance: payload.accountBalance,
-          releasedFundsLedger: payload.releasedFundsLedger,
-          totalReleased: payload.totalReleased,
+          accountBalance: payload.accountBalance ?? 0,
+          releasedFundsLedger: (payload.releasedFundsLedger ?? []) as ReleasedFund[],
+          totalReleased: payload.totalReleased ?? 0,
         });
       } catch {
         setError("Could not connect to the backend.");

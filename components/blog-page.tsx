@@ -4,8 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/top-nav";
 import SiteFooter from "@/components/site-footer";
-import { apiFetch } from "@/lib/kizfarm/api";
-import { DEMO_BLOG_POSTS } from "@/lib/kizfarm/demo-content";
+import { getBlogPosts } from "@/lib/kizfarm/supabase-data";
 
 interface BlogPost {
   _id: string;
@@ -32,10 +31,10 @@ export default function BlogPage() {
       setLoading(true);
       let live: BlogPost[] = [];
       try {
-        const { res, payload } = await apiFetch("/blog");
+        const { res, payload } = await getBlogPosts();
         if (res.ok) live = payload.posts || [];
       } catch {}
-      setPosts([...live, ...DEMO_BLOG_POSTS]);
+      setPosts(live);
       setLoading(false);
     }
     loadBlogs();

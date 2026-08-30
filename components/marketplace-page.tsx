@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getMarketplaceProducts } from "@/lib/kizfarm/supabase-data";
 import { useCart } from "@/lib/kizfarm/cart-context";
 
 interface Product {
@@ -15,7 +15,7 @@ interface Product {
   farmerId: {
     farmName: string;
     location: string;
-  };
+  } | null;
   createdAt: string;
 }
 
@@ -34,16 +34,10 @@ export default function MarketplacePage() {
         setLoading(true);
         setError(null);
 
-        const params = new URLSearchParams();
-        if (selectedCategory && selectedCategory !== "all") {
-          params.set("category", selectedCategory);
-        }
-        if (searchQuery.trim()) {
-          params.set("q", searchQuery.trim());
-        }
-        const endpoint = `/marketplace/products${params.toString() ? `?${params}` : ""}`;
-
-        const { res, payload } = await apiFetch(endpoint);
+        const { res, payload } = await getMarketplaceProducts({
+          category: selectedCategory && selectedCategory !== "all" ? selectedCategory : undefined,
+          q: searchQuery.trim() || undefined,
+        });
 
         if (!res.ok) {
           setError(payload?.error || "Failed to fetch products");

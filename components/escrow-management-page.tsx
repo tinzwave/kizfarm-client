@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminEscrows, getAdminEscrowStats } from "@/lib/kizfarm/supabase-data";
 
 interface Escrow {
   _id: string;
@@ -28,12 +27,8 @@ export default function EscrowManagementPage() {
 
   const fetchEscrows = async () => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/escrow`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setEscrows(data.escrows || []);
+      const { payload } = await getAdminEscrows();
+      if (payload?.ok) setEscrows((payload.escrows as Escrow[]) || []);
     } catch (err) {
       console.error('Fetch escrows failed:', err);
     } finally {
@@ -43,12 +38,8 @@ export default function EscrowManagementPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/escrow/stats/summary`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setStats(data.stats);
+      const { payload } = await getAdminEscrowStats();
+      if (payload?.ok) setStats(payload.stats);
     } catch (err) {
       console.error('Fetch stats failed:', err);
     }

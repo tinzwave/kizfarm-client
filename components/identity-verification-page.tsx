@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getMyFarmerProfile } from "@/lib/kizfarm/supabase-data";
+import { submitFarmerVerification } from "@/lib/kizfarm/supabase-mutations";
 
 type UploadKey = "farmerImage" | "validIdImage";
 
@@ -61,25 +63,14 @@ export default function IdentityVerificationPage() {
   };
 
   const fetchFarmerStatus = async () => {
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("kizfarm_token")
-        : null;
-    if (!token) {
-      router.push("/login");
-      return;
-    }
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!data?.farmer) {
+      const { payload } = await getMyFarmerProfile();
+      if (!payload?.farmer) {
         router.push("/farmer/become");
         return;
       }
-      setFarmer(data.farmer);
-      setFarmAddress(data.farmer?.farmAddress || "");
+      setFarmer(payload.farmer);
+      setFarmAddress(payload.farmer?.farmAddress || "");
     } catch (e) {
       console.error(e);
     } finally {
@@ -144,8 +135,6 @@ export default function IdentityVerificationPage() {
     e?.stopPropagation();
     if (!farmer) return;
     if (!allowEdit) return;
-    const token = localStorage.getItem("kizfarm_token");
-    if (!token) return router.push("/login");
 
     const farmerImage = selectedFiles.farmerImage;
     const validIdImage = selectedFiles.validIdImage;
@@ -172,22 +161,16 @@ export default function IdentityVerificationPage() {
       return;
     }
 
-    const form = new FormData();
-    form.append("farmAddress", farmAddress.trim());
-    if (farmerImage) form.append("farmerImage", farmerImage);
-    if (validIdImage) form.append("validIdImage", validIdImage);
-    farmImages.forEach((farmImage) => form.append("farmImages", farmImage));
-
     setSubmitting(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/verify`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
+      const { res, payload } = await submitFarmerVerification({
+        farmAddress: farmAddress.trim(),
+        farmerImageFile: farmerImage,
+        validIdImageFile: validIdImage,
+        farmImageFiles: farmImages.length === 5 ? farmImages : undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      setFarmer(data.farmer);
+      if (!res.ok) throw new Error(payload?.error || "Upload failed");
+      await fetchFarmerStatus();
     } catch (err) {
       alert(String(err));
     } finally {
@@ -390,7 +373,7 @@ export default function IdentityVerificationPage() {
                     {(farmImagePreviews.length
                       ? farmImagePreviews
                       : getExistingFarmImages()
-                    ).map((preview, index) => (
+                    ).map((preview: string, index: number) => (
                       <div
                         key={`${preview}-${index}`}
                         className="relative aspect-square overflow-hidden rounded-md bg-white border border-zinc-200"

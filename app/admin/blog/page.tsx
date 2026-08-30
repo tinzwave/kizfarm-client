@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAdminBlogPosts } from "@/lib/kizfarm/supabase-data";
+import { deleteBlogPost } from "@/lib/kizfarm/supabase-mutations";
 
 interface BlogPost {
   _id: string;
@@ -23,7 +24,7 @@ export default function AdminBlogPage() {
   async function loadPosts() {
     try {
       setLoading(true);
-      const { res, payload } = await apiFetch("/blog/admin");
+      const { res, payload } = await getAdminBlogPosts();
       if (!res.ok) {
         throw new Error(payload.error || "Failed to load posts");
       }
@@ -43,9 +44,7 @@ export default function AdminBlogPage() {
     if (!confirm("Are you sure you want to delete this blog post?")) return;
 
     try {
-      const { res, payload } = await apiFetch(`/blog/${id}`, {
-        method: "DELETE",
-      });
+      const { res, payload } = await deleteBlogPost(id);
       if (!res.ok) {
         throw new Error(payload.error || "Failed to delete post");
       }
@@ -60,7 +59,7 @@ export default function AdminBlogPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-emerald-950 tracking-tight">Blogs Management</h1>
-          <p className="text-xs text-secondary mt-1">
+          <p className="text-xs text-on-surface-variant mt-1">
             Create, publish, edit, or delete articles on the KizFarm dynamic blog.
           </p>
         </div>

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
+import { createBuyerCourse, updateBuyerCourse } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 
 type ReviewStatus = "draft" | "pending" | "approved" | "rejected";
@@ -48,9 +49,9 @@ export default function BuyerCoursesPage() {
     setLoading(true);
     try {
       const [coursesRes, mineRes, subsRes] = await Promise.all([
-        apiFetch("/learning/buyer/courses"),
-        apiFetch("/learning/buyer/my-courses"),
-        apiFetch("/learning/subscriptions?source=buyer"),
+        getBuyerBrowseCourses(),
+        getMyCreatedCourses(),
+        getMySubscriptions({ source: "buyer" }),
       ]);
       if (coursesRes.payload?.ok) setCourses(coursesRes.payload.courses ?? []);
       if (mineRes.payload?.ok) setMyCourses(mineRes.payload.courses ?? []);
@@ -99,14 +100,9 @@ export default function BuyerCoursesPage() {
       price: Number(form.price),
       content: form.content,
     };
-    const endpoint = editingCourse
-      ? `/learning/buyer/courses/${editingCourse._id}`
-      : "/learning/buyer/courses";
-    const method = editingCourse ? "PATCH" : "POST";
-    const { res, payload } = await apiFetch(endpoint, {
-      method,
-      body: JSON.stringify(body),
-    });
+    const { res, payload } = editingCourse
+      ? await updateBuyerCourse(editingCourse._id, body)
+      : await createBuyerCourse(body);
 
     if (!res.ok) {
       setMessage(payload?.error || "Could not submit course.");

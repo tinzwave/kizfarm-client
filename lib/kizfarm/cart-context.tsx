@@ -7,8 +7,6 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { apiFetch } from "./api";
-
 export interface CartItem {
   productId: string;
   name: string;
@@ -46,7 +44,6 @@ function clampQuantity(quantity: number, maxQuantity?: number) {
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -67,33 +64,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-  }, [items]);
-
-  // Optionally sync to database if user is authenticated
-  useEffect(() => {
-    if (items.length === 0) return;
-
-    const syncToDb = async () => {
-      try {
-        setIsSyncing(true);
-        const token = localStorage.getItem("kizfarm_token");
-        if (token) {
-          await apiFetch("/buyer/cart/save", {
-            method: "POST",
-            body: JSON.stringify({ items }),
-          });
-        }
-      } catch (err) {
-        console.warn("Failed to sync cart to database:", err);
-        // Silently fail - localStorage is still available
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-
-    // Debounce the sync to avoid too many requests
-    const timer = setTimeout(syncToDb, 1000);
-    return () => clearTimeout(timer);
   }, [items]);
 
   const addItem = useCallback(

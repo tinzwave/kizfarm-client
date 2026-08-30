@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
-import { DEMO_BLOG_POSTS } from "@/lib/kizfarm/demo-content";
+import { getBlogPostBySlug } from "@/lib/kizfarm/supabase-data";
 
 interface Block {
   type: "heading" | "paragraph" | "image" | "video";
@@ -36,19 +35,13 @@ export default function BlogDetail({ slug, onBack }: { slug: string; onBack?: ()
 
   useEffect(() => {
     async function loadPost() {
-      const demo = DEMO_BLOG_POSTS.find((p) => p.slug === slug);
-      if (demo) {
-        setPost(demo);
-        setLoading(false);
-        return;
-      }
       try {
         setLoading(true);
-        const { res, payload } = await apiFetch(`/blog/${slug}`);
+        const { res, payload } = await getBlogPostBySlug(slug);
         if (!res.ok) {
           throw new Error(payload.error || "Failed to load blog post");
         }
-        setPost(payload.post);
+        setPost((payload.post as BlogPost) ?? null);
       } catch (err: any) {
         setError(err.message || "An error occurred");
       } finally {

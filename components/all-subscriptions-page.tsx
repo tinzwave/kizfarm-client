@@ -89,7 +89,7 @@ export default function AllSubscriptionsPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
             <h2 className="text-h1 font-h1 text-on-surface mb-2">All Subscriptions</h2>
-            <p className="text-body-sm text-secondary">Manage and monitor student course enrollments and subscription lifecycles.</p>
+            <p className="text-body-sm text-on-surface-variant">Manage and monitor student course enrollments and subscription lifecycles.</p>
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant text-primary rounded-lg text-label-md font-bold hover:shadow-md transition-all">
@@ -161,7 +161,7 @@ export default function AllSubscriptionsPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <img alt="Tutor" className="w-6 h-6 rounded-full" data-alt="A portrait of an expert agricultural tutor in their 40s, with a warm and approachable look, wearing a green polo shirt. The background shows a modern hydroponic farm with vibrant green plants and precise lighting, suggesting expertise in advanced farming techniques. Professional and trustworthy visual style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBntjoxnNEJwNclzUqJsiyz6KbLYtbsreIY4J-Qtx6pbco8cBTmzpmxOHVUq49-gRMfF8DzQezjrIXRhGWkIfcLOsSGdp_KN98-iRcYEc42FV5IPj6UxjOInN7BONIys_ErXOiDWBVl8prW5Du7Jncg8N_6vfHCPwdQlS6c80g22P2SgWQfIHjtiteXkr71O4KDX6ZUlaa-VQBtLv1Gh3swtgW1_uqUpp8S2KN__GKgljJScmKuFF1V-MJsCe0aTAu5cJirBb4LT7A" />
-                      <span className="text-body-sm text-secondary">Dr. Sarah Miller</span>
+                      <span className="text-body-sm text-on-surface-variant">Dr. Sarah Miller</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -195,7 +195,7 @@ export default function AllSubscriptionsPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <img alt="Tutor" className="w-6 h-6 rounded-full" data-alt="A close-up portrait of a professional female agricultural analyst with a confident expression. She is in a well-lit laboratory environment with clean, modern equipment in the background. The aesthetic is bright and clinical, emphasizing scientific precision and reliability in modern farming education." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCesey78PbkIPGOQ4YJ7AeJ-y9FPCjolUCaL2-mazkya2yga8SiocRVpNCWnmgUO2ssUjZhPIyciBo7Up2J-pYHDEHJ5x3RuVBXWFwrBGugm-53Vmx44eAgrBY15ncnKb6wnaDaJ2uQTZP2YlcnLhVCJO3H-oVN3vd9gC0eEq1HgT6Fuwuz3Af4gV-mhtSRhdC-qzY2CWxfaKh9yV58cH10MtsM3_--53Jx39zIGqK_N9G-Qd_vRBoe6Q6rkEo7q163fMaWh4xgwJc" />
-                      <span className="text-body-sm text-secondary">Prof. Robert Chen</span>
+                      <span className="text-body-sm text-on-surface-variant">Prof. Robert Chen</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -229,7 +229,7 @@ export default function AllSubscriptionsPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <img alt="Tutor" className="w-6 h-6 rounded-full" data-alt="A portrait of a young, innovative agricultural entrepreneur with a creative and energetic look. The background is a vibrant indoor vertical farm with rows of glowing LEDs and lush greens. The photo style is modern, high-contrast, and dynamic, reflecting the future of sustainable food production." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYPMQoZV82rJnDS_l6sB1mwE5LL1gL9PAXbz3Udx7T2QfbqbQPaGyUBFWptEywSVVC5Z878ARerqvnLG-TCwbjUxIfsJ8HOb7Kjp4DWJZr5xh-T2V0oIYfUfgqZVkzgiOVbiNlo6Y6HCG0vNbvjAe1gkgxFkMK60IQufZXXgI81gmUawBW6lhEd8lVqwk2CYMv4U8fXHSfperZs3fn6I1J-mO3KOzUwBMmcOTJmQXPrSfsZmFp9PX7-jR-NWnEyFjW5Dicpegc-JI" />
-                      <span className="text-body-sm text-secondary">Elena Rodriguez</span>
+                      <span className="text-body-sm text-on-surface-variant">Elena Rodriguez</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -263,7 +263,7 @@ export default function AllSubscriptionsPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <img alt="Tutor" className="w-6 h-6 rounded-full" data-alt="A portrait of an experienced field engineer with a rugged but professional demeanor. He is standing in an open field with irrigation systems visible in the background under a clear, warm sunset light. The image captures a sense of practical wisdom and field-tested expertise in agriculture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpaDCngf_XkokyzGCaGI98h9zz-W5qG4Emlf3w5-oGFN4oQWp_TMKcS6Dh-6TtpTisG11DvwQtK5X-QLY6OwqHsbV_VBNREpQ8mI6WodQVqh1psa3_VOjKCSFjNbuSRhQj_lB9TOb-sXw0K4NUkEfP4hwA3qjWEJ1zxJxUrLXsgjlT72QpzXNZL-gMa6t9zBKP7Fjp3R9RmNychheqCLCuuF49W4dazD0nO8aJUabu-5jMsM8K3nxwaRonXExn4tqrik37sE-v1Fk" />
-                      <span className="text-body-sm text-secondary">Marcus Aurelio</span>
+                      <span className="text-body-sm text-on-surface-variant">Marcus Aurelio</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">

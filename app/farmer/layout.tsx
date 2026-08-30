@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FarmerSidebar from "@/components/farmer-sidebar";
 import { usePathname, useRouter } from "next/navigation";
-import { getAuthToken } from "@/lib/kizfarm/auth";
+import { getSession } from "@/lib/kizfarm/supabase-auth";
+import { getFarmerStatus } from "@/lib/kizfarm/supabase-data";
 
 export default function FarmerLayout({
   children,
@@ -48,8 +49,8 @@ export default function FarmerLayout({
     // - Approved -> allow dashboard routes
     async function checkStatus() {
       setCheckingAccess(true);
-      const token = getAuthToken();
-      if (!token) {
+      const session = await getSession();
+      if (!session) {
         if (pathname !== "/login") router.replace("/login");
         setCheckingAccess(false);
         return;
@@ -58,16 +59,12 @@ export default function FarmerLayout({
       const isBecome = pathname === "/farmer/become";
       const isVerify = pathname === "/farmer/verify";
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
-          cache: "no-store",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const { res, payload: json } = await getFarmerStatus();
         if (!res.ok) {
           if (pathname !== "/login") router.replace("/login");
           setCheckingAccess(false);
           return;
         }
-        const json = await res.json();
         const farmer = json?.farmer;
         const status = farmer?.status;
 

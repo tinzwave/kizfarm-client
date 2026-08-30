@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getMyFarmerProfile } from "@/lib/kizfarm/supabase-data";
+import { registerAsFarmer } from "@/lib/kizfarm/supabase-mutations";
+import { getSession, getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 
 const NIGERIAN_STATES = [
   "Abia",
@@ -52,27 +55,17 @@ export default function BecomeAFarmerPage() {
 
   useEffect(() => {
     const check = async () => {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("kizfarm_token")
-          : null;
-      if (!token) {
+      const session = await getSession();
+      if (!session) {
         router.replace("/login");
         return;
       }
+      const profile = await getCurrentProfile();
+      setFullName(profile?.name || "");
+
       try {
-        const rawUser = localStorage.getItem("kizfarm_user");
-        const user = rawUser ? JSON.parse(rawUser) : null;
-        setFullName(user?.name || "");
-      } catch {
-        setFullName("");
-      }
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (data?.farmer) {
+        const { res, payload } = await getMyFarmerProfile();
+        if (res.ok && payload.farmer) {
           // already started registration -> go to verification
           router.push("/farmer/verify");
           return;
@@ -88,17 +81,17 @@ export default function BecomeAFarmerPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("kizfarm_token")
-        : null;
-    if (!token) {
+    // Read the form synchronously -- e.currentTarget goes stale after an
+    // await, so this must happen before any async work.
+    const formData = new FormData(e.currentTarget);
+
+    const session = await getSession();
+    if (!session) {
       // redirect to login
       router.push("/login");
       return;
     }
 
-    const formData = new FormData(e.currentTarget);
     const farmName = String(formData.get("farm_name") || "").trim();
     const contact = phone.trim();
     const location = String(formData.get("location") || "");
@@ -124,22 +117,14 @@ export default function BecomeAFarmerPage() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}/farmer/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          fullName: fullName.trim(),
-          farmName,
-          phone: contact,
-          location,
-          farmType,
-        }),
+      const { res, payload } = await registerAsFarmer({
+        fullName: fullName.trim(),
+        farmName,
+        phone: contact,
+        location,
+        farmType,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Registration failed");
+      if (!res.ok) throw new Error(payload?.error || "Registration failed");
       // redirect to verification
       router.push("/farmer/verify");
     } catch (err) {
@@ -206,7 +191,7 @@ export default function BecomeAFarmerPage() {
               <h2 className="text-on-surface font-headline-lg mb-xs">
                 Create Farmer Account
               </h2>
-              <p className="text-secondary font-body-md">
+              <p className="text-on-surface-variant font-body-md">
                 Join the KIZ FARM ecosystem and start managing your production
                 with precision.
               </p>
@@ -370,7 +355,7 @@ export default function BecomeAFarmerPage() {
                 >
                   {submitting ? "Submitting…" : "Join KIZ FARM"}
                 </button>
-                <p className="text-center text-secondary font-label-sm">
+                <p className="text-center text-on-surface-variant font-label-sm">
                   By joining, you agree to our{" "}
                   <a
                     className="text-[#1B6D24] font-semibold hover:underline"
@@ -419,7 +404,7 @@ export default function BecomeAFarmerPage() {
 
       {/* Footer */}
       <footer className="py-lg px-gutter border-t border-zinc-200 bg-white">
-        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-md text-secondary">
+        <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row justify-between items-center gap-md text-on-surface-variant">
           <p className="font-label-sm">
             © 2024 KIZ FARM DIGITAL AGRONOMY. ALL RIGHTS RESERVED.
           </p>

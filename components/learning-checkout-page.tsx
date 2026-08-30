@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getCourseById } from "@/lib/kizfarm/supabase-data";
+import { purchaseCourse } from "@/lib/kizfarm/supabase-mutations";
+import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 
 interface Course {
   _id: string;
@@ -28,16 +30,16 @@ export default function LearningCheckoutPage() {
     async function loadCourseAndProfile() {
       if (!courseId) return;
       try {
-        const [courseRes, profileRes] = await Promise.all([
-          apiFetch(`/learning/courses/${courseId}?source=${source}`),
-          apiFetch("/buyer/profile")
+        const [courseRes, profile] = await Promise.all([
+          getCourseById(courseId, { source }),
+          getCurrentProfile(),
         ]);
 
         if (courseRes.payload?.ok) {
           setCourse(courseRes.payload.course);
         }
-        if (profileRes.res.ok && profileRes.payload.profile) {
-          setEmail(profileRes.payload.profile.email);
+        if (profile?.email) {
+          setEmail(profile.email);
         }
       } catch (err) {
         console.error("Error loading course details:", err);
@@ -75,11 +77,21 @@ export default function LearningCheckoutPage() {
     setPaying(true);
 
     try {
-      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_4815a51356e4576307137f8d75e8db5ce8eb473f";
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (!paystackPublicKey) {
+        setError("Payment gateway is not configured. Please contact support.");
+        setPaying(false);
+        return;
+      }
+      if (!email) {
+        setError("Could not verify your account email. Please log in again.");
+        setPaying(false);
+        return;
+      }
 
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
-        email: email || "customer@kizfarm.com",
+        email,
         amount: Math.round(payablePrice * 100), // in kobo
         currency: "NGN",
         metadata: {
@@ -95,10 +107,7 @@ export default function LearningCheckoutPage() {
         callback: function (response: any) {
           const paymentRef = response.reference;
 
-          apiFetch("/learning/subscriptions", {
-            method: "POST",
-            body: JSON.stringify({ courseId, paymentReference: paymentRef, source }),
-          }).then(({ res, payload }) => {
+          purchaseCourse(courseId, paymentRef).then(({ res, payload }) => {
             if (!res.ok) {
               setError(payload?.error || "Payment succeeded, but subscription failed. Reference: " + paymentRef);
               setPaying(false);

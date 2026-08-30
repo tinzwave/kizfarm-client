@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch } from "@/lib/kizfarm/api";
-import { startChat } from "@/lib/kizfarm/chat";
+import { getProductById, getProductReviews, getWishlist } from "@/lib/kizfarm/supabase-data";
+import { startChat, submitReview, addToWishlist, removeFromWishlist } from "@/lib/kizfarm/supabase-mutations";
 import { useCart } from "@/lib/kizfarm/cart-context";
 
 type FarmerRef =
@@ -31,7 +31,7 @@ interface Product {
   unit: string;
   quantity: number;
   images: string[];
-  farmerId?: FarmerRef;
+  farmerId?: FarmerRef | null;
   farmer?: FarmerRef;
   farmer_id?: string;
   seller?: FarmerRef;
@@ -62,6 +62,8 @@ export default function ProductDetailPage({ productId }: Props) {
   const [showChatModal, setShowChatModal] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
 
   // Reviews state
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -84,7 +86,7 @@ export default function ProductDetailPage({ productId }: Props) {
       try {
         setLoading(true);
         setError(null);
-        const { res, payload } = await apiFetch(`/marketplace/products/${productId}`);
+        const { res, payload } = await getProductById(productId);
 
         if (!res.ok) {
           setError(payload?.error || "Failed to fetch product");
@@ -111,7 +113,7 @@ export default function ProductDetailPage({ productId }: Props) {
     const fetchReviews = async () => {
       setReviewsLoading(true);
       try {
-        const { res, payload } = await apiFetch(`/buyer/reviews/${productId}`);
+        const { res, payload } = await getProductReviews(productId);
         if (res.ok) {
           setReviews(payload?.reviews || []);
           setReviewsAvg(payload?.avg || 0);
@@ -125,6 +127,19 @@ export default function ProductDetailPage({ productId }: Props) {
     fetchReviews();
   }, [productId]);
 
+  // Check whether this product is already in the buyer's wishlist
+  useEffect(() => {
+    if (!productId) return;
+    const checkWishlist = async () => {
+      const { res, payload } = await getWishlist();
+      if (res.ok) {
+        const items = (payload.items || []) as { product: { _id: string } }[];
+        setInWishlist(items.some((item) => item.product._id === productId));
+      }
+    };
+    checkWishlist();
+  }, [productId]);
+
   const handleGoBack = () => {
     router.back();
   };
@@ -134,17 +149,20 @@ export default function ProductDetailPage({ productId }: Props) {
   const farmerName = farmer?.farmName || farmer?.name || "Farmer";
   const farmerLocation = farmer?.location || "Unknown Location";
   const chatProductId = product?._id || product?.id || productId || "";
-  const chatFarmerUserId = product?.userId || "";
 
   const handleChatWithFarmer = async () => {
-    if (!chatFarmerUserId || !chatProductId) {
+    if (!chatProductId) {
       alert("Unable to start chat for this product right now.");
       return;
     }
     try {
       setChatLoading(true);
-      const chat = await startChat(chatFarmerUserId, chatProductId);
-      router.push(`/buyer/chat/${chat._id}`);
+      const { res, payload } = await startChat(chatProductId);
+      if (!res.ok || !payload.chat) {
+        alert(payload?.error || "Failed to start chat. Please try again.");
+        return;
+      }
+      router.push(`/buyer/chat/${payload.chat._id}`);
     } catch (err) {
       console.error("Error starting chat:", err);
       alert("Failed to start chat. Please try again.");
@@ -177,21 +195,34 @@ export default function ProductDetailPage({ productId }: Props) {
     setTimeout(() => setAddedToCart(false), 2000);
   };
 
+  const handleToggleWishlist = async () => {
+    if (!product || wishlistLoading) return;
+    setWishlistLoading(true);
+    try {
+      if (inWishlist) {
+        const { res } = await removeFromWishlist(product._id);
+        if (res.ok) setInWishlist(false);
+      } else {
+        const { res } = await addToWishlist(product._id);
+        if (res.ok) setInWishlist(true);
+      }
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
   const handleSubmitReview = async () => {
     if (!productId) return;
     setSubmittingReview(true);
     setReviewError(null);
     try {
-      const { res, payload } = await apiFetch(`/buyer/reviews/${productId}`, {
-        method: 'POST',
-        body: JSON.stringify({ rating: newRating, comment: newComment }),
-      });
+      const { res, payload } = await submitReview(productId, { rating: newRating, comment: newComment });
       if (!res.ok) {
         setReviewError(payload?.error || 'Failed to submit review');
         return;
       }
       // Refresh reviews
-      const { res: r2, payload: p2 } = await apiFetch(`/buyer/reviews/${productId}`);
+      const { res: r2, payload: p2 } = await getProductReviews(productId);
       if (r2.ok) {
         setReviews(p2?.reviews || []);
         setReviewsAvg(p2?.avg || 0);
@@ -433,6 +464,18 @@ export default function ProductDetailPage({ productId }: Props) {
                 </span>
                 {addedToCart ? 'Added!' : alreadyInCart ? 'In Cart' : 'Add to Cart'}
               </button>
+              <button
+                onClick={handleToggleWishlist}
+                disabled={wishlistLoading}
+                aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                className={`h-[48px] w-[48px] flex items-center justify-center rounded-xl border-2 transition-all active:scale-95 duration-150 disabled:opacity-50 ${
+                  inWishlist ? 'border-error text-error bg-error/5' : 'border-outline-variant text-on-surface-variant hover:border-error hover:text-error'
+                }`}
+              >
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: inWishlist ? "'FILL' 1" : "'FILL' 0" }}>
+                  favorite
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -568,6 +611,18 @@ export default function ProductDetailPage({ productId }: Props) {
             {addedToCart || alreadyInCart ? 'check_circle' : 'shopping_cart'}
           </span>
           {addedToCart ? 'Added!' : alreadyInCart ? 'In Cart' : 'Add to Cart'}
+        </button>
+        <button
+          onClick={handleToggleWishlist}
+          disabled={wishlistLoading}
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          className={`h-[48px] w-[48px] flex items-center justify-center rounded-xl border-2 active:scale-95 duration-150 disabled:opacity-50 ${
+            inWishlist ? 'border-error text-error bg-error/5' : 'border-outline-variant text-on-surface-variant'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: inWishlist ? "'FILL' 1" : "'FILL' 0" }}>
+            favorite
+          </span>
         </button>
       </div>
     </div>

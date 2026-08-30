@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerOrders } from "@/lib/kizfarm/supabase-data";
 
 interface OrderItem {
   productId: string;
@@ -15,12 +15,12 @@ interface OrderItem {
 
 interface Order {
   _id: string;
-  buyerId?: {
+  buyerId: {
     _id: string;
     name: string;
     email: string;
     phone: string;
-  };
+  } | null;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -63,12 +63,12 @@ export default function FarmerOrdersPage() {
     try {
       setLoading(true);
       setError(null);
-      const { res, payload } = await apiFetch("/farmer-orders");
+      const { res, payload } = await getFarmerOrders();
       if (!res.ok) {
         setError(payload?.error || "Failed to load farmer orders");
         return;
       }
-      setOrders(payload.orders || []);
+      setOrders((payload.orders as Order[]) || []);
     } catch (err) {
       console.error("Error fetching farmer orders:", err);
       setError("Failed to fetch orders from server");

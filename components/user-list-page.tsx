@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminBuyers, getAdminBuyerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
+import { suspendAdminBuyer, unsuspendAdminBuyer, deactivateAdminBuyer } from "@/lib/kizfarm/supabase-mutations";
 
 interface User {
   _id: string;
@@ -38,16 +38,8 @@ export default function UserListPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('kizfarm_token');
-      const params = new URLSearchParams();
-      params.append('role', 'user'); // Always show buyers only
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      
-      const res = await fetch(`${API_URL}/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setUsers(data.users || []);
+      const { res, payload } = await getAdminBuyers({ status: statusFilter });
+      if (res.ok) setUsers(payload.users || []);
     } catch (err) {
       console.error('Fetch users failed:', err);
     } finally {
@@ -67,13 +59,9 @@ export default function UserListPage() {
 
     // Check if user can be suspended
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/users/${user._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success && data.user) {
-        const activeCount = data.activeOrdersCount || 0;
+      const { res, payload } = await getAdminBuyerSuspensionEligibility(user._id);
+      if (res.ok) {
+        const activeCount = payload.activeOrdersCount ?? 0;
         setCanSuspend(activeCount === 0);
         if (activeCount > 0) {
           setSuspensionError("This buyer has an active order and cannot be suspended.");
@@ -90,22 +78,12 @@ export default function UserListPage() {
     setSuspensionError("");
 
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/users/${selectedUser._id}/suspend`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ suspensionReason })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await suspendAdminBuyer(selectedUser._id, suspensionReason);
+      if (res.ok) {
         setShowSuspendModal(false);
         fetchUsers();
       } else {
-        setSuspensionError(data.error || 'Failed to suspend user');
+        setSuspensionError(payload?.error || 'Failed to suspend user');
       }
     } catch (err) {
       setSuspensionError('Network error');
@@ -117,37 +95,24 @@ export default function UserListPage() {
 
   const handleUnsuspend = async (user: User) => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/users/${user._id}/unsuspend`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        fetchUsers();
-      }
+      const { res } = await unsuspendAdminBuyer(user._id);
+      if (res.ok) fetchUsers();
     } catch (err) {
       console.error('Unsuspend failed:', err);
     }
   };
 
-  const handleDelete = async (user: User) => {
-    if (!window.confirm(`Are you sure you want to permanently delete buyer "${user.name}"? This action cannot be undone.`)) return;
+  const handleDeactivate = async (user: User) => {
+    if (!window.confirm(`Deactivate buyer "${user.name}"? This blocks them from logging in. Their order history is kept.`)) return;
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/users/${user._id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await deactivateAdminBuyer(user._id);
+      if (res.ok) {
         fetchUsers();
       } else {
-        alert(data.error || 'Failed to delete user');
+        alert(payload?.error || 'Failed to deactivate user');
       }
     } catch (err) {
-      console.error('Delete failed:', err);
+      console.error('Deactivate failed:', err);
     }
   };
 
@@ -231,7 +196,7 @@ export default function UserListPage() {
                   </thead>
                   <tbody className="divide-y divide-outline-variant">
                     {filteredUsers.map((user) => (
-                      <tr key={user._id} className={`hover:bg-gray-50/80 transition-colors ${user.status === 'suspended' ? 'bg-red-50/10' : ''}`}>
+                      <tr key={user._id} className={`hover:bg-gray-50/80 transition-colors ${user.status !== 'active' ? 'bg-red-50/10' : ''}`}>
                         <td className="px-6 py-4">
                           <div className="text-body-md font-semibold text-on-surface">{user.name}</div>
                         </td>
@@ -255,12 +220,12 @@ export default function UserListPage() {
                             <button className="px-3 py-1.5 text-xs font-semibold text-primary hover:bg-emerald-50 rounded-md transition-colors">
                               View
                             </button>
-                            {user.status === 'suspended' ? (
+                            {user.status !== 'active' ? (
                               <button
                                 onClick={() => handleUnsuspend(user)}
                                 className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors"
                               >
-                                Unsuspend
+                                Reactivate
                               </button>
                             ) : (
                               <button
@@ -271,10 +236,10 @@ export default function UserListPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleDelete(user)}
+                              onClick={() => handleDeactivate(user)}
                               className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
                             >
-                              Delete
+                              Deactivate
                             </button>
                           </div>
                         </td>

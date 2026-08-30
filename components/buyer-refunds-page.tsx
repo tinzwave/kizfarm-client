@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBuyerRefunds } from "@/lib/kizfarm/supabase-data";
 
 interface RefundEntry {
   orderId: string;
@@ -30,12 +30,12 @@ export default function BuyerRefundsPage() {
       setLoading(true);
       setError("");
       try {
-        const { res, payload } = await apiFetch("/buyer/refunds");
+        const { res, payload } = await getBuyerRefunds();
         if (!res.ok) {
           setError(payload?.error || "Could not load refunds.");
           return;
         }
-        setData(payload);
+        setData(payload as BuyerRefundData);
       } catch {
         setError("Could not connect to the backend.");
       } finally {

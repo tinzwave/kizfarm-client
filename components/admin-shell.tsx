@@ -2,12 +2,19 @@
 
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 export default function AdminShell({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const handleLogout = async () => {
+    await signOut();
+    router.push("/admin/login");
+  };
   return (
     <div
       className="bg-surface-container-lowest text-on-surface"
@@ -216,7 +223,7 @@ export default function AdminShell({
               <p className="font-label-md text-on-surface leading-none mb-1">
                 Admin User
               </p>
-              <p className="font-label-sm text-secondary leading-none">
+              <p className="font-label-sm text-on-surface-variant leading-none">
                 Super Administrator
               </p>
             </div>
@@ -226,6 +233,15 @@ export default function AdminShell({
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZC_LRaKvUzhFoj2SsEaEabfvJYppbkwRYYcSNz-1ab3fLWw39UTK-0f0rHEDQu94zZ7u4oDLeYxdtgzpDvikM5NiNmnaY6qLPgDZkI5mHIFKgVlKEMcURH4jQ71XVSD65ZI71db6-IRgfdKIxCakWyAIdguTpVQRigEhG4VNC2AGrMPyD_MaP_tDao5lAs6vTbGN5aqRVDYoyfFarSpWnPymFe9eijJEQy5yenpXZUlMS95KUsKHlTw6qQypQ3yk3XR4rHPgb_Q4"
             />
           </div>
+          <button
+            onClick={handleLogout}
+            className="hover:bg-gray-100 rounded-full p-2 transition-all duration-200 text-gray-500"
+            title="Log out"
+          >
+            <span className="material-symbols-outlined" data-icon="logout">
+              logout
+            </span>
+          </button>
         </div>
       </header>
 

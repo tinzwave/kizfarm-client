@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import TopNav from "@/components/top-nav";
 import SiteFooter from "@/components/site-footer";
-import { apiFetch } from "@/lib/kizfarm/api";
-import { DEMO_PRODUCTS, DEMO_BLOG_POSTS, DEMO_COURSES } from "@/lib/kizfarm/demo-content";
+import { getMarketplaceProducts, getBlogPosts, getCourses } from "@/lib/kizfarm/supabase-data";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { getCurrentProfile, redirectPathForRole } from "@/lib/kizfarm/supabase-auth";
 
 interface Product {
   _id: string;
@@ -16,7 +17,7 @@ interface Product {
   unit?: string;
   category?: string;
   images?: string[];
-  farmerId?: { farmName?: string; location?: string };
+  farmerId?: { farmName?: string; location?: string } | null;
 }
 
 interface BlogPost {
@@ -28,6 +29,14 @@ interface BlogPost {
   category: string;
   readTime: number;
   createdAt: string;
+}
+
+interface Course {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  tutor?: { name: string; imageUrl?: string };
 }
 
 const money = (value = 0) => `NGN ${Number(value).toLocaleString()}`;
@@ -43,6 +52,7 @@ export default function HomePage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterSubmitted, setNewsletterSubmitted] = useState(false);
   const [activeHeroVideo, setActiveHeroVideo] = useState(0);
@@ -63,83 +73,68 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = localStorage.getItem("kizfarm_token");
-    const user = localStorage.getItem("kizfarm_user");
-    if (token) {
-      let role = "user";
-      if (user) {
-        try {
-          const parsed = JSON.parse(user);
-          if (parsed.role) role = parsed.role;
-        } catch {}
-      }
-      if (role === "farmer") {
-        router.push("/farmer/dashboard");
-      } else if (role === "admin") {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/buyer/dashboard");
-      }
-      return;
-    }
-    setLoggedIn(false);
-    setUserEmail(null);
+    const supabase = createClient();
+    let cancelled = false;
 
-    const onAuth = () => {
-      const t = localStorage.getItem("kizfarm_token");
-      const u = localStorage.getItem("kizfarm_user");
-      setLoggedIn(!!t);
-      try {
-        setUserEmail(u ? JSON.parse(u).email : null);
-      } catch {
-        setUserEmail(null);
+    async function checkSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (session) {
+        const profile = await getCurrentProfile();
+        if (cancelled) return;
+        router.push(redirectPathForRole(profile?.role));
+        return;
       }
-    };
-    window.addEventListener("storage", onAuth);
-    window.addEventListener("kizfarm_auth_changed", onAuth as EventListener);
+      setLoggedIn(false);
+      setUserEmail(null);
+    }
+    checkSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(!!session);
+      setUserEmail(session?.user?.email ?? null);
+    });
+
     return () => {
-      window.removeEventListener("storage", onAuth);
-      window.removeEventListener(
-        "kizfarm_auth_changed",
-        onAuth as EventListener,
-      );
+      cancelled = true;
+      subscription.unsubscribe();
     };
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     async function loadProducts() {
-      let live: Product[] = [];
       try {
-        const { payload } = await apiFetch("/marketplace/products");
-        if (payload?.ok) live = payload.products ?? [];
+        const { res, payload } = await getMarketplaceProducts();
+        if (res.ok) setProducts((payload.products ?? []).slice(0, 4));
       } catch {}
-      setProducts([...live, ...DEMO_PRODUCTS].slice(0, 4));
     }
     loadProducts();
   }, []);
 
   useEffect(() => {
     async function loadBlogs() {
-      let live: BlogPost[] = [];
       try {
-        const { payload } = await apiFetch("/blog");
-        if (payload?.ok) live = payload.posts ?? [];
+        const { res, payload } = await getBlogPosts();
+        if (res.ok) setBlogPosts((payload.posts ?? []).slice(0, 3));
       } catch {}
-      setBlogPosts([...live, ...DEMO_BLOG_POSTS].slice(0, 3));
     }
     loadBlogs();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("kizfarm_token");
-    localStorage.removeItem("kizfarm_user");
-    try {
-      window.dispatchEvent(new Event("kizfarm_auth_changed"));
-    } catch {}
-    setLoggedIn(false);
-    router.push("/");
-  };
+  useEffect(() => {
+    async function loadCourses() {
+      try {
+        const { res, payload } = await getCourses({ audience: "farmer" });
+        if (res.ok) setCourses((payload.courses ?? []).slice(0, 3));
+      } catch {}
+    }
+    loadCourses();
+  }, []);
 
   const steps = [
     {
@@ -334,11 +329,7 @@ export default function HomePage() {
             {products.map((product) => (
               <Link
                 key={product._id}
-                href={
-                  product._id.startsWith("demo-")
-                    ? "/buyer/marketplace"
-                    : `/buyer/marketplace-detail/${product._id}`
-                }
+                href={`/buyer/marketplace-detail/${product._id}`}
                 className="group border border-slate-100 rounded-xl overflow-hidden hover:border-[#1B6D24] transition-all duration-300"
               >
                 <div className="h-64 overflow-hidden">
@@ -394,62 +385,49 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {DEMO_COURSES.slice(0, 3).map((course) => (
+            {courses.map((course) => (
               <Link
                 key={course._id}
                 href="/learning"
                 className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
-                <div className="h-44 overflow-hidden relative">
-                  <img
-                    src={course.thumbnail}
-                    alt={course.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <span className="absolute top-3 right-3 bg-white/95 backdrop-blur px-2.5 py-1 rounded-md text-xs font-bold text-[#1B6D24] flex items-center gap-1">
-                    <span
-                      className="material-symbols-outlined text-[14px]"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      star
-                    </span>
-                    {course.rating}
-                  </span>
+                <div className="h-44 overflow-hidden relative bg-gradient-to-br from-emerald-900 to-green-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-white/30 text-[64px]">school</span>
                 </div>
                 <div className="flex flex-1 flex-col p-6">
-                  <h3 className="text-lg font-bold text-zinc-900 leading-snug mb-2 group-hover:text-[#1B6D24] transition-colors">
+                  <h3 className="text-lg font-bold text-zinc-900 leading-snug mb-2 group-hover:text-[#1B6D24] transition-colors line-clamp-2">
                     {course.title}
                   </h3>
-                  <p className="text-sm text-zinc-500 leading-relaxed mb-5 flex-1">
+                  <p className="text-sm text-zinc-500 leading-relaxed mb-5 flex-1 line-clamp-3">
                     {course.description}
                   </p>
                   <div className="flex items-center gap-3 mb-5 pt-5 border-t border-zinc-100">
-                    <img
-                      src={course.tutor.avatar}
-                      alt={course.tutor.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
+                    {course.tutor?.imageUrl ? (
+                      <img
+                        src={course.tutor.imageUrl}
+                        alt={course.tutor.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#1B6D24] font-bold flex items-center justify-center">
+                        {course.tutor?.name?.[0] || "K"}
+                      </div>
+                    )}
                     <div>
-                      <p className="text-sm font-bold text-zinc-900">{course.tutor.name}</p>
-                      <p className="text-xs text-zinc-500">{course.tutor.credential}</p>
+                      <p className="text-sm font-bold text-zinc-900">{course.tutor?.name || "KIZ FARM Tutor"}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-zinc-400 flex items-center gap-3">
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[15px]">play_circle</span>
-                        {course.lessons} lessons
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[15px]">groups</span>
-                        {course.students}
-                      </span>
-                    </span>
+                  <div className="flex items-center justify-end">
                     <span className="text-[#1B6D24] font-bold">{money(course.price)}</span>
                   </div>
                 </div>
               </Link>
             ))}
+            {courses.length === 0 && (
+              <div className="md:col-span-3 rounded-2xl border border-dashed border-white/20 p-10 text-center text-sm text-white/50">
+                No courses available yet.
+              </div>
+            )}
           </div>
         </div>
       </section>

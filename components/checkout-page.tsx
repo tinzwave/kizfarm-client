@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from "@/lib/kizfarm/cart-context";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAddresses, placeOrder } from "@/lib/kizfarm/supabase-mutations";
 
 interface AddressItem {
   _id: string;
@@ -33,7 +33,7 @@ export default function CheckoutPage() {
     const fetchAddresses = async () => {
       try {
         setLoadingAddresses(true);
-        const addrRes = await apiFetch("/buyer/addresses");
+        const addrRes = await getAddresses();
 
         if (addrRes.res.ok && addrRes.payload.addresses) {
           const list = addrRes.payload.addresses;
@@ -73,15 +73,10 @@ export default function CheckoutPage() {
     setPlacingOrder(true);
 
     try {
-      const orderPayload = {
+      const { res, payload } = await placeOrder({
         items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
         addressId: selectedAddressId,
         paymentMethod: paymentMethod === "card" ? "card" : paymentMethod === "bank" ? "bank_transfer" : "mpesa",
-      };
-
-      const { res, payload } = await apiFetch("/buyer/orders", {
-        method: "POST",
-        body: JSON.stringify(orderPayload),
       });
 
       if (!res.ok) {
@@ -120,7 +115,7 @@ export default function CheckoutPage() {
           <div className="bg-white dark:bg-slate-900 max-w-md w-full rounded-2xl p-6 shadow-2xl border border-gray-100 dark:border-gray-800 text-center">
             <span className="material-symbols-outlined text-6xl text-amber-500 mb-4">home_pin</span>
             <h3 className="text-xl font-bold text-on-surface mb-2">Delivery Address Required</h3>
-            <p className="text-sm text-secondary mb-6 leading-relaxed">
+            <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
               You must have at least one saved delivery address in your profile to checkout. 
               Please add an address first.
             </p>
@@ -130,7 +125,7 @@ export default function CheckoutPage() {
                   Add Delivery Address
                 </button>
               </Link>
-              <Link href="/buyer/cart" className="block w-full text-center text-sm text-secondary hover:underline">
+              <Link href="/buyer/cart" className="block w-full text-center text-sm text-on-surface-variant hover:underline">
                 Return to Cart
               </Link>
             </div>
@@ -209,7 +204,7 @@ export default function CheckoutPage() {
                       />
                       <div className="flex flex-col pr-6">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className={`material-symbols-outlined ${selectedAddressId === address._id ? "text-primary" : "text-secondary"}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                          <span className={`material-symbols-outlined ${selectedAddressId === address._id ? "text-primary" : "text-on-surface-variant"}`} style={{ fontVariationSettings: "'FILL' 1" }}>
                             {address.label?.toLowerCase() === "office" ? "business" : "home"}
                           </span>
                           <span className="font-label-sm text-label-sm font-bold uppercase tracking-wider">

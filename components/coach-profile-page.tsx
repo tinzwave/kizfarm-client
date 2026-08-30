@@ -123,7 +123,7 @@ export default function CoachProfilePage() {
                 <div className="flex items-center gap-lg">
                   <div className="text-right">
                     <p className="font-h3 text-h3 text-on-surface">₦35,000</p>
-                    <p className="font-label-sm text-secondary">Best Value</p>
+                    <p className="font-label-sm text-on-surface-variant">Best Value</p>
                   </div>
                   <button className="bg-primary-container text-on-primary px-lg py-sm rounded-lg font-label-md hover:opacity-90 transition-all active:scale-95">Book Now</button>
                 </div>

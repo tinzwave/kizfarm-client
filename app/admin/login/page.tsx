@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveAdminAuth } from "@/lib/kizfarm/auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { getCurrentProfile, isAdminProfile } from "@/lib/kizfarm/supabase-auth";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -10,21 +11,21 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
     try {
-      const res = await fetch(`${API}/auth/admin/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Admin login failed");
-      if (data.token && data.admin) saveAdminAuth(data.token, data.admin);
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw new Error(signInError.message);
+
+      const profile = await getCurrentProfile();
+      if (!isAdminProfile(profile)) {
+        await supabase.auth.signOut();
+        throw new Error("This account does not have admin access.");
+      }
       router.push("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "Admin login failed");
@@ -36,7 +37,7 @@ export default function AdminLoginPage() {
   return (
     <main className="w-full flex min-h-screen items-center justify-center bg-white">
       <div className="w-full max-w-md p-8">
-        <h2 className="text-2xl font-bold mb-4">Admin Login (Demo)</h2>
+        <h2 className="text-2xl font-bold mb-4">Admin Login</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium">Email</label>

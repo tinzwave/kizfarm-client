@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminAllProducts } from "@/lib/kizfarm/supabase-data";
+import { deleteAdminProduct } from "@/lib/kizfarm/supabase-mutations";
 
 interface Product {
   _id: string;
@@ -38,18 +38,10 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
   const fetchProducts = async (search?: string) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("kizfarm_token");
-      const params = new URLSearchParams();
-      params.append("limit", "50");
-      if (search) params.append("search", search);
-
-      const res = await fetch(`${API_URL}/admin/products?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setProducts(data.products || []);
-        setTotal(data.total || 0);
+      const { res, payload } = await getAdminAllProducts({ search });
+      if (res.ok) {
+        setProducts(payload.products || []);
+        setTotal(payload.total || 0);
       }
     } catch (err) {
       console.error("Fetch products failed:", err);
@@ -66,16 +58,11 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
     )
       return;
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/products/${product._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await deleteAdminProduct(product._id);
+      if (res.ok) {
         fetchProducts(searchQ || undefined);
       } else {
-        alert(data.error || "Failed to delete product");
+        alert(payload?.error || "Failed to delete product");
       }
     } catch (err) {
       console.error("Delete failed:", err);

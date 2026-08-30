@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBlogPosts } from "@/lib/kizfarm/supabase-data";
 import BlogDetail from "./blog-detail";
 
 interface BlogPost {
@@ -28,7 +28,7 @@ export default function DashboardBlogPage({ portal }: { portal: "buyer" | "farme
     async function loadBlogs() {
       try {
         setLoading(true);
-        const { res, payload } = await apiFetch("/blog");
+        const { res, payload } = await getBlogPosts();
         if (!res.ok) {
           throw new Error(payload.error || "Failed to load blogs");
         }

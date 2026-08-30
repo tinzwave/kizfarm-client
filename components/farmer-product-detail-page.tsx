@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerProductById } from "@/lib/kizfarm/supabase-data";
+import { updateFarmerProduct } from "@/lib/kizfarm/supabase-mutations";
 
 type Product = Record<string, any>;
 
@@ -36,20 +37,6 @@ function fieldValue(product: Product | null, ...keys: string[]) {
     return String(value);
   }
   return "";
-}
-
-function friendlyError(payload: unknown, fallback: string) {
-  if (typeof payload !== "string") {
-    if (payload && typeof payload === "object" && "error" in payload) {
-      return String((payload as { error?: unknown }).error || fallback);
-    }
-    return fallback;
-  }
-  if (payload.includes("<!DOCTYPE html>") || payload.includes("Cannot ")) {
-    const match = payload.match(/Cannot\s+\w+\s+[^\s<]+/);
-    return match?.[0] || fallback;
-  }
-  return payload;
 }
 
 export default function FarmerProductDetailPage({ id }: { id: string }) {
@@ -90,22 +77,16 @@ export default function FarmerProductDetailPage({ id }: { id: string }) {
       setError(null);
       setSaveError(null);
       setIsEditing(false);
-      const { res, payload } = await apiFetch(`/farmer/products/${id}`, {
-        cache: "no-store",
-      });
+      const { res, payload } = await getFarmerProductById(id);
       if (cancelled) return;
       if (!res.ok) {
-        setError(
-          typeof payload === "string"
-            ? payload
-            : payload?.error || "Failed to load product",
-        );
+        setError(payload?.error || "Failed to load product");
         setProduct(null);
         syncForm(null);
         setLoading(false);
         return;
       }
-      const p = payload?.product || payload;
+      const p = payload.product;
       setProduct(p || null);
       syncForm(p || null);
       setLoading(false);
@@ -151,21 +132,15 @@ export default function FarmerProductDetailPage({ id }: { id: string }) {
       moistureCode: form.moistureCode.trim(),
     };
 
-    const { res, payload } = await apiFetch(`/farmer/products/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(body),
-    });
+    const { res, payload } = await updateFarmerProduct(id, body);
 
     if (!res.ok) {
-      setSaveError(friendlyError(payload, "Failed to update product"));
+      setSaveError(payload?.error || "Failed to update product");
       setSaving(false);
       return;
     }
 
-    const updated = payload?.product || payload || {
-      ...product,
-      ...body,
-    };
+    const updated = payload.product || { ...product, ...body };
     setProduct(updated);
     syncForm(updated);
     setIsEditing(false);
@@ -219,9 +194,6 @@ export default function FarmerProductDetailPage({ id }: { id: string }) {
         ) : error ? (
           <div className="py-16 text-center">
             <div className="text-red-600 font-medium">{error}</div>
-            <div className="text-sm text-zinc-500 mt-2">
-              Ensure the API endpoint `GET /farmer/products/:id` is available.
-            </div>
           </div>
         ) : !product ? (
           <div className="py-16 text-center text-zinc-500">

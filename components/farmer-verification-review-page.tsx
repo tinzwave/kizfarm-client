@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAdminFarmerVerifications } from "@/lib/kizfarm/supabase-data";
+import { adminReviewFarmer } from "@/lib/kizfarm/supabase-mutations";
 
 export default function FarmerVerificationReviewPage() {
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -14,16 +15,8 @@ export default function FarmerVerificationReviewPage() {
   const handleApprove = async (id: string) => {
     setSubmitting(true);
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("kizfarm_token")
-          : null;
-      const res = await fetch(`${API}/admin/verify-farmers/${id}/approve`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Approve failed");
+      const { res, payload } = await adminReviewFarmer(id, true);
+      if (!res.ok) throw new Error(payload?.error || "Approve failed");
       // remove from pending list
       setList((l) => l.filter((it) => it._id !== id));
     } catch (err) {
@@ -40,15 +33,8 @@ export default function FarmerVerificationReviewPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const token =
-          typeof window !== "undefined"
-            ? localStorage.getItem("kizfarm_token")
-            : null;
-        const res = await fetch(`${API}/admin/verify-farmers`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        const data = await res.json();
-        if (data?.list) setList(data.list || []);
+        const { payload } = await getAdminFarmerVerifications();
+        if (payload?.ok) setList(payload.list || []);
       } catch (err) {
         console.error(err);
       } finally {

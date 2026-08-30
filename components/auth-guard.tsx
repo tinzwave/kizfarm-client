@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken, getStoredUser, isAdminUser, parseJwt } from "@/lib/kizfarm/auth";
+import { getCurrentProfile, getSession } from "@/lib/kizfarm/supabase-auth";
 
 type AuthGuardProps = {
   children: React.ReactNode;
@@ -14,22 +14,28 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (!token) {
-      setAuthorized(false);
-      router.replace("/login");
-      return;
-    }
+    let cancelled = false;
+    async function check() {
+      const session = await getSession();
+      if (!session) {
+        if (!cancelled) setAuthorized(false);
+        router.replace("/login");
+        return;
+      }
 
-    const payload = parseJwt(token);
-    const user = getStoredUser();
-    if (isAdminUser(payload) || isAdminUser(user)) {
-      setAuthorized(false);
-      router.replace("/admin/dashboard");
-      return;
-    }
+      const profile = await getCurrentProfile();
+      if (profile?.role === "admin") {
+        if (!cancelled) setAuthorized(false);
+        router.replace("/admin/dashboard");
+        return;
+      }
 
-    setAuthorized(true);
+      if (!cancelled) setAuthorized(true);
+    }
+    check();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (authorized === null) {

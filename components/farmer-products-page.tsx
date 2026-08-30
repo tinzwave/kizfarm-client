@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerProducts } from "@/lib/kizfarm/supabase-data";
 
 type FarmerProduct = {
   _id?: string;
@@ -43,22 +43,15 @@ export default function FarmerProductsPage() {
     (async () => {
       setLoading(true);
       setError(null);
-      const { res, payload } = await apiFetch("/farmer/products", {
-        cache: "no-store",
-      });
+      const { res, payload } = await getFarmerProducts();
       if (cancelled) return;
       if (!res.ok) {
-        setError(
-          typeof payload === "string"
-            ? payload
-            : payload?.error || "Failed to load products",
-        );
+        setError(payload?.error || "Failed to load products");
         setProducts([]);
         setLoading(false);
         return;
       }
-      const list = Array.isArray(payload) ? payload : payload?.products || [];
-      setProducts(Array.isArray(list) ? list : []);
+      setProducts(payload.products || []);
       setLoading(false);
     })();
     return () => {
@@ -90,9 +83,6 @@ export default function FarmerProductsPage() {
         ) : error ? (
           <div className="py-16 text-center">
             <div className="text-red-600 font-medium">{error}</div>
-            <div className="text-sm text-zinc-500 mt-2">
-              Ensure the API endpoint `GET /farmer/products` is available.
-            </div>
           </div>
         ) : products.length === 0 ? (
           <div className="py-16 text-center">

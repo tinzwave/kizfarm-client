@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getFarmerBankDetails } from "@/lib/kizfarm/supabase-data";
+import { saveFarmerBankDetails } from "@/lib/kizfarm/supabase-mutations";
 
 type Props = { hideSidebar?: boolean };
 
@@ -23,17 +23,13 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
 
   const fetchBankDetails = async () => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/farmer/bank-details`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success && data.bankDetails) {
-        setBankName(data.bankDetails.bankName || "");
-        setAccountHolderName(data.bankDetails.accountHolderName || "");
-        setAccountNumber(data.bankDetails.accountNumber || "");
-        setBranchCode(data.bankDetails.branchCode || "");
-        setIsVerified(data.bankDetails.isVerified || false);
+      const { res, payload } = await getFarmerBankDetails();
+      if (res.ok && payload.bankDetails) {
+        setBankName(payload.bankDetails.bankName || "");
+        setAccountHolderName(payload.bankDetails.accountHolderName || "");
+        setAccountNumber(payload.bankDetails.accountNumber || "");
+        setBranchCode(payload.bankDetails.branchCode || "");
+        setIsVerified(payload.bankDetails.isVerified || false);
       }
     } catch (err) {
       console.error('Fetch bank details failed:', err);
@@ -46,32 +42,23 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
     e.preventDefault();
     setSaving(true);
     setMessage("");
-    
+
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/farmer/bank-details`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          bankName,
-          accountHolderName,
-          accountNumber,
-          branchCode
-        })
+      const { res, payload } = await saveFarmerBankDetails({
+        bankName,
+        accountHolderName,
+        accountNumber,
+        branchCode,
       });
-      
-      const data = await res.json();
-      if (res.ok && data.success) {
+
+      if (res.ok) {
         setMessageType("success");
         setMessage("Bank details saved successfully!");
         setIsVerified(false);
         fetchBankDetails();
       } else {
         setMessageType("error");
-        setMessage(data.error || "Failed to save bank details");
+        setMessage(payload?.error || "Failed to save bank details");
       }
     } catch (err) {
       setMessageType("error");

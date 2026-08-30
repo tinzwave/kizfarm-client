@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBuyerOrderById } from "@/lib/kizfarm/supabase-data";
+import { confirmReceipt, rateDriver, setOrderPaymentReference, payOrder } from "@/lib/kizfarm/supabase-mutations";
+import { getSession } from "@/lib/kizfarm/supabase-auth";
 
 interface OrderItem {
   productId: string;
@@ -21,14 +23,14 @@ interface Order {
     farmName: string;
     location: string;
     phone?: string;
-  };
+  } | null;
   driverId?: {
     _id: string;
     name: string;
     phone: string;
     vehicleType?: string;
     currentLocation?: string;
-  };
+  } | null;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -70,12 +72,12 @@ export default function TrackOrderPage() {
     try {
       setLoading(true);
       setError(null);
-      const { res, payload } = await apiFetch(`/buyer/orders/${id}`);
+      const { res, payload } = await getBuyerOrderById(id);
       if (!res.ok) {
         setError(payload?.error || "Order not found");
         return;
       }
-      setOrder(payload.order);
+      setOrder(payload.order as Order);
       setRatingSubmitted(Boolean(payload.order?.driverRatedAt));
     } catch (err) {
       console.error("Error fetching order details:", err);
@@ -95,9 +97,7 @@ export default function TrackOrderPage() {
     if (!orderId) return;
     try {
       setConfirmingReceipt(true);
-      const { res, payload } = await apiFetch(`/buyer/orders/${orderId}/confirm-receipt`, {
-        method: "POST"
-      });
+      const { res, payload } = await confirmReceipt(orderId);
       if (!res.ok) {
         alert(payload?.error || "Failed to confirm receipt");
         return;
@@ -117,10 +117,7 @@ export default function TrackOrderPage() {
     setRatingLoading(true);
     try {
       if (!orderId) return;
-      const { res, payload } = await apiFetch(`/buyer/orders/${orderId}/rate-driver`, {
-        method: "POST",
-        body: JSON.stringify({ rating: driverRating }),
-      });
+      const { res, payload } = await rateDriver(orderId, driverRating);
       if (!res.ok) {
         alert(payload?.error || "Failed to submit driver rating");
         return;
@@ -168,25 +165,45 @@ export default function TrackOrderPage() {
     }
 
     try {
-      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_4815a51356e4576307137f8d75e8db5ce8eb473f";
+      // Generate our own reference and record it on the order *before*
+      // opening the checkout widget, so the paystack-webhook Edge Function
+      // can match this order even if it arrives before this tab's own
+      // callback does (e.g. the buyer closes the tab right after paying).
+      const reference = `KFM-PAY-${order._id}-${Date.now()}`;
+      const { res: refRes, payload: refPayload } = await setOrderPaymentReference(orderId, reference);
+      if (!refRes.ok) {
+        setPaymentError(refPayload?.error || "Could not start payment. Please try again.");
+        setPaying(false);
+        return;
+      }
+
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (!paystackPublicKey) {
+        setPaymentError("Payment gateway is not configured. Please contact support.");
+        setPaying(false);
+        return;
+      }
+
+      const session = await getSession();
+      if (!session?.user?.email) {
+        setPaymentError("Could not verify your account. Please log in again.");
+        setPaying(false);
+        return;
+      }
+
       const handler = (window as any).PaystackPop.setup({
         key: paystackPublicKey,
-        email: "customer@kizfarm.com",
+        email: session.user.email,
         amount: Math.round(order.total * 100),
         currency: "NGN",
+        ref: reference,
         metadata: {
           brand: "KIZ FARM",
           orderId: order._id,
         },
         callback: function (response: any) {
           const method = order.paymentMethod === "bank_transfer" ? "bank_transfer" : order.paymentMethod === "mpesa" ? "mpesa" : "card";
-          apiFetch(`/buyer/orders/${orderId}/pay`, {
-              method: "POST",
-              body: JSON.stringify({
-                paymentReference: response.reference,
-                paymentMethod: method,
-              }),
-            })
+          payOrder(orderId, response.reference, method)
             .then(async ({ res, payload }) => {
             if (!res.ok) {
               setPaymentError(payload?.error || "Payment succeeded, but order activation failed. Please contact support.");
@@ -221,7 +238,7 @@ export default function TrackOrderPage() {
       <div className="min-h-screen bg-background p-12 text-center">
         <span className="material-symbols-outlined text-6xl text-amber-500 mb-4">warning</span>
         <h2 className="text-xl font-bold text-on-surface mb-2">No Order ID Provided</h2>
-        <p className="text-secondary mb-6">Please go back to your orders page to select an order.</p>
+        <p className="text-on-surface-variant mb-6">Please go back to your orders page to select an order.</p>
         <Link href="/buyer/orders">
           <button className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold">Go to My Orders</button>
         </Link>
@@ -242,7 +259,7 @@ export default function TrackOrderPage() {
       <div className="min-h-screen bg-background p-12 text-center">
         <span className="material-symbols-outlined text-6xl text-error mb-4">error</span>
         <h2 className="text-xl font-bold text-on-surface mb-2">Error Loading Order</h2>
-        <p className="text-secondary mb-6">{error || "Could not retrieve order details."}</p>
+        <p className="text-on-surface-variant mb-6">{error || "Could not retrieve order details."}</p>
         <Link href="/buyer/orders">
           <button className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold">Go to My Orders</button>
         </Link>
@@ -300,7 +317,7 @@ export default function TrackOrderPage() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h1 className="font-headline-xl text-headline-xl text-primary mb-2">Track Your Harvest</h1>
-              <p className="text-secondary font-body-md">
+              <p className="text-on-surface-variant font-body-md">
                 Order #KF-{order._id.slice(-6).toUpperCase()} • Placed {new Date(order.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -310,7 +327,7 @@ export default function TrackOrderPage() {
                 <span className={`relative inline-flex rounded-full h-3 w-3 ${isCancelled ? "bg-red-500" : "bg-[#1B6D24]"}`}></span>
               </div>
               <div>
-                <p className="font-label-xs text-label-xs text-secondary uppercase">Live Status</p>
+                <p className="font-label-xs text-label-xs text-on-surface-variant uppercase">Live Status</p>
                 <p className={`font-headline-md text-headline-md font-bold uppercase ${isCancelled ? "text-red-600" : "text-[#1B6D24]"}`}>
                   {getStatusDisplay(status)}
                 </p>
@@ -451,7 +468,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("pending") ? "text-[#1B6D24]" : "text-gray-500"}`}>Order Placed</h3>
-                    <p className="text-secondary text-xs">Awaiting farmer confirmation</p>
+                    <p className="text-on-surface-variant text-xs">Awaiting farmer confirmation</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">Your order has been received by the Kiz Farm system.</p>
                   </div>
                 </div>
@@ -465,7 +482,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("confirmed") ? "text-[#1B6D24]" : "text-gray-500"}`}>Confirmed by Farmer</h3>
-                    <p className="text-secondary text-xs">Farmer accepted and scheduled harvest</p>
+                    <p className="text-on-surface-variant text-xs">Farmer accepted and scheduled harvest</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">
                       {order.adminNotes || `${order.farmerId?.farmName || "The farmer"} has confirmed your selection for harvest.`}
                     </p>
@@ -481,7 +498,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("packed") ? "text-[#1B6D24]" : "text-gray-500"}`}>Harvested & Packed</h3>
-                    <p className="text-secondary text-xs">Ready for driver pickup</p>
+                    <p className="text-on-surface-variant text-xs">Ready for driver pickup</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">Produce was harvested and packed in sustainable bio-containers.</p>
                   </div>
                 </div>
@@ -495,7 +512,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("assigned") ? "text-[#1B6D24]" : "text-gray-500"}`}>Courier Assigned</h3>
-                    <p className="text-secondary text-xs">Logistic driver dispatched</p>
+                    <p className="text-on-surface-variant text-xs">Logistic driver dispatched</p>
                     {order.driverId ? (
                       <p className="mt-1 text-on-surface-variant font-body-sm text-sm">
                         Driver {order.driverId.name} has been assigned to collect your harvest.
@@ -515,7 +532,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("in_transit") ? "text-[#1B6D24]" : "text-gray-500"}`}>In Transit</h3>
-                    <p className="text-secondary text-xs">En route to delivery address</p>
+                    <p className="text-on-surface-variant text-xs">En route to delivery address</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">
                       Package is on the way.
                     </p>
@@ -536,7 +553,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("delivered") ? "text-[#1B6D24]" : "text-gray-500"}`}>Delivered</h3>
-                    <p className="text-secondary text-xs">Arrived at destination</p>
+                    <p className="text-on-surface-variant text-xs">Arrived at destination</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">Logistics driver has completed physical dropoff.</p>
                   </div>
                 </div>
@@ -550,7 +567,7 @@ export default function TrackOrderPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className={`font-bold text-[16px] ${isStepDone("receipt_confirmed") ? "text-[#1B6D24]" : "text-gray-500"}`}>Receipt Confirmed</h3>
-                    <p className="text-secondary text-xs">Closed order successfully</p>
+                    <p className="text-on-surface-variant text-xs">Closed order successfully</p>
                     <p className="mt-1 text-on-surface-variant font-body-sm text-sm">Buyer confirmed receipt of fresh produce.</p>
                   </div>
                 </div>
@@ -575,14 +592,14 @@ export default function TrackOrderPage() {
                     </div>
                     <div>
                       <p className="font-label-sm text-on-surface font-semibold">{order.driverId.name}</p>
-                      <p className="text-label-xs text-secondary capitalize">{order.driverId.vehicleType || "bike"} Driver</p>
+                      <p className="text-label-xs text-on-surface-variant capitalize">{order.driverId.vehicleType || "bike"} Driver</p>
                     </div>
                     <a href={`tel:${order.driverId.phone}`} className="ml-auto material-symbols-outlined text-primary p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 active:scale-95">
                       call
                     </a>
                   </div>
                   {order.driverId.currentLocation && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-secondary flex items-center gap-2">
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-on-surface-variant flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm text-primary">location_on</span>
                       <span>Last Seen: {order.driverId.currentLocation}</span>
                     </div>
@@ -604,7 +621,7 @@ export default function TrackOrderPage() {
                     </div>
                     <div>
                       <p className="font-label-sm text-on-surface font-semibold">{order.farmerId.farmName}</p>
-                      <p className="text-label-xs text-secondary">{order.farmerId.location}</p>
+                      <p className="text-label-xs text-on-surface-variant">{order.farmerId.location}</p>
                     </div>
                     {order.farmerId.phone && (
                       <a href={`tel:${order.farmerId.phone}`} className="ml-auto material-symbols-outlined text-primary p-2 bg-white rounded-full border border-gray-200 hover:bg-gray-50 active:scale-95">
@@ -613,7 +630,7 @@ export default function TrackOrderPage() {
                     )}
                   </div>
                   {order.farmerNotes && (
-                    <div className="mt-4 p-3 bg-green-50/50 rounded-lg text-xs text-secondary italic">
+                    <div className="mt-4 p-3 bg-green-50/50 rounded-lg text-xs text-on-surface-variant italic">
                       " {order.farmerNotes} "
                     </div>
                   )}
@@ -634,7 +651,7 @@ export default function TrackOrderPage() {
                     />
                     <div className="flex-1">
                       <p className="font-label-sm font-semibold">{item.name}</p>
-                      <p className="text-label-xs text-secondary">
+                      <p className="text-label-xs text-on-surface-variant">
                         Qty: {item.quantity} {item.unit ? `• ${item.unit}` : ""}
                       </p>
                     </div>
@@ -643,7 +660,7 @@ export default function TrackOrderPage() {
                 ))}
                 
                 <hr className="border-gray-100" />
-                <div className="space-y-2 text-sm text-secondary">
+                <div className="space-y-2 text-sm text-on-surface-variant">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
                     <span className="text-on-surface">₦{order.subtotal.toLocaleString()}</span>

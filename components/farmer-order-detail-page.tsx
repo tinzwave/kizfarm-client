@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerOrderById } from "@/lib/kizfarm/supabase-data";
+import { farmerAcceptOrder, farmerPackOrder, farmerRejectOrder } from "@/lib/kizfarm/supabase-mutations";
 
 interface OrderItem {
   productId: string;
@@ -15,18 +16,18 @@ interface OrderItem {
 
 interface Order {
   _id: string;
-  buyerId?: {
+  buyerId: {
     _id: string;
     name: string;
     email: string;
     phone: string;
-  };
-  driverId?: {
+  } | null;
+  driverId: {
     _id: string;
     name: string;
     phone: string;
     vehicleType?: string;
-  };
+  } | null;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -74,12 +75,12 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
     try {
       setLoading(true);
       setError(null);
-      const { res, payload } = await apiFetch(`/farmer-orders/${id}`);
+      const { res, payload } = await getFarmerOrderById(id);
       if (!res.ok) {
         setError(payload?.error || "Order not found");
         return;
       }
-      setOrder(payload.order);
+      setOrder((payload.order as Order) ?? null);
     } catch (err) {
       console.error("Error fetching farmer order details:", err);
       setError("Failed to load order details");
@@ -95,10 +96,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
   const handleConfirmOrder = async () => {
     try {
       setActionLoading(true);
-      const { res, payload } = await apiFetch(`/farmer-orders/${id}/accept`, {
-        method: "POST",
-        body: JSON.stringify({ notes: acceptNotes || "Confirmed by farmer" })
-      });
+      const { res, payload } = await farmerAcceptOrder(id, acceptNotes || "Confirmed by farmer");
       if (!res.ok) {
         alert(payload?.error || "Failed to confirm order");
         return;
@@ -115,9 +113,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
   const handlePackOrder = async () => {
     try {
       setActionLoading(true);
-      const { res, payload } = await apiFetch(`/farmer-orders/${id}/pack`, {
-        method: "POST"
-      });
+      const { res, payload } = await farmerPackOrder(id);
       if (!res.ok) {
         alert(payload?.error || "Failed to mark order as packed");
         return;
@@ -136,10 +132,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
     try {
       setActionLoading(true);
       // Rejection cancels order
-      const { res, payload } = await apiFetch(`/farmer-orders/${id}/reject`, {
-        method: "POST",
-        body: JSON.stringify({ reason: "Rejected by farmer" })
-      });
+      const { res, payload } = await farmerRejectOrder(id, "Rejected by farmer");
       if (!res.ok) {
         alert(payload?.error || "Failed to reject order");
         return;
@@ -166,7 +159,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
       <div className="min-h-screen bg-background p-12 text-center">
         <span className="material-symbols-outlined text-6xl text-error mb-4">error</span>
         <h2 className="text-xl font-bold text-on-surface mb-2">Error Loading Order</h2>
-        <p className="text-secondary mb-6">{error || "Could not retrieve order details."}</p>
+        <p className="text-on-surface-variant mb-6">{error || "Could not retrieve order details."}</p>
         <Link href="/farmer/orders">
           <button className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold">Go to Dashboard</button>
         </Link>

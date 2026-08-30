@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getMyFullProfile } from "@/lib/kizfarm/supabase-data";
+import { updateMyFullProfile } from "@/lib/kizfarm/supabase-mutations";
 
 interface ProfileData {
   name: string;
@@ -41,50 +41,13 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      
-      // Try farmer endpoint first
-      let res = await fetch(`${API_URL}/farmer/profile`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
+      const { res, payload } = await getMyFullProfile();
       if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.profile) {
-          setIsFarmer(true);
-          setFormData({
-            name: data.profile.user?.name || '',
-            email: data.profile.user?.email || '',
-            phone: data.profile.user?.phone || '',
-            address: data.profile.user?.address || '',
-            city: data.profile.user?.city || '',
-            state: data.profile.user?.state || '',
-            country: data.profile.user?.country || '',
-            farmName: data.profile.farmer?.farmName || '',
-            farmType: data.profile.farmer?.farmType || '',
-            location: data.profile.farmer?.location || '',
-          });
-        }
+        setIsFarmer(payload.isFarmer || false);
+        setFormData(payload.profile as ProfileData);
       } else {
-        // Try buyer endpoint
-        res = await fetch(`${API_URL}/buyer/profile`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.profile) {
-            setFormData({
-              name: data.profile.name || '',
-              email: data.profile.email || '',
-              phone: data.profile.phone || '',
-              address: data.profile.address || '',
-              city: data.profile.city || '',
-              state: data.profile.state || '',
-              country: data.profile.country || '',
-            });
-          }
-        }
+        setMessage(payload?.error || 'Failed to load profile');
+        setMessageType('error');
       }
     } catch (err) {
       console.error('Fetch profile failed:', err);
@@ -101,25 +64,13 @@ export default function ProfilePage() {
     setMessage('');
 
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const endpoint = isFarmer ? '/farmer/profile' : '/buyer/profile';
-      
-      const res = await fetch(`${API_URL}${endpoint}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await updateMyFullProfile(formData);
+      if (res.ok) {
         setMessageType('success');
         setMessage('Profile updated successfully!');
       } else {
         setMessageType('error');
-        setMessage(data.error || 'Failed to update profile');
+        setMessage(payload?.error || 'Failed to update profile');
       }
     } catch (err) {
       setMessageType('error');
@@ -153,7 +104,7 @@ export default function ProfilePage() {
           {/* Header Section */}
           <div className="mb-lg border-b border-gray-100 pb-md">
             <h1 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Edit Profile</h1>
-            <p className="font-body-md text-body-md text-secondary">Manage your personal information {isFarmer && 'and farm details'}.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">Manage your personal information {isFarmer && 'and farm details'}.</p>
           </div>
 
           {/* Message */}

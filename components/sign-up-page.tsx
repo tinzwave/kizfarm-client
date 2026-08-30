@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAuthToken, setPendingVerificationEmail } from "@/lib/kizfarm/auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { getSession, setPendingVerificationEmail } from "@/lib/kizfarm/supabase-auth";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -12,26 +13,26 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   // redirect away if already authenticated
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const token = getAuthToken();
-    if (token) router.push('/');
+    getSession().then((session) => {
+      if (session) router.push("/");
+    });
   }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
     try {
-      const res = await fetch(`${API}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone, password }),
+      const supabase = createClient();
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name, phone } },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Signup failed");
+      if (signUpError) throw new Error(signUpError.message);
       // keep pending email for OTP page
       setPendingVerificationEmail(email);
       router.push("/otp");
@@ -110,7 +111,7 @@ export default function SignUpPage() {
             <h2 className="font-headline-lg text-headline-lg text-on-surface">
               Create Account
             </h2>
-            <p className="font-body-md text-body-md text-secondary">
+            <p className="font-body-md text-body-md text-on-surface-variant">
               Start your 14-day free trial. No credit card required.
             </p>
           </div>
@@ -126,7 +127,7 @@ export default function SignUpPage() {
               </label>
               <div className="relative">
                 <span
-                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-secondary"
+                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant"
                   data-icon="person"
                 >
                   person
@@ -152,7 +153,7 @@ export default function SignUpPage() {
               </label>
               <div className="relative">
                 <span
-                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-secondary"
+                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant"
                   data-icon="mail"
                 >
                   mail
@@ -178,7 +179,7 @@ export default function SignUpPage() {
               </label>
               <div className="relative">
                 <span
-                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-secondary"
+                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant"
                   data-icon="phone"
                 >
                   phone
@@ -204,7 +205,7 @@ export default function SignUpPage() {
               </label>
               <div className="relative">
                 <span
-                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-secondary"
+                  className="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant"
                   data-icon="lock"
                 >
                   lock
@@ -218,13 +219,13 @@ export default function SignUpPage() {
                   onChange={(e) => setPassword(e.target.value)}
                 />
                 <span
-                  className="material-symbols-outlined absolute right-sm top-1/2 -translate-y-1/2 text-secondary cursor-pointer"
+                  className="material-symbols-outlined absolute right-sm top-1/2 -translate-y-1/2 text-on-surface-variant cursor-pointer"
                   data-icon="visibility"
                 >
                   visibility
                 </span>
               </div>
-              <p className="font-label-xs text-label-xs text-secondary">
+              <p className="font-label-xs text-label-xs text-on-surface-variant">
                 Must be at least 8 characters long.
               </p>
             </div>
@@ -283,7 +284,7 @@ export default function SignUpPage() {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-outline-variant"></div>
               </div>
-              <span className="relative px-sm bg-white font-label-xs text-label-xs text-secondary">
+              <span className="relative px-sm bg-white font-label-xs text-label-xs text-on-surface-variant">
                 OR SIGN UP WITH
               </span>
             </div>
@@ -306,7 +307,7 @@ export default function SignUpPage() {
                 SSO
               </button>
             </div>
-            <p className="font-body-md text-body-md text-secondary">
+            <p className="font-body-md text-body-md text-on-surface-variant">
               Already have an account?{" "}
               <a className="text-primary font-bold hover:underline" href="#">
                 Log in
@@ -317,7 +318,7 @@ export default function SignUpPage() {
 
         {/* Subtle Footer Branding */}
         <div className="mt-xl text-center">
-          <p className="font-label-xs text-label-xs text-secondary tracking-widest uppercase">
+          <p className="font-label-xs text-label-xs text-on-surface-variant tracking-widest uppercase">
             Digital Agronomy Ecosystem
           </p>
         </div>

@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminBuyers, getAdminBuyerStats } from "@/lib/kizfarm/supabase-data";
 
 interface Buyer {
   _id: string;
@@ -44,30 +43,9 @@ export default function AdminBuyerManagementPage() {
     try {
       setLoading(true);
       setError(null);
-      const token = localStorage.getItem("kizfarm_token");
-      const params = new URLSearchParams();
-      params.append("role", "user");
-
-      if (statusFilter !== "all") {
-        params.append("status", statusFilter);
-      }
-
-      if (searchQ) {
-        params.append("search", searchQ);
-      }
-
-      const res = await fetch(`${API_URL}/admin/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch buyers");
-      }
-
-      const data = await res.json();
-      if (data.success) {
-        setBuyers(data.users || []);
-      }
+      const { res, payload } = await getAdminBuyers({ status: statusFilter, search: searchQ || undefined });
+      if (!res.ok) throw new Error(payload?.error || "Failed to fetch buyers");
+      setBuyers(payload.users || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch buyers");
       console.error("Fetch buyers failed:", err);
@@ -78,22 +56,12 @@ export default function AdminBuyerManagementPage() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/users?role=user&status=all`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const { res, payload } = await getAdminBuyerStats();
       if (res.ok) {
-        const data = await res.json();
-        const allBuyers = data.users || [];
-
         setStats({
-          totalBuyers: allBuyers.length,
-          activeBuyers: allBuyers.filter((b: Buyer) => b.status === "active")
-            .length,
-          suspendedBuyers: allBuyers.filter(
-            (b: Buyer) => b.status === "suspended",
-          ).length,
+          totalBuyers: payload.totalBuyers || 0,
+          activeBuyers: payload.activeBuyers || 0,
+          suspendedBuyers: payload.suspendedBuyers || 0,
         });
       }
     } catch (err) {

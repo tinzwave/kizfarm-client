@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBuyerOrders } from "@/lib/kizfarm/supabase-data";
 
 interface OrderItem {
   productId: string;
@@ -20,7 +20,7 @@ interface Order {
     _id: string;
     farmName: string;
     location: string;
-  };
+  } | null;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -42,7 +42,7 @@ export default function MyOrdersPage() {
       try {
         setLoading(true);
         setError(null);
-        const { res, payload } = await apiFetch("/buyer/orders");
+        const { res, payload } = await getBuyerOrders();
         if (!res.ok) {
           setError(payload?.error || "Failed to fetch orders");
           return;
@@ -122,7 +122,7 @@ export default function MyOrdersPage() {
         {/* Section Header */}
         <div className="mb-lg">
           <h2 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Track Your Orders</h2>
-          <p className="text-secondary font-body-md max-w-2xl">Monitor your recent agricultural purchases, delivery statuses, and transaction history in real-time.</p>
+          <p className="text-on-surface-variant font-body-md max-w-2xl">Monitor your recent agricultural purchases, delivery statuses, and transaction history in real-time.</p>
         </div>
 
         {/* Filter Chips */}
@@ -130,7 +130,7 @@ export default function MyOrdersPage() {
           <button 
             onClick={() => setActiveFilter("all")}
             className={`px-6 py-2 rounded-full font-label-sm text-label-sm whitespace-nowrap transition-all ${
-              activeFilter === "all" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-secondary hover:bg-surface-container"
+              activeFilter === "all" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-on-surface-variant hover:bg-surface-container"
             }`}
           >
             All Orders
@@ -138,7 +138,7 @@ export default function MyOrdersPage() {
           <button 
             onClick={() => setActiveFilter("processing")}
             className={`px-6 py-2 rounded-full font-label-sm text-label-sm whitespace-nowrap transition-all ${
-              activeFilter === "processing" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-secondary hover:bg-surface-container"
+              activeFilter === "processing" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-on-surface-variant hover:bg-surface-container"
             }`}
           >
             Processing
@@ -146,7 +146,7 @@ export default function MyOrdersPage() {
           <button 
             onClick={() => setActiveFilter("shipped")}
             className={`px-6 py-2 rounded-full font-label-sm text-label-sm whitespace-nowrap transition-all ${
-              activeFilter === "shipped" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-secondary hover:bg-surface-container"
+              activeFilter === "shipped" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-on-surface-variant hover:bg-surface-container"
             }`}
           >
             Shipped
@@ -154,7 +154,7 @@ export default function MyOrdersPage() {
           <button 
             onClick={() => setActiveFilter("delivered")}
             className={`px-6 py-2 rounded-full font-label-sm text-label-sm whitespace-nowrap transition-all ${
-              activeFilter === "delivered" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-secondary hover:bg-surface-container"
+              activeFilter === "delivered" ? "bg-primary-container text-white" : "bg-white border border-outline-variant text-on-surface-variant hover:bg-surface-container"
             }`}
           >
             Delivered / Completed
@@ -192,7 +192,7 @@ export default function MyOrdersPage() {
                 <div key={order._id} className="bg-white border border-gray-200 rounded-xl p-md flex flex-col gap-md transition-all hover:shadow-[0_10px_30px_rgba(27,109,36,0.05)] group">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-label-xs text-label-xs text-secondary mb-1">ORDER ID</p>
+                      <p className="font-label-xs text-label-xs text-on-surface-variant mb-1">ORDER ID</p>
                       <h3 className="font-headline-md text-sm font-bold text-on-surface">#KF-{order._id.slice(-6).toUpperCase()}</h3>
                     </div>
                     <span className={`px-3 py-1 rounded-full font-label-xs text-[10px] font-bold uppercase tracking-wider ${style}`}>
@@ -212,9 +212,9 @@ export default function MyOrdersPage() {
                         {firstItem?.name || "Fresh produce"} 
                         {order.items.length > 1 && ` + ${order.items.length - 1} more`}
                       </p>
-                      <p className="font-body-md text-secondary text-xs">{orderDate}</p>
+                      <p className="font-body-md text-on-surface-variant text-xs">{orderDate}</p>
                       {order.farmerId && (
-                        <p className="text-secondary text-[11px]">Farm: {order.farmerId.farmName}</p>
+                        <p className="text-on-surface-variant text-[11px]">Farm: {order.farmerId.farmName}</p>
                       )}
                     </div>
                   </div>
@@ -240,7 +240,7 @@ export default function MyOrdersPage() {
               </div>
               <div>
                 <h4 className="font-label-sm text-label-sm text-on-surface">Start a new order</h4>
-                <p className="text-secondary text-xs mt-1">Browse our latest farm produce</p>
+                <p className="text-on-surface-variant text-xs mt-1">Browse our latest farm produce</p>
               </div>
               <Link href="/buyer/marketplace">
                 <span className="mt-xs inline-block border border-primary text-primary px-4 py-1.5 rounded-lg font-label-xs text-label-xs hover:bg-primary hover:text-white transition-colors cursor-pointer">Go to Market</span>

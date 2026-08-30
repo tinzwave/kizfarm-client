@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { createBlogPost, updateBlogPost, uploadBlogImage } from "@/lib/kizfarm/supabase-mutations";
 
 interface Block {
   type: "heading" | "paragraph" | "image" | "video";
@@ -54,16 +54,11 @@ export default function AdminBlogEditor({ initialData, isEdit = false }: AdminBl
 
   // Upload file helper
   async function uploadFile(file: File) {
-    const formData = new FormData();
-    formData.append("image", file);
-    const { res, payload } = await apiFetch("/blog/upload", {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) {
+    const { res, payload } = await uploadBlogImage(file);
+    if (!res.ok || !payload.imageUrl) {
       throw new Error(payload.error || "File upload failed");
     }
-    return payload.imageUrl;
+    return payload.imageUrl as string;
   }
 
   // Handle cover image selection
@@ -164,13 +159,10 @@ export default function AdminBlogEditor({ initialData, isEdit = false }: AdminBl
         content: JSON.stringify(blocks),
       };
 
-      const url = isEdit ? `/blog/${initialData?._id}` : "/blog";
-      const method = isEdit ? "PATCH" : "POST";
-
-      const { res, payload } = await apiFetch(url, {
-        method,
-        body: JSON.stringify(payloadBody),
-      });
+      const { res, payload } =
+        isEdit && initialData?._id
+          ? await updateBlogPost(initialData._id, payloadBody)
+          : await createBlogPost(payloadBody);
 
       if (!res.ok) {
         throw new Error(payload.error || "Failed to save blog post");

@@ -31,7 +31,7 @@ export default function ShoppingCartPage() {
         <div className="lg:col-span-8">
           <div className="flex items-center justify-between mb-md">
             <h2 className="font-headline-lg text-headline-lg text-on-surface">My Cart</h2>
-            <span className="text-label-sm font-label-sm text-secondary bg-secondary-container px-3 py-1 rounded-full">
+            <span className="text-label-sm font-label-sm text-on-surface-variant bg-secondary-container px-3 py-1 rounded-full">
               {items.length} {items.length === 1 ? 'Item' : 'Items'}
             </span>
           </div>
@@ -40,7 +40,7 @@ export default function ShoppingCartPage() {
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-8 text-center flex flex-col items-center justify-center min-h-[300px]">
               <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">shopping_cart_off</span>
               <p className="text-lg font-semibold text-on-surface mb-2">Your cart is empty</p>
-              <p className="text-sm text-secondary mb-6">Looks like you haven't added any fresh produce yet.</p>
+              <p className="text-sm text-on-surface-variant mb-6">Looks like you haven't added any fresh produce yet.</p>
               <Link href="/buyer/marketplace">
                 <button className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold hover:bg-primary transition-colors">
                   Go to Marketplace
@@ -59,8 +59,8 @@ export default function ShoppingCartPage() {
                 </div>
                 <div className="flex-grow flex flex-col gap-1">
                   <h3 className="font-headline-md text-body-lg text-on-surface">{item.name}</h3>
-                  {item.unit && <p className="text-label-sm font-label-sm text-secondary">Unit: {item.unit}</p>}
-                  {item.farmerName && <p className="text-label-sm font-label-sm text-secondary">Farmer: {item.farmerName}</p>}
+                  {item.unit && <p className="text-label-sm font-label-sm text-on-surface-variant">Unit: {item.unit}</p>}
+                  {item.farmerName && <p className="text-label-sm font-label-sm text-on-surface-variant">Farmer: {item.farmerName}</p>}
                   <p className="font-bold text-[#1B6D24] mt-2">₦ {item.price.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
@@ -98,15 +98,15 @@ export default function ShoppingCartPage() {
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-md sticky top-24">
             <h3 className="font-headline-md text-headline-md text-on-surface mb-md">Order Summary</h3>
             <div className="space-y-4 mb-lg">
-              <div className="flex justify-between text-body-md text-secondary">
+              <div className="flex justify-between text-body-md text-on-surface-variant">
                 <span>Subtotal</span>
                 <span className="text-on-surface">₦ {totalPrice.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-body-md text-secondary">
+              <div className="flex justify-between text-body-md text-on-surface-variant">
                 <span>Transport Fare</span>
                 <span className="text-amber-700 font-semibold">Quoted after checkout</span>
               </div>
-              <div className="flex justify-between text-body-md text-secondary">
+              <div className="flex justify-between text-body-md text-on-surface-variant">
                 <span>Service Charge</span>
                 <span className="text-on-surface">
                   {serviceCharge > 0 ? `₦ ${serviceCharge.toLocaleString()}` : "₦ 0"}
@@ -139,7 +139,7 @@ export default function ShoppingCartPage() {
                 <span className="material-symbols-outlined">arrow_forward</span>
               </button>
             )}
-            <div className="mt-md flex items-center gap-2 justify-center text-label-sm font-label-sm text-secondary">
+            <div className="mt-md flex items-center gap-2 justify-center text-label-sm font-label-sm text-on-surface-variant">
               <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
               Secure Checkout by KIZ FARM
             </div>

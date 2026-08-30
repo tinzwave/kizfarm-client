@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAdminBlogPostById } from "@/lib/kizfarm/supabase-data";
 import AdminBlogEditor from "@/components/admin-blog-editor";
 
 interface BlogPost {
@@ -28,11 +28,11 @@ export default function Page() {
     async function loadPost() {
       try {
         setLoading(true);
-        const { res, payload } = await apiFetch(`/blog/${id}`);
+        const { res, payload } = await getAdminBlogPostById(id);
         if (!res.ok) {
           throw new Error(payload.error || "Failed to load blog post");
         }
-        setPost(payload.post);
+        setPost((payload.post as BlogPost) ?? null);
       } catch (err: any) {
         setError(err.message || "An error occurred");
       } finally {

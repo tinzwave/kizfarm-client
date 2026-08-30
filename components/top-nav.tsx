@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { clearAuth, getAuthToken, getStoredUser } from "@/lib/kizfarm/auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
@@ -21,26 +22,21 @@ export default function TopNav() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = getAuthToken();
-    const user = getStoredUser();
-    setLoggedIn(!!token);
-    setUserEmail(user?.email ?? null);
-    const onAuth = () => {
-      const t = getAuthToken();
-      const u = getStoredUser();
-      setLoggedIn(!!t);
-      setUserEmail(u?.email ?? null);
-    };
-    window.addEventListener("storage", onAuth);
-    window.addEventListener("kizfarm_auth_changed", onAuth as EventListener);
-    return () => {
-      window.removeEventListener("storage", onAuth);
-      window.removeEventListener(
-        "kizfarm_auth_changed",
-        onAuth as EventListener,
-      );
-    };
+    const supabase = createClient();
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setLoggedIn(!!session);
+      setUserEmail(session?.user?.email ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(!!session);
+      setUserEmail(session?.user?.email ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -55,8 +51,8 @@ export default function TopNav() {
     setMenuOpen(false);
   }, [pathname]);
 
-  const handleLogout = () => {
-    clearAuth();
+  const handleLogout = async () => {
+    await signOut();
     setLoggedIn(false);
     setMenuOpen(false);
     router.push("/");

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { createFarmerProduct } from "@/lib/kizfarm/supabase-mutations";
 
 type Props = { hideSidebar?: boolean };
 
@@ -43,33 +43,25 @@ export default function AddProductPage({ hideSidebar = false }: Props) {
 
     setSubmitting(true);
     setError(null);
-    const form = new FormData();
-    form.append("name", name.trim());
-    form.append("description", description.trim());
-    if (category.trim()) form.append("category", category.trim());
-    form.append("price", String(price).trim());
-    if (unit.trim()) form.append("unit", unit.trim());
-    if (quantity.trim()) form.append("quantity", String(quantity).trim());
-    if (moistureCode.trim()) form.append("moistureCode", moistureCode.trim());
-    for (const file of images) form.append("images", file);
 
-    const { res, payload } = await apiFetch("/farmer/products", {
-      method: "POST",
-      body: form,
+    const { res, payload } = await createFarmerProduct({
+      name: name.trim(),
+      description: description.trim(),
+      category: category.trim() || undefined,
+      price: Number(price),
+      unit: unit.trim() || undefined,
+      quantity: quantity.trim() ? Number(quantity) : undefined,
+      moistureCode: moistureCode.trim() || undefined,
+      images,
     });
 
     if (!res.ok) {
-      setError(
-        typeof payload === "string"
-          ? payload
-          : payload?.error || "Failed to create product",
-      );
+      setError(payload?.error || "Failed to create product");
       setSubmitting(false);
       return;
     }
 
-    const created = payload?.product || payload;
-    const id = created?.id || created?._id;
+    const id = payload.product?.id || payload.product?._id;
     if (id) router.push(`/farmer/products/${id}`);
     else router.push("/farmer/products");
   };
@@ -102,9 +94,6 @@ export default function AddProductPage({ hideSidebar = false }: Props) {
           {error ? (
             <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
               {error}
-              <div className="text-red-600/80 mt-1">
-                Expected API: `POST /farmer/products` (multipart/form-data)
-              </div>
             </div>
           ) : null}
 

@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getFarmerPaymentHistory, getFarmerBankDetails } from "@/lib/kizfarm/supabase-data";
+import { saveFarmerBankDetails } from "@/lib/kizfarm/supabase-mutations";
 
 interface Payment {
   _id: string;
@@ -20,6 +20,7 @@ interface BankDetails {
   accountHolderName?: string;
   accountNumber?: string;
   branchCode?: string;
+  isVerified?: boolean;
 }
 
 interface Props {
@@ -40,13 +41,10 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
   }, [activeTab]);
 
   const fetchPayments = async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/farmer/payment-history`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setPayments(data.payments || []);
+      const { res, payload } = await getFarmerPaymentHistory();
+      if (res.ok) setPayments(payload.payments || []);
     } catch (err) {
       console.error('Fetch payments failed:', err);
     } finally {
@@ -55,19 +53,16 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
   };
 
   const fetchBankDetails = async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/farmer/bank-details`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        setBankDetails(data.bankDetails);
+      const { res, payload } = await getFarmerBankDetails();
+      if (res.ok && payload.bankDetails) {
+        setBankDetails(payload.bankDetails);
         setFormData({
-          bankName: data.bankDetails.bankName || '',
-          accountHolderName: data.bankDetails.accountHolderName || '',
-          accountNumber: data.bankDetails.accountNumber || '',
-          branchCode: data.bankDetails.branchCode || ''
+          bankName: payload.bankDetails.bankName || '',
+          accountHolderName: payload.bankDetails.accountHolderName || '',
+          accountNumber: payload.bankDetails.accountNumber || '',
+          branchCode: payload.bankDetails.branchCode || ''
         });
       }
     } catch (err) {
@@ -81,18 +76,12 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
     e.preventDefault();
     setSaving(true);
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/farmer/bank-details`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      const { res, payload } = await saveFarmerBankDetails(formData);
       if (res.ok) {
-        setBankDetails(formData);
+        setBankDetails(payload.bankDetails ?? formData);
         alert('Bank details saved successfully');
+      } else {
+        alert(payload?.error || 'Failed to save bank details');
       }
     } catch (err) {
       console.error('Save failed:', err);
@@ -225,8 +214,10 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
                   </button>
                 </form>
                 {bankDetails.accountNumber && (
-                  <div className="mt-6 p-4 bg-green-50 rounded border border-green-200">
-                    <p className="text-sm text-green-800"><strong>Verified ✓</strong> Bank details on file</p>
+                  <div className={`mt-6 p-4 rounded border ${bankDetails.isVerified ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+                    <p className={`text-sm ${bankDetails.isVerified ? "text-green-800" : "text-amber-800"}`}>
+                      <strong>{bankDetails.isVerified ? "Verified ✓" : "Pending verification"}</strong> Bank details on file
+                    </p>
                   </div>
                 )}
               </div>

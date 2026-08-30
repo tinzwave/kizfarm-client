@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useCart } from "@/lib/kizfarm/cart-context";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getBuyerDashboard, getFarmerStatus } from "@/lib/kizfarm/supabase-data";
 
 interface Product {
   _id: string;
@@ -54,7 +54,7 @@ export default function UserDashboardPage() {
   useEffect(() => {
     async function loadFarmerStatus() {
       try {
-        const { res, payload } = await apiFetch("/farmer/status");
+        const { res, payload } = await getFarmerStatus();
         if (res.ok) setFarmer(payload?.farmer ?? null);
       } finally {
         setFarmerStatusLoaded(true);
@@ -68,12 +68,12 @@ export default function UserDashboardPage() {
       setLoading(true);
       setError("");
       try {
-        const { res, payload } = await apiFetch("/buyer/dashboard");
+        const { res, payload } = await getBuyerDashboard();
         if (!res.ok) {
           setError(payload?.error || "Could not load buyer dashboard.");
           return;
         }
-        setData(payload);
+        setData(payload as BuyerDashboard);
       } catch {
         setError("Could not connect to the backend.");
       } finally {

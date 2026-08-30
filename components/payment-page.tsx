@@ -30,7 +30,7 @@ export default function PaymentPage() {
           {/* Header Section */}
           <div className="mb-lg">
             <h1 className="font-headline-lg text-headline-lg text-primary mb-xs">Payment Methods</h1>
-            <p className="font-body-md text-body-md text-secondary">Manage your saved cards and payment preferences for secure agricultural transactions.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">Manage your saved cards and payment preferences for secure agricultural transactions.</p>
           </div>
 
           {/* Bento Layout for Payment Methods */}
@@ -50,7 +50,7 @@ export default function PaymentPage() {
                       <p className="font-label-sm text-body-md text-on-surface">Visa ending in 4242</p>
                       <span className="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed rounded-full text-[10px] font-bold uppercase tracking-tighter">Primary</span>
                     </div>
-                    <p className="font-label-xs text-label-xs text-secondary mt-0.5">Expires 12/26</p>
+                    <p className="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Expires 12/26</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-sm">
@@ -71,7 +71,7 @@ export default function PaymentPage() {
                   </div>
                   <div>
                     <p className="font-label-sm text-body-md text-on-surface">Mastercard ending in 8801</p>
-                    <p className="font-label-xs text-label-xs text-secondary mt-0.5">Expires 09/25</p>
+                    <p className="font-label-xs text-label-xs text-on-surface-variant mt-0.5">Expires 09/25</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-sm">
@@ -98,14 +98,14 @@ export default function PaymentPage() {
                   <span className="material-symbols-outlined text-primary">verified_user</span>
                   <h3 className="font-label-sm text-label-sm text-on-surface">Secure Transactions</h3>
                 </div>
-                <p className="font-body-md text-label-xs text-secondary">Your payment information is encrypted and protected by industry-leading security protocols.</p>
+                <p className="font-body-md text-label-xs text-on-surface-variant">Your payment information is encrypted and protected by industry-leading security protocols.</p>
               </div>
               <div className="bg-surface-container-low rounded-xl p-md border border-transparent">
                 <div className="flex items-center gap-base mb-sm">
                   <span className="material-symbols-outlined text-primary">history</span>
                   <h3 className="font-label-sm text-label-sm text-on-surface">Payment History</h3>
                 </div>
-                <p className="font-body-md text-label-xs text-secondary">Access complete records of your farm equipment purchases and supply subscriptions in your orders.</p>
+                <p className="font-body-md text-label-xs text-on-surface-variant">Access complete records of your farm equipment purchases and supply subscriptions in your orders.</p>
               </div>
             </div>
 

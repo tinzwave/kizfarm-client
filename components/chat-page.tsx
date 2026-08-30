@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getConversations } from '@/lib/kizfarm/chat';
+import { getConversations } from '@/lib/kizfarm/supabase-data';
 
 interface ChatData {
   _id: string;
@@ -26,7 +26,12 @@ export default function ChatPage() {
       try {
         setLoading(true);
         setError(null);
-        setChats(await getConversations());
+        const { res, payload } = await getConversations();
+        if (!res.ok) {
+          setError(payload?.error || 'Failed to load conversations');
+          return;
+        }
+        setChats(payload.chats || []);
       } catch (err) {
         console.error('Error fetching conversations:', err);
         setError('Failed to load conversations');
@@ -130,7 +135,7 @@ export default function ChatPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className="font-body-md text-body-md text-secondary truncate max-w-[80%]">
+                    <p className="font-body-md text-body-md text-on-surface-variant truncate max-w-[80%]">
                       {chat.lastMessage || `Conversation about ${chat.productId?.name || 'this product'}`}
                     </p>
                   </div>

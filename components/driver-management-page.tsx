@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAllDrivers, getDriverManagementStats } from "@/lib/kizfarm/supabase-data";
+import { createDriver } from "@/lib/kizfarm/supabase-mutations";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,11 +69,19 @@ export default function DriverManagementPage() {
     setLoading(true);
     try {
       const [driversRes, statsRes] = await Promise.all([
-        apiFetch("/admin/drivers"),
-        apiFetch("/admin/stats"),
+        getAllDrivers(),
+        getDriverManagementStats(),
       ]);
-      if (driversRes.payload?.ok) setDrivers(driversRes.payload.drivers ?? []);
-      if (statsRes.payload?.ok) setStats(statsRes.payload.stats ?? null);
+      const fetchedDrivers = (driversRes.payload?.ok ? driversRes.payload.drivers : []) as Driver[];
+      setDrivers(fetchedDrivers);
+      if (statsRes.payload?.ok) {
+        setStats({
+          totalDrivers: fetchedDrivers.length,
+          activeDrivers: fetchedDrivers.filter((d) => d.status === "active").length,
+          totalOrders: statsRes.payload.stats.totalOrders,
+          deliveredOrders: statsRes.payload.stats.deliveredOrders,
+        });
+      }
     } catch {
       // silently handle
     } finally {
@@ -103,17 +112,13 @@ export default function DriverManagementPage() {
     }
     setSubmitting(true);
     try {
-      const body = new FormData();
-      body.set("name", form.name.trim());
-      body.set("phone", form.phone.trim());
-      body.set("vehicleType", form.vehicleType);
-      if (form.vehiclePlate.trim()) body.set("vehiclePlate", form.vehiclePlate.trim());
-      if (form.currentLocation.trim()) body.set("currentLocation", form.currentLocation.trim());
-      if (form.vehicleImage) body.set("vehicleImage", form.vehicleImage);
-
-      const { res, payload } = await apiFetch("/admin/drivers", {
-        method: "POST",
-        body,
+      const { res, payload } = await createDriver({
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        vehicleType: form.vehicleType,
+        vehiclePlate: form.vehiclePlate.trim() || undefined,
+        currentLocation: form.currentLocation.trim() || undefined,
+        vehicleImage: form.vehicleImage,
       });
       if (!res.ok) {
         setFormError(payload?.error ?? "Failed to onboard driver.");

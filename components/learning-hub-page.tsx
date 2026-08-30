@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
 
 interface Tutor {
   _id: string;
@@ -39,8 +39,8 @@ export default function LearningHubPage() {
     setLoading(true);
     try {
       const [coursesRes, subsRes] = await Promise.all([
-        apiFetch("/learning/courses?audience=farmer"),
-        apiFetch("/learning/subscriptions"),
+        getCourses({ audience: "farmer" }),
+        getMySubscriptions(),
       ]);
       if (coursesRes.payload?.ok) setCourses(coursesRes.payload.courses ?? []);
       if (subsRes.payload?.ok) setSubscriptions(subsRes.payload.subscriptions ?? []);

@@ -56,7 +56,12 @@ export function getAuthToken() {
   const user = getStoredUser();
   if (isAdminUser(user)) return null;
   if (token && !isTokenExpired(token)) return token;
-  clearAuth();
+  // Only clear (and dispatch kizfarm_auth_changed) when there was actually
+  // something stored -- otherwise this fires on every call with no token
+  // present, and TopNav's listener calls getAuthToken() again on that same
+  // event, which re-enters here and re-dispatches, infinitely recursing
+  // until the call stack overflows.
+  if (token || adminToken) clearAuth();
   return null;
 }
 

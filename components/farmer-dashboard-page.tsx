@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getFarmerDashboard } from "@/lib/kizfarm/supabase-data";
 
 interface Product {
   _id: string;
@@ -55,12 +55,12 @@ export default function FarmerDashboardPage() {
       setLoading(true);
       setError("");
       try {
-        const { res, payload } = await apiFetch("/farmer/dashboard");
+        const { res, payload } = await getFarmerDashboard();
         if (!res.ok) {
           setError(payload?.error || "Could not load farmer dashboard.");
           return;
         }
-        setData(payload);
+        setData(payload as FarmerDashboard);
       } catch {
         setError("Could not connect to the backend.");
       } finally {
@@ -99,7 +99,7 @@ export default function FarmerDashboardPage() {
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-headline-lg font-headline-lg text-on-surface">{loading ? "Farm Overview" : farmName}</h1>
-            <p className="text-body-md font-body-md text-secondary">
+            <p className="text-body-md font-body-md text-on-surface-variant">
               {data?.farmer?.location ? `${data.farmer.location} · ` : ""}Live sales, products, and order activity.
             </p>
           </div>
@@ -121,7 +121,7 @@ export default function FarmerDashboardPage() {
               <div className="p-3 bg-green-50 rounded-lg text-primary w-fit mb-4">
                 <span className="material-symbols-outlined">{card.icon}</span>
               </div>
-              <p className="text-label-xs font-label-xs text-secondary mb-1">{card.label}</p>
+              <p className="text-label-xs font-label-xs text-on-surface-variant mb-1">{card.label}</p>
               <p className="text-headline-md font-headline-md">{loading ? "-" : card.value}</p>
             </div>
           ))}
@@ -132,7 +132,7 @@ export default function FarmerDashboardPage() {
             <div className="p-6 flex justify-between items-center">
               <div>
                 <h3 className="text-headline-md font-headline-md">Recent Orders</h3>
-                <p className="text-sm text-secondary">Latest buyer orders for your farm</p>
+                <p className="text-sm text-on-surface-variant">Latest buyer orders for your farm</p>
               </div>
               <Link href="/farmer/orders" className="text-[#1B6D24] font-label-sm hover:underline">See all</Link>
             </div>
@@ -140,11 +140,11 @@ export default function FarmerDashboardPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 border-y border-zinc-100">
-                    <th className="px-6 py-4 text-label-xs text-secondary uppercase">Order</th>
-                    <th className="px-6 py-4 text-label-xs text-secondary uppercase">Customer</th>
-                    <th className="px-6 py-4 text-label-xs text-secondary uppercase">Items</th>
-                    <th className="px-6 py-4 text-label-xs text-secondary uppercase">Status</th>
-                    <th className="px-6 py-4 text-label-xs text-secondary uppercase text-right">Total</th>
+                    <th className="px-6 py-4 text-label-xs text-on-surface-variant uppercase">Order</th>
+                    <th className="px-6 py-4 text-label-xs text-on-surface-variant uppercase">Customer</th>
+                    <th className="px-6 py-4 text-label-xs text-on-surface-variant uppercase">Items</th>
+                    <th className="px-6 py-4 text-label-xs text-on-surface-variant uppercase">Status</th>
+                    <th className="px-6 py-4 text-label-xs text-on-surface-variant uppercase text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -152,7 +152,7 @@ export default function FarmerDashboardPage() {
                     <tr key={order._id} className="hover:bg-zinc-50/50">
                       <td className="px-6 py-4 text-label-sm font-semibold">{order.masterOrderId || order._id.slice(-8).toUpperCase()}</td>
                       <td className="px-6 py-4 text-label-sm">{order.buyerId?.name || order.buyerId?.email || "Buyer"}</td>
-                      <td className="px-6 py-4 text-label-sm text-secondary">{order.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}</td>
+                      <td className="px-6 py-4 text-label-sm text-on-surface-variant">{order.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}</td>
                       <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass(order.status)}`}>{order.status.replaceAll("_", " ")}</span></td>
                       <td className="px-6 py-4 font-bold text-right">{money(order.total)}</td>
                     </tr>
@@ -180,7 +180,7 @@ export default function FarmerDashboardPage() {
           <div className="flex justify-between items-end mb-5">
             <div>
               <h3 className="text-headline-md font-headline-md">Your Latest Products</h3>
-              <p className="text-sm text-secondary">Pulled from your product inventory</p>
+              <p className="text-sm text-on-surface-variant">Pulled from your product inventory</p>
             </div>
             <Link href="/farmer/products" className="text-[#1B6D24] font-label-sm hover:underline">Manage</Link>
           </div>
@@ -190,7 +190,7 @@ export default function FarmerDashboardPage() {
                 <img src={product.images?.[0] || "/placeholder.jpg"} alt={product.name} className="h-40 w-full object-cover" />
                 <div className="p-4">
                   <h4 className="font-bold line-clamp-1">{product.name}</h4>
-                  <p className="text-sm text-secondary">{product.quantity ?? 0} {product.unit || "units"} available</p>
+                  <p className="text-sm text-on-surface-variant">{product.quantity ?? 0} {product.unit || "units"} available</p>
                   <p className="mt-2 font-bold text-[#1B6D24]">{money(product.price)}</p>
                 </div>
               </article>

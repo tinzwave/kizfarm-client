@@ -1,56 +1,85 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { getMyFarmerProfile } from "@/lib/kizfarm/supabase-data";
+import { submitFarmerVerification } from "@/lib/kizfarm/supabase-mutations";
+
+interface FarmerVerification {
+  _id: string;
+  status: string;
+  bvn: string | null;
+  bvnUrl: string | null;
+  nin: string | null;
+  govIdUrl: string | null;
+  selfieUrl: string | null;
+  farmAddress: string | null;
+  farmImageUrls: string[];
+  rejectionReason: string | null;
+}
 
 export default function FarmerVerifyPage() {
   const [loading, setLoading] = useState(true);
-  const [farmer, setFarmer] = useState(null);
-  const [files, setFiles] = useState({ bvn: null, govId: null, selfie: null });
+  const [farmer, setFarmer] = useState<FarmerVerification | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const [bvn, setBvn] = useState("");
+  const [nin, setNin] = useState("");
+  const [farmAddress, setFarmAddress] = useState("");
+  const [bvnFile, setBvnFile] = useState<File | null>(null);
+  const [govIdFile, setGovIdFile] = useState<File | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [farmImageFiles, setFarmImageFiles] = useState<File[]>([]);
+
+  const load = async () => {
+    setLoading(true);
+    const { payload } = await getMyFarmerProfile();
+    setFarmer((payload?.farmer as FarmerVerification) || null);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const load = async () => {
-      const token = localStorage.getItem("kizfarm_token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const res = await fetch("http://localhost:4000/farmer/status", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setFarmer(data?.farmer || null);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, []);
 
-  const handleFile = (e) => {
-    const { name, files: f } = e.target;
-    setFiles((s) => ({ ...s, [name]: f[0] }));
+  const handleFarmImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFarmImageFiles(files);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("kizfarm_token");
-    if (!token) return alert("Please login");
-    const form = new FormData();
-    if (files.bvn) form.append("bvn", files.bvn);
-    if (files.govId) form.append("govId", files.govId);
-    if (files.selfie) form.append("selfie", files.selfie);
+    setError("");
 
-    const res = await fetch("http://localhost:4000/farmer/verify", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error || "Upload failed");
-    setFarmer(data.farmer);
+    const hasExistingFarmImages = (farmer?.farmImageUrls?.length || 0) === 5;
+    if (farmImageFiles.length > 0 && farmImageFiles.length !== 5) {
+      setError("Please select exactly 5 farm images.");
+      return;
+    }
+    if (farmImageFiles.length === 0 && !hasExistingFarmImages) {
+      setError("Exactly 5 farm images are required.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { res, payload } = await submitFarmerVerification({
+        bvn: bvn || undefined,
+        nin: nin || undefined,
+        farmAddress: farmAddress || undefined,
+        bvnFile,
+        govIdFile,
+        selfieFile,
+        farmImageFiles: farmImageFiles.length === 5 ? farmImageFiles : undefined,
+      });
+      if (!res.ok) {
+        setError(payload?.error || "Submission failed");
+        return;
+      }
+      await load();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) return <div className="pt-32 text-center">Loading…</div>;
@@ -101,6 +130,9 @@ export default function FarmerVerifyPage() {
             NIN: <strong>{farmer.nin || "Not provided"}</strong>
           </p>
           <p className="mb-2">
+            Farm Address: <strong>{farmer.farmAddress || "Not provided"}</strong>
+          </p>
+          <p className="mb-2">
             Selfie:{" "}
             {farmer.selfieUrl ? (
               <a
@@ -114,6 +146,24 @@ export default function FarmerVerifyPage() {
               "Not provided"
             )}
           </p>
+          <div className="mb-2">
+            Farm Images:{" "}
+            {farmer.farmImageUrls.length > 0 ? (
+              <div className="mt-2 grid grid-cols-5 gap-2">
+                {farmer.farmImageUrls.map((url, i) => (
+                  <a key={url} href={url} target="_blank" className="block">
+                    <img
+                      src={url}
+                      alt={`Farm ${i + 1}`}
+                      className="w-full aspect-square object-cover rounded border"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : (
+              "Not provided"
+            )}
+          </div>
           {farmer.status === "pending" && (
             <button disabled className="mt-4 px-4 py-2 bg-gray-200 rounded">
               Submitted
@@ -122,49 +172,105 @@ export default function FarmerVerifyPage() {
           {farmer.status === "approved" && (
             <div className="mt-4 px-4 py-2 bg-green-100 rounded">Approved</div>
           )}
-          {farmer.status === "rejected" && (
-            <div className="mt-4">
-              <div className="mb-2 text-red-600">
-                Rejected: {farmer.rejectionReason}
-              </div>
-              <p>You may re-upload corrected documents below and resubmit.</p>
-            </div>
-          )}
         </div>
       ) : (
         <form
           onSubmit={handleSubmit}
           className="bg-white p-6 rounded shadow space-y-4"
         >
+          {farmer.status === "rejected" && (
+            <div className="mb-2">
+              <div className="mb-2 text-red-600">
+                Rejected: {farmer.rejectionReason}
+              </div>
+              <p className="text-sm text-slate-600">
+                You may re-upload corrected documents below and resubmit.
+              </p>
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded px-4 py-3">
+              {error}
+            </div>
+          )}
           <div>
-            <label className="block mb-1">BVN (image/pdf)</label>
+            <label className="block mb-1">BVN Number</label>
             <input
-              name="bvn"
-              onChange={handleFile}
+              type="text"
+              value={bvn}
+              onChange={(e) => setBvn(e.target.value)}
+              placeholder="e.g. 22212345678"
+              className="w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block mb-1">BVN Document (image/pdf)</label>
+            <input
+              onChange={(e) => setBvnFile(e.target.files?.[0] ?? null)}
               accept="image/*,application/pdf"
               type="file"
+            />
+          </div>
+          <div>
+            <label className="block mb-1">NIN</label>
+            <input
+              type="text"
+              value={nin}
+              onChange={(e) => setNin(e.target.value)}
+              placeholder="e.g. 12345678901"
+              className="w-full border rounded px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="block mb-1">Government ID (image/pdf)</label>
             <input
-              name="govId"
-              onChange={handleFile}
+              onChange={(e) => setGovIdFile(e.target.files?.[0] ?? null)}
               accept="image/*,application/pdf"
               type="file"
             />
           </div>
           <div>
+            <label className="block mb-1">Farm Address</label>
+            <input
+              type="text"
+              value={farmAddress}
+              onChange={(e) => setFarmAddress(e.target.value)}
+              placeholder="e.g. 12 Kano Street, Kano"
+              className="w-full border rounded px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
             <label className="block mb-1">Live Selfie (image)</label>
             <input
-              name="selfie"
-              onChange={handleFile}
+              onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
               accept="image/*"
               type="file"
             />
           </div>
-          <button className="px-4 py-2 bg-emerald-700 text-white rounded">
-            Submit for Review
+          <div>
+            <label className="block mb-1">
+              Farm Proof Images — exactly 5 required
+              {farmer.farmImageUrls.length === 5 && (
+                <span className="text-xs text-slate-500"> (5 already on file — optional to replace)</span>
+              )}
+            </label>
+            <input
+              onChange={handleFarmImages}
+              accept="image/*"
+              type="file"
+              multiple
+            />
+            {farmImageFiles.length > 0 && (
+              <p className="mt-1 text-xs text-slate-500">
+                {farmImageFiles.length} file(s) selected
+              </p>
+            )}
+          </div>
+          <button
+            disabled={submitting}
+            className="px-4 py-2 bg-emerald-700 text-white rounded disabled:opacity-60"
+          >
+            {submitting ? "Submitting…" : "Submit for Review"}
           </button>
         </form>
       )}

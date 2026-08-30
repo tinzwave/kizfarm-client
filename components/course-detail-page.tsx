@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getCourseAccess, getCourseById } from "@/lib/kizfarm/supabase-data";
 
 interface Tutor {
   name: string;
@@ -39,19 +39,18 @@ export default function CourseDetailPage() {
     async function loadCourse() {
       if (!courseId) return;
       setError("");
-      const endpoint = wantsAccess
-        ? `/learning/subscriptions/${courseId}/access?source=${source}`
-        : `/learning/courses/${courseId}?source=${source}`;
-      const { res, payload } = await apiFetch(endpoint);
+      const { res, payload } = wantsAccess
+        ? await getCourseAccess(courseId, { source })
+        : await getCourseById(courseId, { source });
       if (!res.ok) {
         setError(payload?.error || "Could not load course.");
         if (wantsAccess) {
-          const fallback = await apiFetch(`/learning/courses/${courseId}?source=${source}`);
+          const fallback = await getCourseById(courseId, { source });
           if (fallback.payload?.ok) setCourse(fallback.payload.course);
         }
         return;
       }
-      setCourse(payload.course);
+      setCourse((payload.course as Course) ?? null);
       if (wantsAccess) setHasAccess(true);
     }
     loadCourse();

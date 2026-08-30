@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminFarmers, getAdminFarmerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
+import { suspendAdminFarmer, unsuspendAdminFarmer, deactivateAdminFarmer } from "@/lib/kizfarm/supabase-mutations";
 
 interface Farmer {
   _id: string;
@@ -16,12 +16,6 @@ interface Farmer {
     phone: string;
     status: string;
   };
-}
-
-interface FarmerDetail {
-  farmer: Farmer;
-  activeOrdersCount: number;
-  hasPendingEscrow: boolean;
 }
 
 export default function AllFarmersListPage() {
@@ -47,19 +41,10 @@ export default function AllFarmersListPage() {
   const fetchFarmers = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("kizfarm_token");
-      const params = new URLSearchParams();
-      if (statusFilter !== "all") params.append("status", statusFilter);
-      if (searchQ) params.append("search", searchQ);
-      params.append("limit", "20");
-
-      const res = await fetch(`${API_URL}/admin/farmers?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        setFarmers(data.farmers || []);
-        setTotal(data.total || 0);
+      const { res, payload } = await getAdminFarmers({ status: statusFilter, search: searchQ || undefined });
+      if (res.ok) {
+        setFarmers(payload.farmers || []);
+        setTotal(payload.total || 0);
       }
     } catch (err) {
       console.error("Fetch farmers failed:", err);
@@ -77,23 +62,21 @@ export default function AllFarmersListPage() {
     setShowSuspendModal(true);
 
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/farmers/${farmer._id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: { success: boolean } & FarmerDetail = await res.json();
-      if (data.success) {
-        if (data.activeOrdersCount > 0) {
+      const { res, payload } = await getAdminFarmerSuspensionEligibility(farmer._id);
+      if (res.ok) {
+        if ((payload.activeOrdersCount ?? 0) > 0) {
           setSuspensionError(
             "This farmer has an active order and cannot be suspended."
           );
-        } else if (data.hasPendingEscrow) {
+        } else if (payload.hasPendingEscrow) {
           setSuspensionError(
             "This farmer cannot be suspended because they have unreleased payments in escrow."
           );
         } else {
           setCanSuspend(true);
         }
+      } else {
+        setSuspensionError(payload?.error || "Failed to check suspension eligibility.");
       }
     } catch (err) {
       console.error("Check eligibility failed:", err);
@@ -109,32 +92,12 @@ export default function AllFarmersListPage() {
     setSuspensionError("");
 
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(
-        `${API_URL}/admin/farmers/${selectedFarmer._id}/suspend`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ reason: suspensionReason }),
-        }
-      );
-
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await suspendAdminFarmer(selectedFarmer._id, suspensionReason);
+      if (res.ok) {
         setShowSuspendModal(false);
         fetchFarmers();
       } else {
-        // Use specific backend error messages mapped to friendly UI
-        if (data.error?.includes("active orders")) {
-          setSuspensionError("This farmer has an active order and cannot be suspended.");
-        } else if (data.error?.includes("escrow")) {
-          setSuspensionError("This farmer cannot be suspended because they have unreleased payments in escrow.");
-        } else {
-          setSuspensionError(data.error || "Failed to suspend farmer");
-        }
+        setSuspensionError(payload?.error || "Failed to suspend farmer");
       }
     } catch (err) {
       setSuspensionError("Network error. Please try again.");
@@ -145,42 +108,29 @@ export default function AllFarmersListPage() {
 
   const handleUnsuspend = async (farmer: Farmer) => {
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(
-        `${API_URL}/admin/farmers/${farmer._id}/unsuspend`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const data = await res.json();
-      if (res.ok && data.success) fetchFarmers();
+      const { res } = await unsuspendAdminFarmer(farmer._id);
+      if (res.ok) fetchFarmers();
     } catch (err) {
       console.error("Unsuspend failed:", err);
     }
   };
 
-  const handleDelete = async (farmer: Farmer) => {
+  const handleDeactivate = async (farmer: Farmer) => {
     if (
       !window.confirm(
-        `Are you sure you want to permanently delete farmer "${farmer.fullName}" and all their products? This action cannot be undone.`
+        `Deactivate farmer "${farmer.fullName}"? This blocks them from logging in. Their listings and order history are kept.`
       )
     )
       return;
     try {
-      const token = localStorage.getItem("kizfarm_token");
-      const res = await fetch(`${API_URL}/admin/farmers/${farmer._id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const { res, payload } = await deactivateAdminFarmer(farmer._id);
+      if (res.ok) {
         fetchFarmers();
       } else {
-        alert(data.error || "Failed to delete farmer");
+        alert(payload?.error || "Failed to deactivate farmer");
       }
     } catch (err) {
-      console.error("Delete failed:", err);
+      console.error("Deactivate failed:", err);
     }
   };
 
@@ -224,7 +174,7 @@ export default function AllFarmersListPage() {
   };
 
   const isSuspended = (farmer: Farmer) =>
-    farmer.userId?.status === "suspended";
+    farmer.userId?.status === "suspended" || farmer.userId?.status === "deactivated";
 
   const filteredFarmers = farmers.filter((f) => {
     if (!searchQ) return true;
@@ -489,10 +439,10 @@ export default function AllFarmersListPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleDelete(farmer)}
+                              onClick={() => handleDeactivate(farmer)}
                               className="px-3 py-1.5 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 transition-colors"
                             >
-                              Delete
+                              Deactivate
                             </button>
                           </div>
                         </td>

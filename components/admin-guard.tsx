@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getAdminToken, getStoredUser, isAdminUser, parseJwt } from "@/lib/kizfarm/auth";
+import { getCurrentProfile, getSession, isAdminProfile } from "@/lib/kizfarm/supabase-auth";
 
 export default function AdminGuard({
   children,
@@ -13,17 +13,23 @@ export default function AdminGuard({
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = getAdminToken();
-    const payload = parseJwt(token);
-    const storedUser = getStoredUser();
-
-    if (token && (isAdminUser(payload) || isAdminUser(storedUser))) {
-      setAuthorized(true);
-      return;
+    let cancelled = false;
+    async function check() {
+      const session = await getSession();
+      if (session) {
+        const profile = await getCurrentProfile();
+        if (isAdminProfile(profile)) {
+          if (!cancelled) setAuthorized(true);
+          return;
+        }
+      }
+      if (!cancelled) setAuthorized(false);
+      router.replace("/admin/login");
     }
-    setAuthorized(false);
-    router.replace("/admin/login");
+    check();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (authorized === null) {

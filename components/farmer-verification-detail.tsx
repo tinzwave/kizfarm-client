@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getAdminFarmerVerificationById } from "@/lib/kizfarm/supabase-data";
+import { adminReviewFarmer } from "@/lib/kizfarm/supabase-mutations";
 
 export default function FarmerVerificationDetail({ id }: { id: string }) {
   const params = useParams();
@@ -11,7 +13,6 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
     (typeof window !== "undefined"
       ? window.location.pathname.split("/").pop()
       : undefined);
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [farmer, setFarmer] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,18 +28,11 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
           setError("Invalid farmer id");
           return;
         }
-        const token =
-          typeof window !== "undefined"
-            ? localStorage.getItem("kizfarm_token")
-            : null;
-        const res = await fetch(`${API}/admin/verify-farmers/${actualId}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        const data = await res.json();
+        const { res, payload } = await getAdminFarmerVerificationById(actualId);
         if (!res.ok) {
-          setError(data?.error || "Failed to load farmer");
-        } else if (data?.farmer) {
-          setFarmer(data.farmer);
+          setError(payload?.error || "Failed to load farmer");
+        } else if (payload?.farmer) {
+          setFarmer(payload.farmer);
         }
       } catch (err) {
         console.error(err);
@@ -48,25 +42,14 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
       }
     };
     load();
-  }, [API, actualId]);
+  }, [actualId]);
 
   const handleApprove = async () => {
     if (!farmer) return;
     setSubmitting(true);
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("kizfarm_token")
-          : null;
-      const res = await fetch(
-        `${API}/admin/verify-farmers/${farmer._id}/approve`,
-        {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Approve failed");
+      const { res, payload } = await adminReviewFarmer(farmer._id, true);
+      if (!res.ok) throw new Error(payload?.error || "Approve failed");
       router.push("/admin/verify-farmers");
     } catch (err) {
       console.error(err);
@@ -84,23 +67,8 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
     }
     setSubmitting(true);
     try {
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("kizfarm_token")
-          : null;
-      const res = await fetch(
-        `${API}/admin/verify-farmers/${farmer._id}/reject`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ reason: rejectionReason }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Reject failed");
+      const { res, payload } = await adminReviewFarmer(farmer._id, false, rejectionReason);
+      if (!res.ok) throw new Error(payload?.error || "Reject failed");
       router.push("/admin/verify-farmers");
     } catch (err) {
       console.error(err);

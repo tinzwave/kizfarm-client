@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getConversations } from "@/lib/kizfarm/chat";
+import { getConversations } from "@/lib/kizfarm/supabase-data";
 
 interface ChatData {
   _id: string;
@@ -28,9 +28,12 @@ export default function ChatsPage() {
   const fetchConversations = async () => {
     try {
       setLoading(true);
-      const conversations = await getConversations();
-      // Filter for conversations where current user is the farmer
-      setChats(conversations);
+      const { res, payload } = await getConversations();
+      if (!res.ok) {
+        setError(payload?.error || "Failed to load conversations");
+        return;
+      }
+      setChats(payload.chats || []);
     } catch (err) {
       console.error("Error fetching conversations:", err);
       setError("Failed to load conversations");

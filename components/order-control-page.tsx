@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { apiFetch } from "@/lib/kizfarm/api";
+import { getAdminOrders, getAdminOrderById, getActiveDrivers } from "@/lib/kizfarm/supabase-data";
+import { adminSetOrderStatus, adminSetTransportFare, adminAssignDriver, adminCancelOrder } from "@/lib/kizfarm/supabase-mutations";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -222,8 +223,8 @@ export default function OrderControlPage() {
   const fetchOrders = useCallback(async () => {
     setLoadingList(true);
     try {
-      const { payload } = await apiFetch("/admin/orders");
-      if (payload?.ok) setOrders(payload.orders ?? []);
+      const { payload } = await getAdminOrders();
+      if (payload?.ok) setOrders((payload.orders as Order[]) ?? []);
     } finally {
       setLoadingList(false);
     }
@@ -239,18 +240,17 @@ export default function OrderControlPage() {
     setSelected(null);
     setCancelCheckLoading(true);
     try {
-      const { payload } = await apiFetch(`/admin/orders/${orderId}`);
+      const { payload } = await getAdminOrderById(orderId);
       if (payload?.ok) {
-        setSelected(payload.order);
-        
-        // Check if order can be cancelled
-        const { payload: cancelPayload } = await apiFetch(
-          `/admin/orders/${orderId}/can-cancel`
-        );
-        if (cancelPayload?.ok) {
-          setCanCancelOrder(cancelPayload.canCancel);
-          setCancelReason(cancelPayload.reason || "");
-        }
+        const order = payload.order as Order;
+        setSelected(order);
+
+        // Mirrors admin_cancel_order's server-side guard: no driver assigned,
+        // and not already in a terminal/in-flight state.
+        const canCancel =
+          !order.driverId && !["in_transit", "delivered"].includes(order.status);
+        setCanCancelOrder(canCancel);
+        setCancelReason(canCancel ? "" : "Order has been assigned to a driver");
       }
     } finally {
       setLoadingDetail(false);
@@ -271,16 +271,10 @@ export default function OrderControlPage() {
     setUpdatingStatus(true);
     setStatusError("");
     try {
-      const { res, payload } = await apiFetch(
-        `/admin/orders/${selected._id}/status`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            status: pendingStatus,
-            notes: statusNote || undefined,
-          }),
-        },
-      );
+      const { res, payload } =
+        pendingStatus === "cancelled"
+          ? await adminCancelOrder(selected._id, statusNote || undefined)
+          : await adminSetOrderStatus(selected._id, pendingStatus, statusNote || undefined);
       if (!res.ok) {
         setStatusError(payload?.error ?? "Failed to update.");
         return;
@@ -315,16 +309,7 @@ export default function OrderControlPage() {
     setSavingTransportFare(true);
     setTransportError("");
     try {
-      const { res, payload } = await apiFetch(
-        `/admin/orders/${selected._id}/transport-fare`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            transportFare: amount,
-            notes: transportNote || undefined,
-          }),
-        },
-      );
+      const { res, payload } = await adminSetTransportFare(selected._id, amount, transportNote || undefined);
       if (!res.ok) {
         setTransportError(payload?.error ?? "Failed to save transport fare.");
         return;
@@ -344,8 +329,8 @@ export default function OrderControlPage() {
     setShowDriverModal(true);
     setLoadingDrivers(true);
     try {
-      const { payload } = await apiFetch("/admin/drivers?status=active");
-      if (payload?.ok) setDrivers(payload.drivers ?? []);
+      const { payload } = await getActiveDrivers();
+      if (payload?.ok) setDrivers((payload.drivers as Driver[]) ?? []);
     } finally {
       setLoadingDrivers(false);
     }
@@ -356,13 +341,7 @@ export default function OrderControlPage() {
     setAssigningDriver(driverId);
     setDriverError("");
     try {
-      const { res, payload } = await apiFetch(
-        `/admin/orders/${selected._id}/assign-driver`,
-        {
-          method: "POST",
-          body: JSON.stringify({ driverId }),
-        },
-      );
+      const { res, payload } = await adminAssignDriver(selected._id, driverId);
       if (!res.ok) {
         setDriverError(payload?.error ?? "Assignment failed.");
         return;
@@ -1218,7 +1197,7 @@ export default function OrderControlPage() {
                             const isCurrent =
                               !isCancelled && step.key === selected.status;
                             const dateVal = (
-                              selected as Record<string, unknown>
+                              selected as unknown as Record<string, unknown>
                             )[step.dateKey] as string | null;
 
                             return (

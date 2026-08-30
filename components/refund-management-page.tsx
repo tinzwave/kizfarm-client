@@ -1,16 +1,15 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+import { getAdminRefunds } from "@/lib/kizfarm/supabase-data";
 
 interface RefundedOrder {
   _id: string;
-  farmerId: { farmName: string; _id: string };
+  farmerId?: { farmName: string; fullName?: string };
   total: number;
   items: any[];
   cancelledAt: string;
-  cancelledReason?: string;
+  cancellationReason?: string;
   paymentStatus: string;
   status: string;
 }
@@ -28,12 +27,8 @@ export default function RefundManagementPage() {
 
   const fetchRefunds = async () => {
     try {
-      const token = localStorage.getItem('kizfarm_token');
-      const res = await fetch(`${API_URL}/admin/refunds`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) setRefunds(data.refunds || []);
+      const { res, payload } = await getAdminRefunds();
+      if (res.ok) setRefunds(payload.refunds || []);
     } catch (err) {
       console.error('Fetch refunds failed:', err);
     } finally {
@@ -261,10 +256,10 @@ export default function RefundManagementPage() {
                 </div>
               </div>
 
-              {selectedRefund.cancelledReason && (
+              {selectedRefund.cancellationReason && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                   <p className="text-xs text-yellow-800">
-                    <strong>Cancellation Reason:</strong> {selectedRefund.cancelledReason}
+                    <strong>Cancellation Reason:</strong> {selectedRefund.cancellationReason}
                   </p>
                 </div>
               )}
