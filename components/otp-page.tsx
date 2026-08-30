@@ -10,10 +10,13 @@ export default function OtpPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const search = useSearchParams();
-  const pendingEmail =
-    typeof window !== "undefined"
-      ? getPendingVerificationEmail() || search?.get("email")
-      : null;
+  // Starts null on both server and first client render, then resolves after
+  // mount -- reading localStorage during render would mismatch the SSR
+  // output and trigger a hydration error.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  useEffect(() => {
+    setPendingEmail(getPendingVerificationEmail() || search?.get("email") || null);
+  }, [search]);
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -145,7 +148,9 @@ export default function OtpPage() {
               Verify your account
             </h1>
             <p className="font-body-md text-body-md text-on-secondary-container">
-              Enter the 6-digit code sent to your phone
+              {pendingEmail
+                ? `Enter the 6-digit code sent to ${pendingEmail}`
+                : "Enter the 6-digit code sent to your email"}
             </p>
           </div>
 
