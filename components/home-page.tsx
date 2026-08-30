@@ -36,6 +36,7 @@ interface Course {
   title: string;
   description: string;
   price: number;
+  coverImage?: string;
   tutor?: { name: string; imageUrl?: string };
 }
 
@@ -402,7 +403,15 @@ export default function HomePage() {
                 className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
                 <div className="h-44 overflow-hidden relative bg-gradient-to-br from-emerald-900 to-green-700 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white/30 text-[64px]">school</span>
+                  {course.coverImage ? (
+                    <img
+                      src={course.coverImage}
+                      alt={course.title}
+                      className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-white/30 text-[64px]">school</span>
+                  )}
                 </div>
                 <div className="flex flex-1 flex-col p-6">
                   <h3 className="text-lg font-bold text-zinc-900 leading-snug mb-2 group-hover:text-[#1B6D24] transition-colors line-clamp-2">
