@@ -27,12 +27,21 @@ export default function SignUpPage() {
     setIsLoading(true);
     try {
       const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: { data: { name, phone } },
       });
       if (signUpError) throw new Error(signUpError.message);
+      // Supabase silently no-ops signUp (no error) for an email that's
+      // already registered and confirmed, returning a stub user with an
+      // empty identities array -- the only signal it's not a real new
+      // signup. Without this check the user is sent to /otp expecting a
+      // code that was never sent, with no way to tell why verification
+      // keeps failing.
+      if (signUpData.user && signUpData.user.identities?.length === 0) {
+        throw new Error("This email is already registered. Please log in instead.");
+      }
       // keep pending email for OTP page
       setPendingVerificationEmail(email);
       router.push("/otp");
@@ -305,7 +314,7 @@ export default function SignUpPage() {
             </div>
             <p className="font-body-md text-body-md text-on-surface-variant">
               Already have an account?{" "}
-              <a className="text-primary font-bold hover:underline" href="#">
+              <a className="text-primary font-bold hover:underline" href="/login">
                 Log in
               </a>
             </p>
