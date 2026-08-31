@@ -37,7 +37,7 @@ export default function AdminBlogPage() {
   }
 
   useEffect(() => {
-    loadPosts();
+    void Promise.resolve().then(() => loadPosts());
   }, []);
 
   async function handleDelete(id: string) {

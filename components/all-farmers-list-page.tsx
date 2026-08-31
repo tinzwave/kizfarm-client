@@ -34,10 +34,6 @@ export default function AllFarmersListPage() {
   const [canSuspend, setCanSuspend] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(false);
 
-  useEffect(() => {
-    fetchFarmers();
-  }, [statusFilter]);
-
   const fetchFarmers = async () => {
     try {
       setLoading(true);
@@ -52,6 +48,10 @@ export default function AllFarmersListPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchFarmers());
+  }, [statusFilter]);
 
   const openSuspendModal = async (farmer: Farmer) => {
     setSelectedFarmer(farmer);

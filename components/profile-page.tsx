@@ -35,10 +35,6 @@ export default function ProfilePage() {
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [isFarmer, setIsFarmer] = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const fetchProfile = async () => {
     try {
       const { res, payload } = await getMyFullProfile();
@@ -57,6 +53,10 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchProfile());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

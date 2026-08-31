@@ -275,7 +275,7 @@ export default function UserDetailPage() {
                       <p className="text-body-md font-semibold text-on-surface">Product Review Submitted</p>
                       <span className="text-label-sm text-gray-400">Jan 22, 2024</span>
                     </div>
-                    <p className="text-body-sm text-gray-500 mt-1">User rated "Natural Fertilizer B" with 5 stars: "Great results for my tomatoes!"</p>
+                    <p className="text-body-sm text-gray-500 mt-1">User rated &quot;Natural Fertilizer B&quot; with 5 stars: &quot;Great results for my tomatoes!&quot;</p>
                   </div>
                 </div>
                 <div className="flex gap-4">

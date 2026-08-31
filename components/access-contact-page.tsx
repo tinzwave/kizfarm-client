@@ -29,14 +29,14 @@ export default function AccessContactPage() {
             <span className="material-symbols-outlined text-primary text-[48px]" data-icon="check_circle" style={{fontVariationSettings: "'FILL' 1"}}>check_circle</span>
           </div>
           <h2 className="font-h1 text-h1 text-on-surface mb-2">Subscription Confirmed!</h2>
-          <p className="font-body-md text-text-body-md text-on-surface-variant">Your journey to professional farming excellence starts now. We've notified your coach about your enrollment.</p>
+          <p className="font-body-md text-text-body-md text-on-surface-variant">Your journey to professional farming excellence starts now. We&apos;ve notified your coach about your enrollment.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter max-w-5xl mx-auto">
           {/* Coach Contact Information Card */}
           <div className="md:col-span-7 bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden">
             <div className="p-lg border-b border-outline-variant bg-surface-container-lowest">
-              <h3 className="font-h3 text-h3 text-on-surface">Your Coach's Contact Information</h3>
+              <h3 className="font-h3 text-h3 text-on-surface">Your Coach&apos;s Contact Information</h3>
             </div>
             <div className="p-lg space-y-6">
               <div className="flex items-center gap-4">

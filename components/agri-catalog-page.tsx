@@ -148,7 +148,7 @@ export default function AgriCatalogPage() {
           <div className="bg-secondary-container rounded-3xl p-gutter flex items-center gap-gutter border border-outline-variant">
             <div className="flex-1">
               <h4 className="text-on-secondary-container font-headline-md mb-2">Soil-to-Door</h4>
-              <p className="text-on-secondary-container/80 text-sm mb-4">Track your order from the moment it's harvested until delivery.</p>
+              <p className="text-on-secondary-container/80 text-sm mb-4">Track your order from the moment it&apos;s harvested until delivery.</p>
               <button className="text-on-secondary-fixed bg-secondary-fixed-dim px-4 py-2 rounded-xl text-label-sm">Track Now</button>
             </div>
             <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-lg -rotate-3">

@@ -95,7 +95,7 @@ export default function ChatWithBuyerPage() {
               <div className="space-y-1">
                 <div className="bg-white border border-outline-variant p-4 rounded-2xl rounded-tl-none shadow-sm">
                   <p className="font-body-md">
-                    I'd like about 50 crates if possible. Could you send over a
+                    I&apos;d like about 50 crates if possible. Could you send over a
                     couple of photos of the current batch? Just want to check
                     the sizing.
                   </p>

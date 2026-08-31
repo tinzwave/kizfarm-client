@@ -231,7 +231,7 @@ export default function OrderControlPage() {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    void Promise.resolve().then(() => fetchOrders());
   }, [fetchOrders]);
 
   // ── Select order (refresh detail) ──────────────────────────────────────────

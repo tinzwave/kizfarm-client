@@ -43,19 +43,15 @@ function clampQuantity(quantity: number, maxQuantity?: number) {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-
-  // Load from localStorage on mount
-  useEffect(() => {
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window === "undefined") return [];
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setItems(JSON.parse(stored));
-      }
+      return stored ? JSON.parse(stored) : [];
     } catch {
-      // ignore
+      return [];
     }
-  }, []);
+  });
 
   // Sync to localStorage whenever items change
   useEffect(() => {

@@ -255,7 +255,7 @@ export default function UserDashboardPage() {
           <div className="flex justify-between items-end mb-8">
             <div>
               <h2 className="font-headline-lg text-on-surface">Courses for You</h2>
-              <p className="text-on-surface-variant font-body-md">Practical training from KIZ FARM's learning hub</p>
+              <p className="text-on-surface-variant font-body-md">Practical training from KIZ FARM&apos;s learning hub</p>
             </div>
             <Link className="text-primary font-semibold flex items-center gap-2 hover:underline" href="/learning">
               View All <span className="material-symbols-outlined text-sm">arrow_forward</span>

@@ -20,11 +20,6 @@ export default function EscrowManagementPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalPending: 0, pendingAmount: 0, releasedAmount: 0, totalRefunded: 0 });
 
-  useEffect(() => {
-    fetchEscrows();
-    fetchStats();
-  }, []);
-
   const fetchEscrows = async () => {
     try {
       const { payload } = await getAdminEscrows();
@@ -44,6 +39,13 @@ export default function EscrowManagementPage() {
       console.error('Fetch stats failed:', err);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      fetchEscrows();
+      fetchStats();
+    });
+  }, []);
 
   return (
     <div style={{ backgroundColor: '#f9f9ff', fontFamily: "'Inter', sans-serif" }}>

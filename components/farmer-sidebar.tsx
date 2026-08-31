@@ -9,27 +9,24 @@ type FarmerSidebarProps = {
   onToggleCollapsed?: () => void;
 };
 
-export default function FarmerSidebar({
-  collapsed = false,
-  onToggleCollapsed,
-}: FarmerSidebarProps) {
-  const pathname = usePathname() || "";
-  const [open, setOpen] = useState(false);
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+const isActive = (pathname: string, href: string) =>
+  pathname === href || pathname.startsWith(href + "/");
 
-  const NavLinks = ({
-    onClick,
-    collapsed: linksCollapsed = collapsed,
-  }: {
-    onClick?: () => void;
-    collapsed?: boolean;
-  }) => (
+function NavLinks({
+  pathname,
+  onClick,
+  collapsed: linksCollapsed = false,
+}: {
+  pathname: string;
+  onClick?: () => void;
+  collapsed?: boolean;
+}) {
+  return (
     <nav className="flex-1 space-y-1 px-3 pt-2">
       <Link
         href="/farmer/dashboard"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/dashboard") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/dashboard") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">dashboard</span>
         {!linksCollapsed && "Dashboard"}
@@ -37,7 +34,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/products"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/products") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/products") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">inventory_2</span>
         {!linksCollapsed && "Products"}
@@ -45,7 +42,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/orders"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/orders") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/orders") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">receipt_long</span>
         {!linksCollapsed && "Orders"}
@@ -53,7 +50,7 @@ export default function FarmerSidebar({
       <Link
         href="/learning"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/learning") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/learning") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">school</span>
         {!linksCollapsed && "Learning"}
@@ -61,7 +58,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/blog"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/blog") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/blog") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">article</span>
         {!linksCollapsed && "Blogs"}
@@ -69,7 +66,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/products/add-product"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/products/add-product") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/products/add-product") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">add</span>
         {!linksCollapsed && "Add Product"}
@@ -77,7 +74,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/chats"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/chats") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/chats") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">chat</span>
         {!linksCollapsed && "Chats"}
@@ -85,7 +82,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/profile"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/profile") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/profile") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">person</span>
         {!linksCollapsed && "Profile"}
@@ -93,7 +90,7 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/bank-setup"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/bank-setup") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/bank-setup") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">account_balance</span>
         {!linksCollapsed && "Bank Details"}
@@ -101,13 +98,21 @@ export default function FarmerSidebar({
       <Link
         href="/farmer/payouts"
         onClick={onClick}
-        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive("/farmer/payouts") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/payouts") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
       >
         <span className="material-symbols-outlined">payments</span>
         {!linksCollapsed && "Payments History"}
       </Link>
     </nav>
   );
+}
+
+export default function FarmerSidebar({
+  collapsed = false,
+  onToggleCollapsed,
+}: FarmerSidebarProps) {
+  const pathname = usePathname() || "";
+  const [open, setOpen] = useState(false);
 
   return (
     <>
@@ -134,7 +139,7 @@ export default function FarmerSidebar({
             </button>
           )}
         </div>
-        <NavLinks />
+        <NavLinks pathname={pathname} collapsed={collapsed} />
       </aside>
 
       {/* Mobile top bar (hamburger) */}
@@ -173,7 +178,7 @@ export default function FarmerSidebar({
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <NavLinks onClick={() => setOpen(false)} collapsed={false} />
+            <NavLinks pathname={pathname} onClick={() => setOpen(false)} collapsed={false} />
           </aside>
         </div>
       )}

@@ -100,17 +100,19 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const token = getAuthToken();
-    const user = getStoredUser();
-    setLoggedIn(!!token);
-    try {
-      setUserEmail(user?.email ?? null);
-      const payload = parseJwt(token);
-      setIsAdmin(isAdminUser(payload) || isAdminUser(user));
-    } catch {
-      setUserEmail(null);
-      setIsAdmin(false);
-    }
+    void Promise.resolve().then(() => {
+      const token = getAuthToken();
+      const user = getStoredUser();
+      setLoggedIn(!!token);
+      try {
+        setUserEmail(user?.email ?? null);
+        const payload = parseJwt(token);
+        setIsAdmin(isAdminUser(payload) || isAdminUser(user));
+      } catch {
+        setUserEmail(null);
+        setIsAdmin(false);
+      }
+    });
   }, []);
 
   useEffect(() => {

@@ -34,11 +34,6 @@ export default function AdminBuyerManagementPage() {
   });
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchBuyers();
-    fetchStats();
-  }, [statusFilter, searchQ]);
-
   const fetchBuyers = async () => {
     try {
       setLoading(true);
@@ -68,6 +63,13 @@ export default function AdminBuyerManagementPage() {
       console.error("Fetch stats failed:", err);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      fetchBuyers();
+      fetchStats();
+    });
+  }, [statusFilter, searchQ]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQ(e.target.value);

@@ -76,7 +76,7 @@ export default function BuyerCoursesPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(() => loadData());
   }, []);
 
   async function saveBankDetails() {

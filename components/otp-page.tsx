@@ -15,7 +15,9 @@ export default function OtpPage() {
   // output and trigger a hydration error.
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   useEffect(() => {
-    setPendingEmail(getPendingVerificationEmail() || search?.get("email") || null);
+    void Promise.resolve().then(() => {
+      setPendingEmail(getPendingVerificationEmail() || search?.get("email") || null);
+    });
   }, [search]);
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);

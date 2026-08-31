@@ -21,10 +21,6 @@ export default function ChatsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    fetchConversations();
-  }, []);
-
   const fetchConversations = async () => {
     try {
       setLoading(true);
@@ -41,6 +37,10 @@ export default function ChatsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchConversations());
+  }, []);
 
   const handleChatClick = (chatId: string) => {
     router.push(`/farmer/chats/${chatId}`);
@@ -156,7 +156,7 @@ export default function ChatsPage() {
           </div>
           <h3 className="font-headline-md mb-2">Select a Conversation</h3>
           <p className="text-body-md text-gray-500 max-w-sm text-center">
-            Select a buyer's message to view details and respond to their inquiries
+            Select a buyer&apos;s message to view details and respond to their inquiries
           </p>
         </div>
       </div>

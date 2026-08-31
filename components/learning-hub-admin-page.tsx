@@ -100,7 +100,7 @@ export default function LearningHubAdminPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(() => loadData());
   }, []);
 
   const stats = useMemo(

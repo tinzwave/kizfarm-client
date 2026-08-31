@@ -21,10 +21,6 @@ export default function RefundManagementPage() {
   const [showDetail, setShowDetail] = useState(false);
   const [searchQ, setSearchQ] = useState("");
 
-  useEffect(() => {
-    fetchRefunds();
-  }, []);
-
   const fetchRefunds = async () => {
     try {
       const { res, payload } = await getAdminRefunds();
@@ -35,6 +31,10 @@ export default function RefundManagementPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchRefunds());
+  }, []);
 
   const filteredRefunds = refunds.filter((r) => {
     if (searchQ) {

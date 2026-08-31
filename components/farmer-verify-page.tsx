@@ -39,7 +39,7 @@ export default function FarmerVerifyPage() {
   };
 
   useEffect(() => {
-    load();
+    void Promise.resolve().then(() => load());
   }, []);
 
   const handleFarmImages = (e: React.ChangeEvent<HTMLInputElement>) => {

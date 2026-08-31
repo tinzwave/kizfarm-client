@@ -63,8 +63,10 @@ export default function TrackOrderPage() {
   // Read order ID from URL query parameters client-side
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      setOrderId(params.get("id"));
+      void Promise.resolve().then(() => {
+        const params = new URLSearchParams(window.location.search);
+        setOrderId(params.get("id"));
+      });
     }
   }, []);
 
@@ -89,7 +91,7 @@ export default function TrackOrderPage() {
 
   useEffect(() => {
     if (orderId) {
-      fetchOrderDetails(orderId);
+      void Promise.resolve().then(() => fetchOrderDetails(orderId));
     }
   }, [orderId]);
 
@@ -630,7 +632,7 @@ export default function TrackOrderPage() {
                   </div>
                   {order.farmerNotes && (
                     <div className="mt-4 p-3 bg-green-50/50 rounded-lg text-xs text-on-surface-variant italic">
-                      " {order.farmerNotes} "
+                      &quot;{order.farmerNotes}&quot;
                     </div>
                   )}
                 </div>

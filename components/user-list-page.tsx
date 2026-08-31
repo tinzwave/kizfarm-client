@@ -31,10 +31,6 @@ export default function UserListPage() {
   const [suspensionError, setSuspensionError] = useState("");
   const [canSuspend, setCanSuspend] = useState(true);
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   const fetchUsers = async () => {
     try {
       setLoading(true);
@@ -48,7 +44,7 @@ export default function UserListPage() {
   };
 
   useEffect(() => {
-    fetchUsers();
+    void Promise.resolve().then(() => fetchUsers());
   }, [statusFilter]);
 
   const openSuspendModal = async (user: User) => {

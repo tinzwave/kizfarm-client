@@ -13,16 +13,15 @@ export default function FarmerLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
     try {
-      const saved = localStorage.getItem("kizfarm_farmer_sidebar_collapsed");
-      if (saved === "1") setCollapsed(true);
-    } catch {}
-  }, []);
+      return localStorage.getItem("kizfarm_farmer_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {

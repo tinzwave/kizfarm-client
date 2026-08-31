@@ -213,7 +213,7 @@ export default function FarmerDashboardPage() {
           <div className="flex justify-between items-end mb-5">
             <div>
               <h3 className="text-headline-md font-headline-md">Courses for You</h3>
-              <p className="text-sm text-on-surface-variant">Practical training from KIZ FARM's learning hub</p>
+              <p className="text-sm text-on-surface-variant">Practical training from KIZ FARM&apos;s learning hub</p>
             </div>
             <Link href="/learning" className="text-[#1B6D24] font-label-sm hover:underline">View All</Link>
           </div>

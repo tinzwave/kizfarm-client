@@ -29,10 +29,6 @@ export default function ProductReviewPage() {
   const [searchQ, setSearchQ] = useState("");
   const [ratingFilter, setRatingFilter] = useState<number | "all">("all");
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
   const fetchReviews = async () => {
     try {
       setLoading(true);
@@ -47,6 +43,10 @@ export default function ProductReviewPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchReviews());
+  }, []);
 
   const handleDelete = async (review: Review) => {
     const productName = review.productId?.name || "this product";

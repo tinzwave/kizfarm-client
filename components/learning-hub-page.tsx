@@ -59,7 +59,7 @@ export default function LearningHubPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(() => loadData());
   }, []);
 
   const subscribedIds = useMemo(

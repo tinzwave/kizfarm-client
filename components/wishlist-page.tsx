@@ -28,10 +28,6 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchWishlist();
-  }, []);
-
   const fetchWishlist = async () => {
     setLoading(true);
     try {
@@ -43,6 +39,10 @@ export default function WishlistPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchWishlist());
+  }, []);
 
   const handleRemove = async (productId: string) => {
     setRemovingId(productId);

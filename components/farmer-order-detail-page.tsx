@@ -90,7 +90,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
   };
 
   useEffect(() => {
-    fetchOrderDetails();
+    void Promise.resolve().then(() => fetchOrderDetails());
   }, [id]);
 
   const handleConfirmOrder = async () => {

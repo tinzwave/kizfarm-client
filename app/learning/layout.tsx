@@ -16,7 +16,14 @@ export default function LearningLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() || "";
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem("kizfarm_farmer_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   // null while the real role is still loading, so we don't flash the wrong
   // sidebar (used to be guessed from a "?source=buyer"/"returnTo=/buyer/..."
   // URL param, which only held true when a link happened to carry it --
@@ -29,14 +36,6 @@ export default function LearningLayout({
     pathname === "/learning/add-course" ||
     pathname === "/learning/add-tutor" ||
     pathname === "/learning/subscriptions";
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem("kizfarm_farmer_sidebar_collapsed");
-      if (saved === "1") setCollapsed(true);
-    } catch {}
-  }, []);
 
   useEffect(() => {
     if (isAdminLearning) return;

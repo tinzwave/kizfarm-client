@@ -31,10 +31,6 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   const fetchProducts = async (search?: string) => {
     try {
       setLoading(true);
@@ -49,6 +45,10 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchProducts());
+  }, []);
 
   const handleDelete = async (product: Product) => {
     if (

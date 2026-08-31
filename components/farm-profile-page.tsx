@@ -45,10 +45,6 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
     location: "",
   });
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const fetchProfile = async () => {
     try {
       const { res, payload } = await getMyFullProfile();
@@ -95,6 +91,10 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchProfile());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

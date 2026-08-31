@@ -17,10 +17,6 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [isVerified, setIsVerified] = useState(false);
 
-  useEffect(() => {
-    fetchBankDetails();
-  }, []);
-
   const fetchBankDetails = async () => {
     try {
       const { res, payload } = await getFarmerBankDetails();
@@ -37,6 +33,10 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchBankDetails());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

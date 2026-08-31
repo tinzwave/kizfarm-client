@@ -90,7 +90,7 @@ export default function DriverManagementPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
+    void Promise.resolve().then(() => fetchData());
   }, [fetchData]);
 
   const filteredDrivers = drivers.filter((d) => {

@@ -53,7 +53,7 @@ export default function AddressesPage() {
   };
 
   useEffect(() => {
-    fetchAddresses();
+    void Promise.resolve().then(() => fetchAddresses());
   }, []);
 
   const openAddModal = () => {

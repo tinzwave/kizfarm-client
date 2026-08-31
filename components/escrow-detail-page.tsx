@@ -114,15 +114,6 @@ export default function EscrowDetailPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (escrowId) {
-      fetchEscrowDetail();
-    } else {
-      setError("Escrow ID is missing");
-      setLoading(false);
-    }
-  }, [escrowId]);
-
   const fetchEscrowDetail = async () => {
     try {
       setLoading(true);
@@ -141,6 +132,17 @@ export default function EscrowDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      if (escrowId) {
+        fetchEscrowDetail();
+      } else {
+        setError("Escrow ID is missing");
+        setLoading(false);
+      }
+    });
+  }, [escrowId]);
 
   const handleReleaseFunds = async () => {
     if (!escrow) return;

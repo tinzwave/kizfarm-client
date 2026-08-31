@@ -39,7 +39,7 @@ export default function ShoppingCartPage() {
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-8 text-center flex flex-col items-center justify-center min-h-[300px]">
               <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">shopping_cart_off</span>
               <p className="text-lg font-semibold text-on-surface mb-2">Your cart is empty</p>
-              <p className="text-sm text-on-surface-variant mb-6">Looks like you haven't added any fresh produce yet.</p>
+              <p className="text-sm text-on-surface-variant mb-6">Looks like you haven&apos;t added any fresh produce yet.</p>
               <Link href="/buyer/marketplace">
                 <button className="px-6 py-3 bg-[#1B6D24] text-white rounded-lg font-bold hover:bg-primary transition-colors">
                   Go to Marketplace

@@ -245,9 +245,9 @@ export default function FarmerVerificationReviewPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-body-sm text-gray-600">
-                        {new Date(
-                          f.createdAt || Date.now(),
-                        ).toLocaleDateString()}
+                        {f.createdAt
+                          ? new Date(f.createdAt).toLocaleDateString()
+                          : "—"}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">

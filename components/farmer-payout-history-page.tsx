@@ -35,11 +35,6 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({ bankName: '', accountHolderName: '', accountNumber: '', branchCode: '' });
 
-  useEffect(() => {
-    if (activeTab === 'history') fetchPayments();
-    if (activeTab === 'bank') fetchBankDetails();
-  }, [activeTab]);
-
   const fetchPayments = async () => {
     setLoading(true);
     try {
@@ -71,6 +66,13 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      if (activeTab === 'history') fetchPayments();
+      if (activeTab === 'bank') fetchBankDetails();
+    });
+  }, [activeTab]);
 
   const handleSaveBankDetails = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -78,7 +78,7 @@ export default function FarmerOrdersPage() {
   };
 
   useEffect(() => {
-    fetchOrders();
+    void Promise.resolve().then(() => fetchOrders());
   }, []);
 
   const filteredOrders = orders.filter((order) => {

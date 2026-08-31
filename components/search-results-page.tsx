@@ -33,7 +33,7 @@ export default function SearchResultsPage() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="font-headline-lg text-headline-lg text-on-surface mb-xs">Search Results</h2>
-              <p className="font-body-md text-body-md text-on-surface-variant">12 results found for <span className="font-semibold text-primary">"Tomatoes"</span></p>
+              <p className="font-body-md text-body-md text-on-surface-variant">12 results found for <span className="font-semibold text-primary">&quot;Tomatoes&quot;</span></p>
             </div>
             <div className="flex gap-sm items-center overflow-x-auto pb-2 md:pb-0">
               <button className="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-full font-label-sm whitespace-nowrap hover:bg-surface-container transition-colors">

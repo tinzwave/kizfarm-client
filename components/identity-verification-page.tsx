@@ -79,8 +79,10 @@ export default function IdentityVerificationPage() {
   };
 
   useEffect(() => {
-    setLoading(true);
-    fetchFarmerStatus();
+    void Promise.resolve().then(() => {
+      setLoading(true);
+      fetchFarmerStatus();
+    });
   }, [router]);
 
   useEffect(() => {

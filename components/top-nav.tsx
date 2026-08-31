@@ -42,13 +42,13 @@ export default function TopNav() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
+    void Promise.resolve().then(onScroll);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    setMenuOpen(false);
+    void Promise.resolve().then(() => setMenuOpen(false));
   }, [pathname]);
 
   const handleLogout = async () => {

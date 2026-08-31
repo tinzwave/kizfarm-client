@@ -72,6 +72,13 @@ Deno.serve(async (req) => {
     if (order.payment_status === "paid") {
       return jsonResponse({ error: "Order has already been paid." }, { status: 400 });
     }
+    // Must be the reference set by set_order_payment_reference before checkout
+    // opened -- otherwise a buyer could replay a reference from a different
+    // order/course of theirs (pay_order enforces this too; checked here first
+    // so it fails fast instead of spending a Paystack API call).
+    if (order.payment_reference !== paymentReference) {
+      return jsonResponse({ error: "Payment reference does not match this order." }, { status: 400 });
+    }
 
     const verification = await verifyPaystackPayment(paymentReference);
     if (!verification.success) {
