@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/kizfarm/cart-context";
+import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: "home" },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
 
 export default function BuyerSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { totalItems } = useCart();
 
   const isActive = (href: string) => {
@@ -27,6 +29,11 @@ export default function BuyerSidebar() {
       return pathname === href;
     }
     return pathname.startsWith(href);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/login");
   };
 
   return (
@@ -69,6 +76,14 @@ export default function BuyerSidebar() {
           );
         })}
       </nav>
+
+      <button
+        onClick={handleSignOut}
+        className="flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-zinc-900"
+      >
+        <span className="material-symbols-outlined text-[22px]">logout</span>
+        Sign Out
+      </button>
     </aside>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useState } from "react";
+import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 type FarmerSidebarProps = {
   collapsed?: boolean;
@@ -112,7 +113,13 @@ export default function FarmerSidebar({
   onToggleCollapsed,
 }: FarmerSidebarProps) {
   const pathname = usePathname() || "";
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/login");
+  };
 
   return (
     <>
@@ -140,6 +147,15 @@ export default function FarmerSidebar({
           )}
         </div>
         <NavLinks pathname={pathname} collapsed={collapsed} />
+        <div className="px-3 pb-4">
+          <button
+            onClick={handleSignOut}
+            className={`flex items-center gap-3 px-3 py-3 rounded w-full text-zinc-600 hover:bg-red-50 hover:text-red-600 ${collapsed ? "justify-center" : ""}`}
+          >
+            <span className="material-symbols-outlined">logout</span>
+            {!collapsed && "Sign Out"}
+          </button>
+        </div>
       </aside>
 
       {/* Mobile top bar (hamburger) */}
@@ -179,6 +195,18 @@ export default function FarmerSidebar({
               </button>
             </div>
             <NavLinks pathname={pathname} onClick={() => setOpen(false)} collapsed={false} />
+            <div className="px-3 pb-4">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  handleSignOut();
+                }}
+                className="flex items-center gap-3 px-3 py-3 rounded w-full text-zinc-600 hover:bg-red-50 hover:text-red-600"
+              >
+                <span className="material-symbols-outlined">logout</span>
+                Sign Out
+              </button>
+            </div>
           </aside>
         </div>
       )}
