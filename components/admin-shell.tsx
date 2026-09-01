@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
+import { getAdminRecentActivity } from "@/lib/kizfarm/supabase-data";
 
 export default function AdminShell({
   children,
@@ -11,6 +12,21 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [recentCount, setRecentCount] = useState(0);
+
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      const { res, payload } = await getAdminRecentActivity();
+      if (res.ok) {
+        const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const count = (payload.items || []).filter(
+          (i: { createdAt: string }) => new Date(i.createdAt).getTime() > dayAgo,
+        ).length;
+        setRecentCount(count);
+      }
+    });
+  }, []);
+
   const handleLogout = async () => {
     await signOut();
     router.push("/admin/login");
@@ -97,16 +113,16 @@ export default function AdminShell({
             </span>
           </Link>
 
-          {/* Assign Driver */}
+          {/* Notifications */}
           <Link
-            href="/admin/assign-driver"
+            href="/admin/notifications"
             className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 scale-100 active:scale-[0.98]"
           >
-            <span className="material-symbols-outlined" data-icon="person_add">
-              person_add
+            <span className="material-symbols-outlined" data-icon="notifications">
+              notifications
             </span>
             <span className="font-inter text-sm antialiased">
-              Assign Driver
+              Notifications
             </span>
           </Link>
 
@@ -207,7 +223,7 @@ export default function AdminShell({
           <h2 className="text-lg font-bold text-emerald-900">Admin Console</h2>
         </div>
         <div className="flex items-center gap-6">
-          <div className="relative">
+          <Link href="/admin/notifications" className="relative">
             <button className="hover:bg-gray-100 rounded-full p-2 transition-all duration-200 text-gray-500">
               <span
                 className="material-symbols-outlined"
@@ -215,9 +231,13 @@ export default function AdminShell({
               >
                 notifications
               </span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>
+              {recentCount > 0 && (
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
+                  {recentCount > 9 ? "9+" : recentCount}
+                </span>
+              )}
             </button>
-          </div>
+          </Link>
           <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-1 rounded-lg transition-colors">
             <div className="text-right hidden sm:block">
               <p className="font-label-md text-on-surface leading-none mb-1">

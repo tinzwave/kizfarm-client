@@ -73,7 +73,7 @@ export default function EscrowManagementPage() {
             </div>
             <div className="bg-white p-6 rounded-lg border border-gray-200">
               <p className="text-gray-500 text-sm font-medium mb-2">Refunded</p>
-              <p className="text-3xl font-bold text-red-600">₦0</p>
+              <p className="text-3xl font-bold text-red-600">₦{(stats.totalRefunded || 0).toLocaleString()}</p>
             </div>
           </div>
 

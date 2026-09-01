@@ -1488,6 +1488,37 @@ export async function getAdminBuyers({ status, search }: { status?: string; sear
   return { res: { ok: true } as Response, payload: { ok: true, users: (data || []).map(toAdminBuyer) } };
 }
 
+export async function getAdminBuyerById(userId: string) {
+  const supabase = createClient();
+  const [profileRes, ordersRes] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", userId).eq("role", "user").single(),
+    supabase
+      .from("orders")
+      .select("id, status, payment_status, total, created_at, farmers(farm_name)")
+      .eq("buyer_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
+  ]);
+  if (profileRes.error || !profileRes.data) {
+    return { res: { ok: false } as Response, payload: { error: profileRes.error?.message || "Buyer not found" } };
+  }
+  if (ordersRes.error) return { res: { ok: false } as Response, payload: { error: ordersRes.error.message } };
+
+  const orders = (ordersRes.data || []).map((o: any) => ({
+    _id: o.id,
+    status: o.status,
+    paymentStatus: o.payment_status,
+    total: o.total,
+    createdAt: o.created_at,
+    farmName: o.farmers?.farm_name || null,
+  }));
+
+  return {
+    res: { ok: true } as Response,
+    payload: { ok: true, buyer: toAdminBuyer(profileRes.data), orders },
+  };
+}
+
 export async function getAdminBuyerStats() {
   const supabase = createClient();
   const [totalRes, activeRes, suspendedRes] = await Promise.all([
@@ -1525,6 +1556,10 @@ export async function getAdminRefunds({ status }: { status?: string } = {}) {
       "id, master_order_id, total, payment_status, escrow_status, status, cancelled_at, updated_at, cancellation_reason, order_items(id, name, quantity, price), buyer:profiles!buyer_id(name, email), farmers(full_name, farm_name)",
     )
     .eq("status", "cancelled")
+    // Orders cancelled before ever being paid have nothing to refund --
+    // exclude them so they don't inflate the refund queue with a
+    // misleading "Processing" badge.
+    .neq("payment_status", "pending")
     .order("cancelled_at", { ascending: false })
     .limit(50);
   if (status && status !== "all") query = query.eq("payment_status", status);
@@ -1569,6 +1604,69 @@ export async function getAdminReviews({ limit = 100 }: { limit?: number } = {}) 
   }));
 
   return { res: { ok: true } as Response, payload: { ok: true, reviews, total: count || reviews.length } };
+}
+
+// Platform-wide activity feed for the admin notification bell/page -- same
+// derive-from-existing-tables approach as getBuyerRecentActivity, no
+// dedicated notifications table.
+export async function getAdminRecentActivity() {
+  const supabase = createClient();
+
+  const [ordersRes, farmersRes, buyersRes] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, status, updated_at, total")
+      .order("updated_at", { ascending: false })
+      .limit(15),
+    supabase
+      .from("farmers")
+      .select("id, farm_name, created_at, profiles!user_id(name)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("profiles")
+      .select("id, name, created_at")
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+  if (ordersRes.error) return { res: { ok: false } as Response, payload: { error: ordersRes.error.message } };
+  if (farmersRes.error) return { res: { ok: false } as Response, payload: { error: farmersRes.error.message } };
+  if (buyersRes.error) return { res: { ok: false } as Response, payload: { error: buyersRes.error.message } };
+
+  const orderEvents = (ordersRes.data || []).map((o) => ({
+    id: `order-${o.id}`,
+    type: "order" as const,
+    message: `Order #${o.id.slice(0, 8)} is now "${o.status}"`,
+    amount: o.total,
+    createdAt: o.updated_at,
+    link: `/admin/order-control`,
+  }));
+
+  const farmerEvents = (farmersRes.data || []).map((f: any) => ({
+    id: `farmer-${f.id}`,
+    type: "farmer" as const,
+    message: `New farmer verification request: ${f.farm_name || f.profiles?.name || "Unnamed farm"}`,
+    amount: null,
+    createdAt: f.created_at,
+    link: `/admin/verify-farmers/${f.id}`,
+  }));
+
+  const buyerEvents = (buyersRes.data || []).map((b) => ({
+    id: `buyer-${b.id}`,
+    type: "buyer" as const,
+    message: `New buyer signed up: ${b.name || "Unnamed"}`,
+    amount: null,
+    createdAt: b.created_at,
+    link: `/admin/buyers`,
+  }));
+
+  const items = [...orderEvents, ...farmerEvents, ...buyerEvents].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+
+  return { res: { ok: true } as Response, payload: { ok: true, items } };
 }
 
 export async function getMyFullProfile() {
