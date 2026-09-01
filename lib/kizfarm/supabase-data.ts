@@ -1204,6 +1204,7 @@ function toFarmerProduct(p: any) {
     quantity: p.quantity,
     moistureCode: p.moisture_code,
     images: p.images || [],
+    isActive: p.is_active,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };

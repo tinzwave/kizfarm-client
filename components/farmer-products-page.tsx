@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { getFarmerProducts } from "@/lib/kizfarm/supabase-data";
+import { setFarmerProductActive } from "@/lib/kizfarm/supabase-mutations";
 
 type FarmerProduct = {
   _id?: string;
@@ -15,7 +16,7 @@ type FarmerProduct = {
   unit?: string;
   images?: string[];
   imageUrls?: string[];
-  status?: string;
+  isActive?: boolean;
   createdAt?: string;
 };
 
@@ -35,29 +36,47 @@ export default function FarmerProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<FarmerProduct[]>([]);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const total = useMemo(() => products.length, [products.length]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      const { res, payload } = await getFarmerProducts();
-      if (cancelled) return;
-      if (!res.ok) {
-        setError(payload?.error || "Failed to load products");
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-      setProducts(payload.products || []);
+  const loadProducts = async () => {
+    setLoading(true);
+    setError(null);
+    const { res, payload } = await getFarmerProducts();
+    if (!res.ok) {
+      setError(payload?.error || "Failed to load products");
+      setProducts([]);
       setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+      return;
+    }
+    setProducts(payload.products || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void Promise.resolve().then(() => loadProducts());
   }, []);
+
+  const handleToggleActive = async (p: FarmerProduct) => {
+    const id = productId(p);
+    if (!id) return;
+    const nextActive = !(p.isActive ?? true);
+    if (!nextActive && !window.confirm(`Delist "${productName(p)}"? Buyers won't see it in the marketplace until you re-list it.`)) {
+      return;
+    }
+    setTogglingId(id);
+    try {
+      const { res, payload } = await setFarmerProductActive(id, nextActive);
+      if (res.ok) {
+        setProducts((prev) => prev.map((item) => (productId(item) === id ? { ...item, isActive: nextActive } : item)));
+      } else {
+        alert(payload?.error || "Failed to update product");
+      }
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background text-on-background">
@@ -104,58 +123,77 @@ export default function FarmerProductsPage() {
               const id = productId(p);
               const name = productName(p);
               const img = productImages(p)?.[0];
+              const isActive = p.isActive ?? true;
               return (
-                <Link
+                <div
                   key={id || name}
-                  href={id ? `/farmer/products/${id}` : "/farmer/products"}
                   className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden hover:shadow-md transition-shadow"
                 >
-                  <div className="aspect-[4/3] bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
-                    {img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={img}
-                        alt={name}
-                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-400">
-                        <span className="material-symbols-outlined text-[28px]">
-                          image
+                  <Link href={id ? `/farmer/products/${id}` : "/farmer/products"}>
+                    <div className={`aspect-[4/3] bg-zinc-100 dark:bg-zinc-900 overflow-hidden ${isActive ? "" : "opacity-50 grayscale"}`}>
+                      {img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={img}
+                          alt={name}
+                          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                          <span className="material-symbols-outlined text-[28px]">
+                            image
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4 space-y-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1">
+                          {name}
+                        </div>
+                        <span
+                          className={`text-[11px] px-2 py-1 rounded-full shrink-0 ${
+                            isActive
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                              : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300"
+                          }`}
+                        >
+                          {isActive ? "Active" : "Delisted"}
                         </span>
                       </div>
-                    )}
-                  </div>
-                  <div className="p-4 space-y-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1">
-                        {name}
-                      </div>
-                      {p.status ? (
-                        <span className="text-[11px] px-2 py-1 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300">
-                          {p.status}
-                        </span>
+                      {p.description ? (
+                        <div className="text-sm text-zinc-500 line-clamp-2">
+                          {p.description}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-zinc-400">
+                          No description
+                        </div>
+                      )}
+                      {p.price != null ? (
+                        <div className="pt-2 font-bold text-[#1B6D24]">
+                          ₦{String(p.price)}
+                        </div>
                       ) : null}
+                      <div className="text-xs font-semibold text-zinc-500">
+                        Stock: {p.quantity === null || p.quantity === undefined ? "Not set" : `${p.quantity}${p.unit ? ` ${p.unit}` : ""}`}
+                      </div>
                     </div>
-                    {p.description ? (
-                      <div className="text-sm text-zinc-500 line-clamp-2">
-                        {p.description}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-zinc-400">
-                        No description
-                      </div>
-                    )}
-                    {p.price != null ? (
-                      <div className="pt-2 font-bold text-[#1B6D24]">
-                        ₦{String(p.price)}
-                      </div>
-                    ) : null}
-                    <div className="text-xs font-semibold text-zinc-500">
-                      Stock: {p.quantity === null || p.quantity === undefined ? "Not set" : `${p.quantity}${p.unit ? ` ${p.unit}` : ""}`}
-                    </div>
+                  </Link>
+                  <div className="px-4 pb-4">
+                    <button
+                      onClick={() => handleToggleActive(p)}
+                      disabled={togglingId === id}
+                      className={`w-full h-9 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
+                        isActive
+                          ? "border border-red-200 text-red-600 hover:bg-red-50"
+                          : "border border-[#1B6D24] text-[#1B6D24] hover:bg-green-50"
+                      }`}
+                    >
+                      {togglingId === id ? "Updating…" : isActive ? "Delist" : "Re-list"}
+                    </button>
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

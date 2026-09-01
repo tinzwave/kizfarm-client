@@ -887,6 +887,23 @@ export async function updateFarmerProduct(
   return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
 }
 
+// Soft-delete: a real DELETE isn't safe here since order_items.product_id
+// references products with no ON DELETE clause, so removing a product
+// that's ever been ordered would fail with a raw foreign-key violation.
+// Deactivating just hides it from products_select's public branch (see
+// migration 0021) while keeping order history intact.
+export async function setFarmerProductActive(id: string, isActive: boolean) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("products")
+    .update({ is_active: isActive })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
+}
+
 export async function submitReview(productId: string, input: { rating: number; comment?: string }) {
   const supabase = createClient();
   const {
