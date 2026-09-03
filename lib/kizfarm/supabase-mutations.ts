@@ -896,14 +896,15 @@ export async function updateFarmerProduct(
 }
 
 // A real DELETE fails with a foreign-key violation (Postgres code 23503)
-// for any product that's ever been ordered, since order_items.product_id
-// references it with no ON DELETE clause -- deleting would corrupt past
-// order records. When that happens, fall back to deactivating instead
-// (hides it from products_select's public branch and the farmer's own
-// list, see migration 0021 and getFarmerProducts) so it disappears either
-// way -- the farmer doesn't need to know which path was taken.
-export async function deleteFarmerProduct(id: string) {
-  const supabase = createClient();
+// for any product referenced elsewhere -- order_items.product_id (past
+// orders) or chats.product_id (a buyer/farmer chat started from the
+// listing), neither of which cascade on delete, so deleting outright
+// would corrupt that history. When that happens, fall back to
+// deactivating instead (hides it from products_select's public branch
+// and the farmer's own list, see migration 0021 and getFarmerProducts) so
+// the product disappears either way -- the caller doesn't need to know
+// which path was taken.
+async function deleteProductWithFallback(supabase: ReturnType<typeof createClient>, id: string) {
   const { error } = await supabase.from("products").delete().eq("id", id);
   if (!error) return { res: { ok: true } as Response, payload: { ok: true } };
 
@@ -913,6 +914,11 @@ export async function deleteFarmerProduct(id: string) {
     return { res: { ok: true } as Response, payload: { ok: true } };
   }
   return { res: { ok: false } as Response, payload: { error: error.message } };
+}
+
+export async function deleteFarmerProduct(id: string) {
+  const supabase = createClient();
+  return deleteProductWithFallback(supabase, id);
 }
 
 export async function submitReview(productId: string, input: { rating: number; comment?: string }) {
@@ -1030,9 +1036,7 @@ export async function saveFarmerBankDetails(input: {
 
 export async function deleteAdminProduct(productId: string) {
   const supabase = createClient();
-  const { error } = await supabase.from("products").delete().eq("id", productId);
-  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true } };
+  return deleteProductWithFallback(supabase, productId);
 }
 
 export async function suspendAdminFarmer(farmerId: string, reason?: string) {
