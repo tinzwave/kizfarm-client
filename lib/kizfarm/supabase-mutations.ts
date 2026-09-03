@@ -312,13 +312,16 @@ export async function createDriver(input: {
 
 // ===================== FARMER VERIFICATION =====================
 
+// farmer-kyc is a private bucket (BVN/gov ID/selfies) -- store the storage
+// path, not a public URL (getPublicUrl() on a private bucket 403s for
+// everyone). Read paths are resolved to short-lived signed URLs at fetch
+// time by resolveFarmerKycUrls() in supabase-data.ts.
 async function uploadKycFile(supabase: ReturnType<typeof createClient>, userId: string, file: File) {
   const ext = file.name.split(".").pop() || "bin";
   const path = `${userId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("farmer-kyc").upload(path, file);
   if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from("farmer-kyc").getPublicUrl(path);
-  return data.publicUrl;
+  return path;
 }
 
 export async function submitFarmerVerification(input: {
@@ -330,7 +333,10 @@ export async function submitFarmerVerification(input: {
   selfieFile?: File | null;
   farmerImageFile?: File | null;
   validIdImageFile?: File | null;
-  farmImageFiles?: File[];
+  // Each of the 5 slots is either a new File to upload, or a string --
+  // the existing raw storage path for a slot the caller didn't change
+  // (from farmer.farmImagePaths, never the signed display URL).
+  farmImageFiles?: (File | string)[];
 }) {
   const supabase = createClient();
   const {
@@ -352,7 +358,9 @@ export async function submitFarmerVerification(input: {
       if (input.farmImageFiles.length !== 5) {
         return { res: { ok: false } as Response, payload: { error: "Exactly 5 farm images are required" } };
       }
-      farmImageUrls = await Promise.all(input.farmImageFiles.map((f) => uploadKycFile(supabase, user.id, f)));
+      farmImageUrls = await Promise.all(
+        input.farmImageFiles.map((f) => (typeof f === "string" ? Promise.resolve(f) : uploadKycFile(supabase, user.id, f))),
+      );
     }
 
     const { data, error } = await supabase.rpc("submit_farmer_verification", {

@@ -116,6 +116,46 @@ export async function getFarmerStatus() {
   return { res: { ok: true } as Response, payload: { ok: true, farmer: { _id: data.id, status: data.status } } };
 }
 
+// farmer-kyc is a private bucket -- the *_url fields on the farmers row
+// hold storage paths (see uploadKycFile in supabase-mutations.ts), not
+// usable URLs. Resolve them to short-lived signed URLs at read time,
+// batched into one storage call regardless of how many farmers/fields are
+// involved. Falls back to the raw (unusable) value if signing fails,
+// rather than throwing and breaking the whole page.
+const KYC_SIGNED_URL_TTL = 60 * 60;
+const KYC_SINGLE_URL_KEYS = ["bvnUrl", "govIdUrl", "selfieUrl", "farmerImageUrl", "validIdImageUrl", "farmImageUrl"] as const;
+
+async function resolveFarmerKycUrls<T extends Record<string, any>>(
+  supabase: ReturnType<typeof createClient>,
+  farmers: T[],
+): Promise<T[]> {
+  const paths = new Set<string>();
+  for (const f of farmers) {
+    for (const key of KYC_SINGLE_URL_KEYS) {
+      if (f[key]) paths.add(f[key]);
+    }
+    for (const p of f.farmImageUrls || []) {
+      if (p) paths.add(p);
+    }
+  }
+  if (paths.size === 0) return farmers;
+
+  const { data, error } = await supabase.storage.from("farmer-kyc").createSignedUrls(Array.from(paths), KYC_SIGNED_URL_TTL);
+  if (error || !data) return farmers;
+
+  const signedByPath = new Map(data.map((d) => [d.path, d.signedUrl]));
+  return farmers.map((f) => {
+    const resolved: Record<string, any> = { ...f };
+    for (const key of KYC_SINGLE_URL_KEYS) {
+      if (f[key]) resolved[key] = signedByPath.get(f[key]) || f[key];
+    }
+    if (Array.isArray(f.farmImageUrls)) {
+      resolved.farmImageUrls = f.farmImageUrls.map((p: string) => (p ? signedByPath.get(p) || p : p));
+    }
+    return resolved as T;
+  });
+}
+
 export async function getMyFarmerProfile() {
   const supabase = createClient();
   const {
@@ -127,26 +167,35 @@ export async function getMyFarmerProfile() {
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   if (!data) return { res: { ok: true } as Response, payload: { ok: true, farmer: null } };
 
+  // Resubmitting the verification form needs to keep unchanged farm-image
+  // slots as-is -- the RPC's array field is all-or-nothing (a full new set
+  // of 5 or omit entirely, no per-slot merge), so the client has to send
+  // back the *raw storage path* for any slot it isn't replacing. The
+  // signed URLs below are display-only and can't be reused as paths (a
+  // signing token isn't a valid object path for the next sign attempt).
+  const farmImagePaths: string[] = data.farm_image_urls || [];
+
+  const [farmer] = await resolveFarmerKycUrls(supabase, [
+    {
+      _id: data.id,
+      status: data.status,
+      bvn: data.bvn,
+      bvnUrl: data.bvn_url,
+      nin: data.nin,
+      govIdUrl: data.gov_id_url,
+      selfieUrl: data.selfie_url,
+      farmerImageUrl: data.farmer_image_url,
+      validIdImageUrl: data.valid_id_image_url,
+      farmAddress: data.farm_address,
+      farmImageUrl: data.farm_image_url,
+      farmImageUrls: data.farm_image_urls || [],
+      rejectionReason: data.rejection_reason,
+    },
+  ]);
+
   return {
     res: { ok: true } as Response,
-    payload: {
-      ok: true,
-      farmer: {
-        _id: data.id,
-        status: data.status,
-        bvn: data.bvn,
-        bvnUrl: data.bvn_url,
-        nin: data.nin,
-        govIdUrl: data.gov_id_url,
-        selfieUrl: data.selfie_url,
-        farmerImageUrl: data.farmer_image_url,
-        validIdImageUrl: data.valid_id_image_url,
-        farmAddress: data.farm_address,
-        farmImageUrl: data.farm_image_url,
-        farmImageUrls: data.farm_image_urls || [],
-        rejectionReason: data.rejection_reason,
-      },
-    },
+    payload: { ok: true, farmer: { ...farmer, farmImagePaths } },
   };
 }
 
@@ -861,7 +910,8 @@ export async function getAdminFarmerVerifications() {
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, list: (data || []).map(toAdminFarmerVerification) } };
+  const list = await resolveFarmerKycUrls(supabase, (data || []).map(toAdminFarmerVerification));
+  return { res: { ok: true } as Response, payload: { ok: true, list } };
 }
 
 export async function getAdminFarmerVerificationById(id: string) {
@@ -872,7 +922,8 @@ export async function getAdminFarmerVerificationById(id: string) {
     .eq("id", id)
     .single();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: error?.message || "Farmer not found" } };
-  return { res: { ok: true } as Response, payload: { ok: true, farmer: toAdminFarmerVerification(data) } };
+  const [farmer] = await resolveFarmerKycUrls(supabase, [toAdminFarmerVerification(data)]);
+  return { res: { ok: true } as Response, payload: { ok: true, farmer } };
 }
 
 // ===================== LEARNING HUB =====================

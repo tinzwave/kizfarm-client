@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getMyFarmerProfile } from "@/lib/kizfarm/supabase-data";
 import { submitFarmerVerification } from "@/lib/kizfarm/supabase-mutations";
@@ -20,6 +21,8 @@ const uploadCopy: Record<UploadKey, { title: string; helper: string; icon: strin
   },
 };
 
+const FARM_IMAGE_SLOTS = 5;
+
 export default function IdentityVerificationPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -29,19 +32,27 @@ export default function IdentityVerificationPage() {
     farmerImage: null,
     validIdImage: null,
   });
-  const [farmImagePreviews, setFarmImagePreviews] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<
     Record<UploadKey, File | null>
   >({
     farmerImage: null,
     validIdImage: null,
   });
-  const [farmImages, setFarmImages] = useState<File[]>([]);
+  // Each of the 5 farm-image slots is independently clickable/replaceable,
+  // matching the farmerImage/validIdImage pattern above -- rather than one
+  // input requiring all 5 files picked at once.
+  const [farmImageSlots, setFarmImageSlots] = useState<(File | null)[]>(
+    Array(FARM_IMAGE_SLOTS).fill(null),
+  );
+  const [farmImageSlotPreviews, setFarmImageSlotPreviews] = useState<
+    (string | null)[]
+  >(Array(FARM_IMAGE_SLOTS).fill(null));
   const [submitting, setSubmitting] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
 
   const farmerImageRef = useRef<HTMLInputElement | null>(null);
   const validIdImageRef = useRef<HTMLInputElement | null>(null);
-  const farmImagesRef = useRef<HTMLInputElement | null>(null);
+  const farmImageRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const refs: Record<UploadKey, React.RefObject<HTMLInputElement | null>> = {
     farmerImage: farmerImageRef,
@@ -54,12 +65,21 @@ export default function IdentityVerificationPage() {
     return farmer.validIdImageUrl || farmer.govIdUrl || "";
   };
 
-  const getExistingFarmImages = () => {
+  // Signed URLs, for display only.
+  const getExistingFarmImages = (): string[] => {
     if (!farmer) return [];
     if (Array.isArray(farmer.farmImageUrls) && farmer.farmImageUrls.length > 0) {
       return farmer.farmImageUrls;
     }
     return farmer.farmImageUrl ? [farmer.farmImageUrl] : [];
+  };
+
+  // Raw storage paths -- needed when resubmitting so an unchanged slot can
+  // be sent back as-is. A signed display URL can't be reused as a path
+  // (the signing token isn't a valid object path for the next sign call).
+  const getExistingFarmImagePaths = (): string[] => {
+    if (!farmer) return [];
+    return Array.isArray(farmer.farmImagePaths) ? farmer.farmImagePaths : [];
   };
 
   const fetchFarmerStatus = async () => {
@@ -90,9 +110,11 @@ export default function IdentityVerificationPage() {
       Object.values(previews).forEach((preview) => {
         if (preview) URL.revokeObjectURL(preview);
       });
-      farmImagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+      farmImageSlotPreviews.forEach((preview) => {
+        if (preview) URL.revokeObjectURL(preview);
+      });
     };
-  }, [previews, farmImagePreviews]);
+  }, [previews, farmImageSlotPreviews]);
 
   const handleFileChange =
     (key: UploadKey) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -111,23 +133,30 @@ export default function IdentityVerificationPage() {
       });
     };
 
-  const handleFarmImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const files = Array.from(e.target.files || []).filter((file) =>
-      file.type.startsWith("image/"),
-    );
+  const handleFarmImageSlotChange =
+    (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = e.target.files?.[0] || null;
+      if (file && !file.type.startsWith("image/")) return;
+      setFarmImageSlots((current) => {
+        const next = [...current];
+        next[index] = file;
+        return next;
+      });
+      setFarmImageSlotPreviews((current) => {
+        if (current[index]) URL.revokeObjectURL(current[index] as string);
+        const next = [...current];
+        next[index] = file ? URL.createObjectURL(file) : null;
+        return next;
+      });
+    };
 
-    if (files.length > 0 && files.length !== 5) {
-      alert("Please select exactly 5 clear farm images.");
-    }
-
-    setFarmImages(files);
-    setFarmImagePreviews((current) => {
-      current.forEach((preview) => URL.revokeObjectURL(preview));
-      return files.map((file) => URL.createObjectURL(file));
-    });
-  };
+  const existingFarmImages = getExistingFarmImages();
+  const existingFarmImagePaths = getExistingFarmImagePaths();
+  const farmImagesFilledCount = Array.from({ length: FARM_IMAGE_SLOTS }).filter(
+    (_, i) => farmImageSlots[i] || existingFarmImages[i],
+  ).length;
 
   const allowEdit =
     !farmer || farmer.status === "draft" || farmer.status === "rejected";
@@ -140,7 +169,6 @@ export default function IdentityVerificationPage() {
 
     const farmerImage = selectedFiles.farmerImage;
     const validIdImage = selectedFiles.validIdImage;
-    const existingFarmImages = getExistingFarmImages();
 
     if (!farmAddress.trim()) {
       alert("Farm address is required.");
@@ -154,14 +182,20 @@ export default function IdentityVerificationPage() {
       alert("Valid ID image is required.");
       return;
     }
-    if (farmImages.length > 0 && farmImages.length !== 5) {
-      alert("Please upload exactly 5 clear farm images.");
+    if (farmImagesFilledCount !== FARM_IMAGE_SLOTS) {
+      alert("Please upload all 5 farm proof images.");
       return;
     }
-    if (farmImages.length === 0 && existingFarmImages.length !== 5) {
-      alert("Please upload exactly 5 clear farm images.");
-      return;
-    }
+
+    // Only resend the farm-image array if at least one slot actually
+    // changed -- otherwise omit it so the RPC keeps the existing 5 as-is.
+    const anyFarmImageChanged = farmImageSlots.some((f) => f !== null);
+    const farmImagePayload = anyFarmImageChanged
+      ? Array.from(
+          { length: FARM_IMAGE_SLOTS },
+          (_, i) => farmImageSlots[i] || existingFarmImagePaths[i],
+        )
+      : undefined;
 
     setSubmitting(true);
     try {
@@ -169,10 +203,11 @@ export default function IdentityVerificationPage() {
         farmAddress: farmAddress.trim(),
         farmerImageFile: farmerImage,
         validIdImageFile: validIdImage,
-        farmImageFiles: farmImages.length === 5 ? farmImages : undefined,
+        farmImageFiles: farmImagePayload,
       });
       if (!res.ok) throw new Error(payload?.error || "Upload failed");
       await fetchFarmerStatus();
+      setJustSubmitted(true);
     } catch (err) {
       alert(String(err));
     } finally {
@@ -352,73 +387,67 @@ export default function IdentityVerificationPage() {
                   <span className="material-symbols-outlined">agriculture</span>
                 </div>
                 <span className="text-label-xs font-label-xs text-zinc-500 uppercase">
-                  {farmImagePreviews.length || getExistingFarmImages().length}/5
-                  images
+                  {farmImagesFilledCount}/{FARM_IMAGE_SLOTS} images
                 </span>
               </div>
               <h3 className="text-headline-md font-headline-md mb-2">
                 Farm Images
               </h3>
               <p className="text-body-md text-zinc-500 mb-md">
-                Upload exactly 5 clear images showing the farm from different
-                angles for physical proof.
+                Upload 5 clear images showing the farm from different angles.
+                Click each box to add its image -- all at once or one at a
+                time, in any order.
               </p>
-              <div className="relative rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50 overflow-hidden p-3 min-h-[260px]">
-                {(farmImagePreviews.length
-                  ? farmImagePreviews
-                  : getExistingFarmImages()
-                ).length ? (
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    {(farmImagePreviews.length
-                      ? farmImagePreviews
-                      : getExistingFarmImages()
-                    ).map((preview: string, index: number) => (
-                      <div
-                        key={`${preview}-${index}`}
-                        className="relative aspect-square overflow-hidden rounded-md bg-white border border-zinc-200"
-                      >
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {Array.from({ length: FARM_IMAGE_SLOTS }).map((_, index) => {
+                  const preview =
+                    farmImageSlotPreviews[index] || existingFarmImages[index] || null;
+                  return (
+                    <div
+                      key={index}
+                      className="relative aspect-square rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50 overflow-hidden flex items-center justify-center"
+                    >
+                      {preview ? (
                         <img
                           src={preview}
                           className="h-full w-full object-cover"
                           alt={`Farm proof image ${index + 1}`}
                         />
-                        <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-xs font-semibold text-white">
-                          {index + 1}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex min-h-[220px] flex-col items-center justify-center text-center p-4">
-                    <span className="material-symbols-outlined text-4xl text-zinc-300 mb-2">
-                      add_photo_alternate
-                    </span>
-                    <span className="text-label-sm text-zinc-600">
-                      Click to upload 5 farm images
-                    </span>
-                    <span className="text-label-xs text-zinc-400 mt-1">
-                      Select exactly 5 PNG or JPG files
-                    </span>
-                  </div>
-                )}
-                <input
-                  ref={farmImagesRef}
-                  onChange={handleFarmImagesChange}
-                  disabled={!allowEdit}
-                  accept="image/*"
-                  type="file"
-                  multiple
-                  className="absolute inset-0 opacity-0"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ cursor: allowEdit ? "pointer" : "not-allowed" }}
-                />
-                {submitting && (
-                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                    <span className="font-semibold text-sm text-zinc-600">
-                      Uploading...
-                    </span>
-                  </div>
-                )}
+                      ) : (
+                        <div className="flex flex-col items-center text-center p-2">
+                          <span className="material-symbols-outlined text-2xl text-zinc-300 mb-1">
+                            add_photo_alternate
+                          </span>
+                          <span className="text-label-xs text-zinc-500">
+                            Image {index + 1}
+                          </span>
+                        </div>
+                      )}
+                      <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-xs font-semibold text-white">
+                        {index + 1}
+                      </span>
+                      <input
+                        ref={(el) => {
+                          farmImageRefs.current[index] = el;
+                        }}
+                        onChange={handleFarmImageSlotChange(index)}
+                        disabled={!allowEdit}
+                        accept="image/*"
+                        type="file"
+                        className="absolute inset-0 opacity-0"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ cursor: allowEdit ? "pointer" : "not-allowed" }}
+                      />
+                      {submitting && (
+                        <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                          <span className="material-symbols-outlined animate-spin text-lg text-zinc-500">
+                            autorenew
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -428,8 +457,13 @@ export default function IdentityVerificationPage() {
               type="button"
               onClick={handleSubmit}
               disabled={submitting || !allowEdit}
-              className="bg-[#1B6D24] text-white px-xl h-12 rounded-lg font-label-sm uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/10 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="bg-[#1B6D24] text-white px-xl h-12 rounded-lg font-label-sm uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/10 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
+              {submitting && (
+                <span className="material-symbols-outlined animate-spin text-lg">
+                  autorenew
+                </span>
+              )}
               {submitting
                 ? "Submitting..."
                 : farmer?.status === "pending"
@@ -443,6 +477,35 @@ export default function IdentityVerificationPage() {
           </div>
         </div>
       </main>
+
+      {justSubmitted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-8 text-center shadow-xl">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
+              <span className="material-symbols-outlined text-3xl text-primary">
+                task_alt
+              </span>
+            </div>
+            <h3 className="text-headline-md font-headline-md mb-2">
+              Application Submitted
+            </h3>
+            <p className="text-body-md text-zinc-500 mb-6">
+              Your farmer application has been submitted. Our admin team will
+              review it and get back to you.
+            </p>
+            <Link
+              href="/buyer/dashboard"
+              className="flex w-full h-12 items-center justify-center bg-[#1B6D24] text-white rounded-lg font-label-sm uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all"
+            >
+              Back to Buyer Dashboard
+            </Link>
+            <p className="text-label-xs text-zinc-400 mt-4">
+              Keep an eye on your dashboard -- it will update once admin
+              reviews your application.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

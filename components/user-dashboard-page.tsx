@@ -123,7 +123,13 @@ export default function UserDashboardPage() {
               Become a Farmer
             </Link>
           )}
-          {hasFarmerApplication && !isApprovedFarmer && (
+          {hasFarmerApplication && farmer?.status === "pending" && (
+            <Link href="/farmer/verify" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all">
+              <span className="material-symbols-outlined text-lg">hourglass_top</span>
+              Awaiting Admin Approval
+            </Link>
+          )}
+          {hasFarmerApplication && (farmer?.status === "draft" || farmer?.status === "rejected") && (
             <Link href="/farmer/verify" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all">
               <span className="material-symbols-outlined text-lg">verified</span>
               Farmer Verification
@@ -131,8 +137,8 @@ export default function UserDashboardPage() {
           )}
           {isApprovedFarmer && (
             <Link href="/farmer/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-[#1B6D24] bg-green-50 border border-green-200 hover:bg-green-100 transition-all">
-              <span className="material-symbols-outlined text-lg">agriculture</span>
-              Farmer Portal
+              <span className="material-symbols-outlined text-lg">check_circle</span>
+              Approved
             </Link>
           )}
           <Link href="/buyer/cart" className="relative rounded-full p-2 hover:bg-gray-50">
@@ -171,11 +177,30 @@ export default function UserDashboardPage() {
           </div>
         )}
 
-        {hasFarmerApplication && !isApprovedFarmer && (
+        {hasFarmerApplication && farmer?.status === "pending" && (
           <div className="mb-6 bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold mb-1 text-amber-950">Farmer application in progress</h2>
-              <p className="text-amber-800 text-sm">Continue verification so your farmer portal can be activated.</p>
+              <h2 className="text-xl font-bold mb-1 text-amber-950">Awaiting admin approval</h2>
+              <p className="text-amber-800 text-sm">Your farmer application has been submitted. Our admin team will review it and get back to you.</p>
+            </div>
+            <Link href="/farmer/verify" className="px-6 py-3 bg-amber-600 text-white hover:bg-amber-700 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 active:scale-95">
+              View Application
+              <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
+            </Link>
+          </div>
+        )}
+
+        {hasFarmerApplication && (farmer?.status === "draft" || farmer?.status === "rejected") && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-bold mb-1 text-amber-950">
+                {farmer?.status === "rejected" ? "Farmer application needs changes" : "Farmer application in progress"}
+              </h2>
+              <p className="text-amber-800 text-sm">
+                {farmer?.status === "rejected"
+                  ? "Your application was rejected -- review the reason and resubmit."
+                  : "Continue verification so your farmer portal can be activated."}
+              </p>
             </div>
             <Link href="/farmer/verify" className="px-6 py-3 bg-amber-600 text-white hover:bg-amber-700 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 active:scale-95">
               Continue Verification
@@ -191,8 +216,8 @@ export default function UserDashboardPage() {
               <p className="text-white/80 text-sm">You are logged in as a verified farmer. Manage your crops, listings, and payouts here.</p>
             </div>
             <Link href="/farmer/dashboard" className="px-6 py-3 bg-white text-[#1B6D24] hover:bg-slate-100 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 shadow-sm active:scale-95">
-              Go to Farmer Dashboard
-              <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
+              <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
+              Approved -- Go to Farmer Dashboard
             </Link>
           </div>
         )}

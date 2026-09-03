@@ -235,11 +235,26 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
 
               <aside className="space-y-4">
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <h5 className="text-sm text-slate-500">Farmer</h5>
-                  <div className="mt-2">
-                    <div className="text-sm font-semibold">
-                      {farmer.fullName || farmer.userId?.name || "Unnamed"}
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-14 shrink-0 rounded-full overflow-hidden border border-slate-200 bg-white flex items-center justify-center">
+                      {farmer.farmerImageUrl || farmer.selfieUrl ? (
+                        <img
+                          src={farmer.farmerImageUrl || farmer.selfieUrl}
+                          alt={farmer.fullName || farmer.userId?.name || "Farmer"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="material-symbols-outlined text-slate-300 text-3xl">person</span>
+                      )}
                     </div>
+                    <div>
+                      <h5 className="text-xs uppercase tracking-wide text-slate-500">Farmer</h5>
+                      <div className="text-sm font-semibold">
+                        {farmer.fullName || farmer.userId?.name || "Unnamed"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-1">
                     <div className="text-sm text-slate-600">
                       {farmer.userId?.email}
                     </div>
