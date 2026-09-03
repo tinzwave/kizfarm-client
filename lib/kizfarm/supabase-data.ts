@@ -1280,6 +1280,10 @@ export async function getFarmerProducts() {
     .from("products")
     .select("*")
     .eq("farmer_id", farmer.id)
+    // Deleted products (is_active = false, see deleteFarmerProduct) stay
+    // out of the farmer's own list too -- once deleted, it's gone from
+    // their perspective, same as a real delete would be.
+    .eq("is_active", true)
     .order("created_at", { ascending: false });
   if (queryError) return { res: { ok: false } as Response, payload: { error: queryError.message } };
   return { res: { ok: true } as Response, payload: { ok: true, products: (data || []).map(toFarmerProduct) } };

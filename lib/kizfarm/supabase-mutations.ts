@@ -895,21 +895,24 @@ export async function updateFarmerProduct(
   return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
 }
 
-// Soft-delete: a real DELETE isn't safe here since order_items.product_id
-// references products with no ON DELETE clause, so removing a product
-// that's ever been ordered would fail with a raw foreign-key violation.
-// Deactivating just hides it from products_select's public branch (see
-// migration 0021) while keeping order history intact.
-export async function setFarmerProductActive(id: string, isActive: boolean) {
+// A real DELETE fails with a foreign-key violation (Postgres code 23503)
+// for any product that's ever been ordered, since order_items.product_id
+// references it with no ON DELETE clause -- deleting would corrupt past
+// order records. When that happens, fall back to deactivating instead
+// (hides it from products_select's public branch and the farmer's own
+// list, see migration 0021 and getFarmerProducts) so it disappears either
+// way -- the farmer doesn't need to know which path was taken.
+export async function deleteFarmerProduct(id: string) {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("products")
-    .update({ is_active: isActive })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  if (!error) return { res: { ok: true } as Response, payload: { ok: true } };
+
+  if (error.code === "23503") {
+    const { error: deactivateError } = await supabase.from("products").update({ is_active: false }).eq("id", id);
+    if (deactivateError) return { res: { ok: false } as Response, payload: { error: deactivateError.message } };
+    return { res: { ok: true } as Response, payload: { ok: true } };
+  }
+  return { res: { ok: false } as Response, payload: { error: error.message } };
 }
 
 export async function submitReview(productId: string, input: { rating: number; comment?: string }) {

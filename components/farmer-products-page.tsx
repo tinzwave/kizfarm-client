@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { getFarmerProducts } from "@/lib/kizfarm/supabase-data";
-import { setFarmerProductActive } from "@/lib/kizfarm/supabase-mutations";
+import { deleteFarmerProduct } from "@/lib/kizfarm/supabase-mutations";
 
 type FarmerProduct = {
   _id?: string;
@@ -16,7 +16,6 @@ type FarmerProduct = {
   unit?: string;
   images?: string[];
   imageUrls?: string[];
-  isActive?: boolean;
   createdAt?: string;
 };
 
@@ -36,7 +35,7 @@ export default function FarmerProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState<FarmerProduct[]>([]);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const total = useMemo(() => products.length, [products.length]);
 
@@ -58,23 +57,20 @@ export default function FarmerProductsPage() {
     void Promise.resolve().then(() => loadProducts());
   }, []);
 
-  const handleToggleActive = async (p: FarmerProduct) => {
+  const handleDelete = async (p: FarmerProduct) => {
     const id = productId(p);
     if (!id) return;
-    const nextActive = !(p.isActive ?? true);
-    if (!nextActive && !window.confirm(`Delist "${productName(p)}"? Buyers won't see it in the marketplace until you re-list it.`)) {
-      return;
-    }
-    setTogglingId(id);
+    if (!window.confirm(`Delete "${productName(p)}"? This can't be undone.`)) return;
+    setDeletingId(id);
     try {
-      const { res, payload } = await setFarmerProductActive(id, nextActive);
+      const { res, payload } = await deleteFarmerProduct(id);
       if (res.ok) {
-        setProducts((prev) => prev.map((item) => (productId(item) === id ? { ...item, isActive: nextActive } : item)));
+        setProducts((prev) => prev.filter((item) => productId(item) !== id));
       } else {
-        alert(payload?.error || "Failed to update product");
+        alert(payload?.error || "Failed to delete product");
       }
     } finally {
-      setTogglingId(null);
+      setDeletingId(null);
     }
   };
 
@@ -123,14 +119,13 @@ export default function FarmerProductsPage() {
               const id = productId(p);
               const name = productName(p);
               const img = productImages(p)?.[0];
-              const isActive = p.isActive ?? true;
               return (
                 <div
                   key={id || name}
                   className="group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden hover:shadow-md transition-shadow"
                 >
                   <Link href={id ? `/farmer/products/${id}` : "/farmer/products"}>
-                    <div className={`aspect-[4/3] bg-zinc-100 dark:bg-zinc-900 overflow-hidden ${isActive ? "" : "opacity-50 grayscale"}`}>
+                    <div className="aspect-[4/3] bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
                       {img ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -147,19 +142,8 @@ export default function FarmerProductsPage() {
                       )}
                     </div>
                     <div className="p-4 space-y-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1">
-                          {name}
-                        </div>
-                        <span
-                          className={`text-[11px] px-2 py-1 rounded-full shrink-0 ${
-                            isActive
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                              : "bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300"
-                          }`}
-                        >
-                          {isActive ? "Active" : "Delisted"}
-                        </span>
+                      <div className="font-semibold text-zinc-900 dark:text-zinc-100 line-clamp-1">
+                        {name}
                       </div>
                       {p.description ? (
                         <div className="text-sm text-zinc-500 line-clamp-2">
@@ -182,15 +166,12 @@ export default function FarmerProductsPage() {
                   </Link>
                   <div className="px-4 pb-4">
                     <button
-                      onClick={() => handleToggleActive(p)}
-                      disabled={togglingId === id}
-                      className={`w-full h-9 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${
-                        isActive
-                          ? "border border-red-200 text-red-600 hover:bg-red-50"
-                          : "border border-[#1B6D24] text-[#1B6D24] hover:bg-green-50"
-                      }`}
+                      onClick={() => handleDelete(p)}
+                      disabled={deletingId === id}
+                      className="w-full h-9 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 border border-red-200 text-red-600 hover:bg-red-50 flex items-center justify-center gap-1.5"
                     >
-                      {togglingId === id ? "Updating…" : isActive ? "Delist" : "Re-list"}
+                      <span className="material-symbols-outlined text-sm">delete</span>
+                      {deletingId === id ? "Deleting…" : "Delete"}
                     </button>
                   </div>
                 </div>
