@@ -81,6 +81,14 @@ function NavLinks({
         {!linksCollapsed && "Chats"}
       </Link>
       <Link
+        href="/buyer/marketplace"
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/buyer/marketplace") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+      >
+        <span className="material-symbols-outlined">storefront</span>
+        {!linksCollapsed && "Marketplace"}
+      </Link>
+      <Link
         href="/farmer/profile"
         onClick={onClick}
         className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/profile") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
