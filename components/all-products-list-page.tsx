@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getAdminAllProducts } from "@/lib/kizfarm/supabase-data";
-import { deleteAdminProduct } from "@/lib/kizfarm/supabase-mutations";
+import { setProductActive } from "@/lib/kizfarm/supabase-mutations";
 
 interface Product {
   _id: string;
@@ -12,6 +12,7 @@ interface Product {
   unit: string;
   quantity: number;
   images: string[];
+  isActive?: boolean;
   createdAt: string;
   farmerId?: {
     fullName: string;
@@ -30,6 +31,9 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Product | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const fetchProducts = async (search?: string) => {
     try {
@@ -50,23 +54,34 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
     void Promise.resolve().then(() => fetchProducts());
   }, []);
 
-  const handleDelete = async (product: Product) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to permanently delete "${product.name}"? All associated reviews will also be removed. This cannot be undone.`
-      )
-    )
-      return;
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => setSuccessMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  const applyStatusChange = async (product: Product, nextActive: boolean) => {
+    setUpdatingId(product._id);
     try {
-      const { res, payload } = await deleteAdminProduct(product._id);
+      const { res, payload } = await setProductActive(product._id, nextActive);
       if (res.ok) {
-        fetchProducts(searchQ || undefined);
+        setProducts((prev) => prev.map((p) => (p._id === product._id ? { ...p, isActive: nextActive } : p)));
+        setSuccessMessage(nextActive ? `"${product.name}" is active again.` : `"${product.name}" has been deactivated.`);
       } else {
-        alert(payload?.error || "Failed to delete product");
+        alert(payload?.error || "Failed to update product");
       }
     } catch (err) {
-      console.error("Delete failed:", err);
+      console.error("Status change failed:", err);
+    } finally {
+      setUpdatingId(null);
+      setConfirmTarget(null);
     }
+  };
+
+  const handleActivate = (product: Product) => applyStatusChange(product, true);
+  const handleDeactivateClick = (product: Product) => setConfirmTarget(product);
+  const handleConfirmDeactivate = () => {
+    if (confirmTarget) applyStatusChange(confirmTarget, false);
   };
 
   const filteredProducts = products.filter((p) => {
@@ -115,6 +130,13 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
               </button>
             </div>
           </div>
+
+          {successMessage && (
+            <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+              <span className="material-symbols-outlined text-lg">check_circle</span>
+              {successMessage}
+            </div>
+          )}
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-8">
@@ -231,6 +253,9 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
                       <th className="px-6 py-4 font-label-sm text-slate-500 uppercase tracking-wider">
                         Stock
                       </th>
+                      <th className="px-6 py-4 font-label-sm text-slate-500 uppercase tracking-wider">
+                        Status
+                      </th>
                       <th className="px-6 py-4 font-label-sm text-slate-500 uppercase tracking-wider text-right">
                         Actions
                       </th>
@@ -299,14 +324,36 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
                             </span>
                           )}
                         </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              product.isActive === false
+                                ? "bg-slate-100 text-slate-600"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
+                            {product.isActive === false ? "Inactive" : "Active"}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleDelete(product)}
-                              className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-                            >
-                              Delete
-                            </button>
+                            {product.isActive === false ? (
+                              <button
+                                onClick={() => handleActivate(product)}
+                                disabled={updatingId === product._id}
+                                className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {updatingId === product._id ? "Updating…" : "Activate"}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleDeactivateClick(product)}
+                                disabled={updatingId === product._id}
+                                className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {updatingId === product._id ? "Updating…" : "Deactivate"}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -339,6 +386,38 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
           </div>
         </div>
       </main>
+
+      {confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+                <span className="material-symbols-outlined text-red-600">visibility_off</span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Deactivate product?</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Buyers won&apos;t see &quot;{confirmTarget.name}&quot; in the marketplace anymore. The farmer or an
+              admin can reactivate it any time.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="flex-1 h-10 rounded-lg text-sm font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeactivate}
+                disabled={updatingId === confirmTarget._id}
+                className="flex-1 h-10 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {updatingId === confirmTarget._id ? "Deactivating…" : "Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

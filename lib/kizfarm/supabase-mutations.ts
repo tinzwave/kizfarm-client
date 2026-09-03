@@ -895,30 +895,21 @@ export async function updateFarmerProduct(
   return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
 }
 
-// A real DELETE fails with a foreign-key violation (Postgres code 23503)
-// for any product referenced elsewhere -- order_items.product_id (past
-// orders) or chats.product_id (a buyer/farmer chat started from the
-// listing), neither of which cascade on delete, so deleting outright
-// would corrupt that history. When that happens, fall back to
-// deactivating instead (hides it from products_select's public branch
-// and the farmer's own list, see migration 0021 and getFarmerProducts) so
-// the product disappears either way -- the caller doesn't need to know
-// which path was taken.
-async function deleteProductWithFallback(supabase: ReturnType<typeof createClient>, id: string) {
-  const { error } = await supabase.from("products").delete().eq("id", id);
-  if (!error) return { res: { ok: true } as Response, payload: { ok: true } };
-
-  if (error.code === "23503") {
-    const { error: deactivateError } = await supabase.from("products").update({ is_active: false }).eq("id", id);
-    if (deactivateError) return { res: { ok: false } as Response, payload: { error: deactivateError.message } };
-    return { res: { ok: true } as Response, payload: { ok: true } };
-  }
-  return { res: { ok: false } as Response, payload: { error: error.message } };
-}
-
-export async function deleteFarmerProduct(id: string) {
+// A real DELETE isn't used at all here: order_items.product_id and
+// chats.product_id both reference products with no ON DELETE clause, so
+// deleting a product that's ever been ordered or chatted about would
+// corrupt that history for one product and raise a raw foreign-key error
+// for another -- an inconsistent, surprising outcome depending on the
+// product. Deactivating is the one consistent, always-safe action: hides
+// it from products_select's public branch (see migration 0021) while
+// keeping every record intact, and either the owning farmer or an admin
+// can flip it back. RLS (products_farmer_write) already restricts this to
+// the owning farmer or an admin -- shared by both call sites below.
+export async function setProductActive(id: string, isActive: boolean) {
   const supabase = createClient();
-  return deleteProductWithFallback(supabase, id);
+  const { error } = await supabase.from("products").update({ is_active: isActive }).eq("id", id);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
 export async function submitReview(productId: string, input: { rating: number; comment?: string }) {
@@ -1032,11 +1023,6 @@ export async function saveFarmerBankDetails(input: {
       },
     },
   };
-}
-
-export async function deleteAdminProduct(productId: string) {
-  const supabase = createClient();
-  return deleteProductWithFallback(supabase, productId);
 }
 
 export async function suspendAdminFarmer(farmerId: string, reason?: string) {

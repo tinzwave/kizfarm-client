@@ -1276,14 +1276,13 @@ export async function getFarmerProducts() {
   const { error, farmer } = await getOwnFarmer(supabase);
   if (error || !farmer) return { res: { ok: false } as Response, payload: { error: error || "Farmer record not found" } };
 
+  // Includes inactive products too -- the farmer needs to see them to
+  // reactivate, unlike buyers who only ever see is_active = true rows
+  // (enforced by products_select RLS regardless of this query).
   const { data, error: queryError } = await supabase
     .from("products")
     .select("*")
     .eq("farmer_id", farmer.id)
-    // Deleted products (is_active = false, see deleteFarmerProduct) stay
-    // out of the farmer's own list too -- once deleted, it's gone from
-    // their perspective, same as a real delete would be.
-    .eq("is_active", true)
     .order("created_at", { ascending: false });
   if (queryError) return { res: { ok: false } as Response, payload: { error: queryError.message } };
   return { res: { ok: true } as Response, payload: { ok: true, products: (data || []).map(toFarmerProduct) } };
@@ -1458,6 +1457,7 @@ export async function getAdminAllProducts({ search }: { search?: string } = {}) 
     unit: p.unit,
     quantity: p.quantity,
     images: p.images || [],
+    isActive: p.is_active,
     createdAt: p.created_at,
     farmerId: p.farmers ? { fullName: p.farmers.full_name, farmName: p.farmers.farm_name } : undefined,
     userId: p.profiles ? { name: p.profiles.name, email: p.profiles.email } : undefined,
