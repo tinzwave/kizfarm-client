@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAdminFarmers } from "@/lib/kizfarm/supabase-data";
 import { adminCreateProductForFarmer } from "@/lib/kizfarm/supabase-mutations";
@@ -35,14 +35,22 @@ export default function AdminAddProductPage() {
   const [moistureCode, setMoistureCode] = useState("");
   const [images, setImages] = useState<File[]>([]);
 
+  // Guards against an out-of-order response: if the user pauses twice in
+  // quick succession, two searches can be in flight at once, and without
+  // this the slower (earlier) one can resolve after the newer one and
+  // briefly overwrite it with stale results.
+  const searchRequestId = useRef(0);
+
   useEffect(() => {
     const timer = setTimeout(async () => {
+      const requestId = ++searchRequestId.current;
       setSearchingFarmers(true);
       try {
         const { res, payload } = await getAdminFarmers({ status: "approved", search: farmerSearch || undefined });
+        if (requestId !== searchRequestId.current) return;
         if (res.ok) setFarmerOptions((payload.farmers as FarmerOption[]) || []);
       } finally {
-        setSearchingFarmers(false);
+        if (requestId === searchRequestId.current) setSearchingFarmers(false);
       }
     }, 300);
     return () => clearTimeout(timer);
