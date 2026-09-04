@@ -172,20 +172,27 @@ export default function LoginPage() {
             </div>
 
             {/* Remember Me */}
-            <div className="flex items-center gap-base">
-              <input
-                className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
-                id="remember"
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              <label
-                className="font-label-sm text-on-surface-variant cursor-pointer"
-                htmlFor="remember"
-              >
-                Keep me logged in
-              </label>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-base">
+                <input
+                  className="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer"
+                  id="remember"
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                <label
+                  className="font-label-sm text-on-surface-variant cursor-pointer"
+                  htmlFor="remember"
+                >
+                  Keep me logged in
+                </label>
+              </div>
+              {!remember && (
+                <p className="font-label-xs text-on-surface-variant pl-7">
+                  You&apos;ll be signed out when you close this tab, and new tabs won&apos;t share this session.
+                </p>
+              )}
             </div>
 
             {/* Primary Action */}

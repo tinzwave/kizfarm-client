@@ -891,10 +891,16 @@ export async function adminCreateProductForFarmer(input: {
 
   const { data: farmer, error: farmerError } = await supabase
     .from("farmers")
-    .select("id, user_id")
+    .select("id, user_id, status, profiles!user_id(status)")
     .eq("id", input.farmerId)
     .single();
   if (farmerError || !farmer) return { res: { ok: false } as Response, payload: { error: "Farmer not found" } };
+  if (farmer.status !== "approved") {
+    return { res: { ok: false } as Response, payload: { error: "Can only post products for an approved farmer." } };
+  }
+  if ((farmer as any).profiles?.status !== "active") {
+    return { res: { ok: false } as Response, payload: { error: "This farmer's account is not active, so a product can't be posted on their behalf." } };
+  }
 
   const imageUrls: string[] = [];
   for (const file of input.images || []) {
@@ -1103,6 +1109,19 @@ export async function suspendAdminFarmer(farmerId: string, reason?: string) {
     .update({ status: "suspended", suspension_reason: reason || null, suspended_at: new Date().toISOString() })
     .eq("id", farmer.user_id);
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+
+  // Pull their listings off the marketplace too -- suspension shouldn't
+  // leave a locked-out farmer's products purchasable. Deliberately not
+  // reversed by unsuspendAdminFarmer below -- admin/the farmer re-enables
+  // each listing manually rather than everything silently reappearing.
+  const { error: productsError } = await supabase.from("products").update({ is_active: false }).eq("farmer_id", farmerId);
+  if (productsError) {
+    return {
+      res: { ok: false } as Response,
+      payload: { error: `Farmer suspended, but their products could not be deactivated: ${productsError.message}` },
+    };
+  }
+
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
@@ -1145,6 +1164,17 @@ export async function deactivateAdminFarmer(farmerId: string) {
 
   const { error } = await supabase.from("profiles").update({ status: "deactivated" }).eq("id", farmer.user_id);
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+
+  // See suspendAdminFarmer above -- same reasoning for pulling listings off
+  // the marketplace, not reversed automatically on reactivation.
+  const { error: productsError } = await supabase.from("products").update({ is_active: false }).eq("farmer_id", farmerId);
+  if (productsError) {
+    return {
+      res: { ok: false } as Response,
+      payload: { error: `Farmer deactivated, but their products could not be deactivated: ${productsError.message}` },
+    };
+  }
+
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
