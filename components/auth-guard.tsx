@@ -46,6 +46,13 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
         return;
       }
 
+      if (profile.status !== "active") {
+        await signOut();
+        if (!cancelled) setAuthorized(false);
+        router.replace("/login");
+        return;
+      }
+
       if (!cancelled) setAuthorized(true);
     }
     check();

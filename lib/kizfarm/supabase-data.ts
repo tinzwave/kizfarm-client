@@ -109,11 +109,18 @@ export async function getFarmerStatus() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { res: { ok: true } as Response, payload: { ok: true, farmer: null } };
+  if (!user) return { res: { ok: true } as Response, payload: { ok: true, farmer: null, profileStatus: null } };
 
-  const { data } = await supabase.from("farmers").select("*").eq("user_id", user.id).single();
-  if (!data) return { res: { ok: true } as Response, payload: { ok: true, farmer: null } };
-  return { res: { ok: true } as Response, payload: { ok: true, farmer: { _id: data.id, status: data.status } } };
+  const [farmerRes, profileRes] = await Promise.all([
+    supabase.from("farmers").select("*").eq("user_id", user.id).single(),
+    supabase.from("profiles").select("status").eq("id", user.id).single(),
+  ]);
+  const profileStatus = profileRes.data?.status ?? null;
+  if (!farmerRes.data) return { res: { ok: true } as Response, payload: { ok: true, farmer: null, profileStatus } };
+  return {
+    res: { ok: true } as Response,
+    payload: { ok: true, farmer: { _id: farmerRes.data.id, status: farmerRes.data.status }, profileStatus },
+  };
 }
 
 // farmer-kyc is a private bucket -- the *_url fields on the farmers row

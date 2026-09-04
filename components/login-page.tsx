@@ -55,6 +55,15 @@ export default function LoginPage() {
         }
 
         const profile = await getCurrentProfile();
+        if (profile && profile.status !== "active") {
+          await signOut();
+          setError(
+            profile.status === "suspended"
+              ? "Your account has been suspended. Please contact support."
+              : "Your account has been deactivated. Please contact support.",
+          );
+          return;
+        }
         router.push(redirectPathForRole(profile?.role));
       } catch (err: any) {
         setError(err.message || "Login failed");

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FarmerSidebar from "@/components/farmer-sidebar";
 import { usePathname, useRouter } from "next/navigation";
-import { getSession } from "@/lib/kizfarm/supabase-auth";
+import { getSession, signOut } from "@/lib/kizfarm/supabase-auth";
 import { getFarmerStatus } from "@/lib/kizfarm/supabase-data";
 
 export default function FarmerLayout({
@@ -66,6 +66,13 @@ export default function FarmerLayout({
         }
         const farmer = json?.farmer;
         const status = farmer?.status;
+
+        if (json?.profileStatus && json.profileStatus !== "active") {
+          await signOut();
+          if (pathname !== "/login") router.replace("/login");
+          setCheckingAccess(false);
+          return;
+        }
 
         // If user hasn't registered as a farmer yet, keep them on /farmer/become.
         if (!farmer) {
