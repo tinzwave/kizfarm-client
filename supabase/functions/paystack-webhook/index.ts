@@ -92,7 +92,26 @@ Deno.serve(async (req) => {
 
       const courseId = event.data?.metadata?.course_id;
       const userId = event.data?.metadata?.user_id;
-      if (courseId && userId) {
+      // Pre-check before calling activate_subscription, same pattern as the
+      // orders branch above -- without it, this fires (and re-sends all 3
+      // emails) on almost every purchase, not just as a crash-recovery
+      // fallback, since the webhook and the client's own purchase-course
+      // call both fire for essentially every real transaction.
+      // activate_subscription's own idempotency guard (0027) still keeps
+      // the data safe even if both this check and the client's call race
+      // each other, so this only needs to catch the common case.
+      const { data: alreadyActivated } = courseId && userId
+        ? await admin
+            .from("subscriptions")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("course_id", courseId)
+            .eq("payment_reference", reference)
+            .eq("status", "active")
+            .maybeSingle()
+        : { data: null };
+
+      if (courseId && userId && !alreadyActivated) {
         const { data: subscription, error: subErr } = await admin.rpc("activate_subscription", {
           p_user_id: userId,
           p_course_id: courseId,
