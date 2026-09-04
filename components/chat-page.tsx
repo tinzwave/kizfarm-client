@@ -12,6 +12,7 @@ interface ChatData {
   lastMessage?: string;
   lastMessageTime?: string;
   updatedAt?: string;
+  unreadCount?: number;
 }
 
 export default function ChatPage() {
@@ -126,17 +127,22 @@ export default function ChatPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center mb-1">
-                    <h3 className="font-headline-md text-[18px] text-on-surface truncate">
+                    <h3 className={`font-headline-md text-[18px] text-on-surface truncate ${chat.unreadCount ? "font-bold" : ""}`}>
                       {chat.farmerId?.name || 'Farmer'}
                     </h3>
                     <span className="font-label-xs text-label-xs text-primary">
                       {formatTime(chat.lastMessageTime || chat.updatedAt)}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <p className="font-body-md text-body-md text-on-surface-variant truncate max-w-[80%]">
+                  <div className="flex justify-between items-center gap-2">
+                    <p className={`font-body-md text-body-md truncate max-w-[80%] ${chat.unreadCount ? "text-on-surface font-semibold" : "text-on-surface-variant"}`}>
                       {chat.lastMessage || `Conversation about ${chat.productId?.name || 'this product'}`}
                     </p>
+                    {!!chat.unreadCount && (
+                      <span className="flex-shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-on-primary text-[11px] font-bold flex items-center justify-center">
+                        {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>

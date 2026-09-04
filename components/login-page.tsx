@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/kizfarm/supabase-client";
+import { createClient, setRememberMe } from "@/lib/kizfarm/supabase-client";
 import { getCurrentProfile, getSession, redirectPathForRole, setPendingVerificationEmail, signOut } from "@/lib/kizfarm/supabase-auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -43,6 +43,7 @@ export default function LoginPage() {
     setIsLoading(true);
     (async () => {
       try {
+        setRememberMe(remember);
         const supabase = createClient();
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) {

@@ -1177,13 +1177,23 @@ export async function getConversations() {
   } = await supabase.auth.getUser();
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
-  const { data, error } = await supabase
-    .from("chats")
-    .select(CHAT_SELECT)
-    .or(`buyer_id.eq.${user.id},farmer_id.eq.${user.id}`)
-    .order("updated_at", { ascending: false });
-  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, chats: (data || []).map(toChat) } };
+  const [chatsRes, unreadRes] = await Promise.all([
+    supabase
+      .from("chats")
+      .select(CHAT_SELECT)
+      .or(`buyer_id.eq.${user.id},farmer_id.eq.${user.id}`)
+      .order("updated_at", { ascending: false }),
+    supabase.from("messages").select("chat_id").eq("receiver_id", user.id).eq("is_read", false),
+  ]);
+  if (chatsRes.error) return { res: { ok: false } as Response, payload: { error: chatsRes.error.message } };
+
+  const unreadCounts = new Map<string, number>();
+  for (const m of unreadRes.data || []) {
+    unreadCounts.set(m.chat_id, (unreadCounts.get(m.chat_id) || 0) + 1);
+  }
+
+  const chats = (chatsRes.data || []).map((c: any) => ({ ...toChat(c), unreadCount: unreadCounts.get(c.id) || 0 }));
+  return { res: { ok: true } as Response, payload: { ok: true, chats } };
 }
 
 export async function getChatDetails(chatId: string) {

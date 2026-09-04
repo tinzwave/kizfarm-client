@@ -12,6 +12,7 @@ interface ChatData {
   lastMessage: string;
   lastMessageTime: string;
   isActive: boolean;
+  unreadCount?: number;
 }
 
 export default function ChatsPage() {
@@ -132,16 +133,23 @@ export default function ChatsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
-                      <h3 className="font-label-sm truncate text-on-surface">
+                      <h3 className={`font-label-sm truncate text-on-surface ${chat.unreadCount ? "font-bold" : ""}`}>
                         {chat.buyerId.name}
                       </h3>
                       <span className="text-[10px] text-gray-400 ml-2">
                         {formatTime(chat.lastMessageTime)}
                       </span>
                     </div>
-                    <p className="text-body-md text-gray-600 line-clamp-1">
-                      {chat.lastMessage || "No messages yet"}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-body-md line-clamp-1 ${chat.unreadCount ? "text-on-surface font-semibold" : "text-gray-600"}`}>
+                        {chat.lastMessage || "No messages yet"}
+                      </p>
+                      {!!chat.unreadCount && (
+                        <span className="flex-shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center">
+                          {chat.unreadCount > 9 ? "9+" : chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))
