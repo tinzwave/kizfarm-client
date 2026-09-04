@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { getAdminAllProducts } from "@/lib/kizfarm/supabase-data";
 import { setProductActive } from "@/lib/kizfarm/supabase-mutations";
 
@@ -119,6 +120,15 @@ export default function AllProductsListPage({ hideSidebar = false }: Props) {
               <h2 className="font-h1 text-on-background">Inventory Management</h2>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href="/admin/products/new"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-label-md hover:opacity-90 transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg" data-icon="add">
+                  add
+                </span>
+                New Product for Farmer
+              </Link>
               <button className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant text-primary rounded-lg font-label-md hover:bg-slate-50 transition-colors">
                 <span
                   className="material-symbols-outlined text-lg"

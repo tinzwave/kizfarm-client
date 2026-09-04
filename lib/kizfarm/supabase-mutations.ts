@@ -853,6 +853,65 @@ export async function createFarmerProduct(input: {
     .insert({
       farmer_id: farmer.id,
       user_id: user.id,
+      created_by: user.id,
+      name: input.name,
+      description: input.description,
+      category: input.category || null,
+      price: input.price,
+      unit: input.unit || null,
+      quantity: input.quantity ?? null,
+      moisture_code: input.moistureCode || null,
+      images: imageUrls,
+    })
+    .select()
+    .single();
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, product: toFarmerProduct(data) } };
+}
+
+// Admin (or a team member) posting a product on a farmer's behalf -- the
+// farmer_id/user_id belong to the chosen farmer, so it's fully theirs to
+// manage afterward, same as products_farmer_write already allows.
+export async function adminCreateProductForFarmer(input: {
+  farmerId: string;
+  name: string;
+  description: string;
+  category?: string;
+  price: number;
+  unit?: string;
+  quantity?: number;
+  moistureCode?: string;
+  images?: File[];
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
+
+  const { data: farmer, error: farmerError } = await supabase
+    .from("farmers")
+    .select("id, user_id")
+    .eq("id", input.farmerId)
+    .single();
+  if (farmerError || !farmer) return { res: { ok: false } as Response, payload: { error: "Farmer not found" } };
+
+  const imageUrls: string[] = [];
+  for (const file of input.images || []) {
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${farmer.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("product-images").upload(path, file);
+    if (uploadError) return { res: { ok: false } as Response, payload: { error: uploadError.message } };
+    const { data: publicUrl } = supabase.storage.from("product-images").getPublicUrl(path);
+    imageUrls.push(publicUrl.publicUrl);
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      farmer_id: farmer.id,
+      user_id: farmer.user_id,
+      created_by: user.id,
       name: input.name,
       description: input.description,
       category: input.category || null,
