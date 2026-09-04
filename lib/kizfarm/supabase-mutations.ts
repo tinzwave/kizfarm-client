@@ -1124,10 +1124,24 @@ export async function unsuspendAdminFarmer(farmerId: string) {
 // constraints anyway once they have any order/escrow history (Postgres
 // enforces referential integrity that the old MongoDB backend never had).
 // Deactivating blocks login while preserving order/financial history.
+//
+// Same active-order/escrow guard suspendAdminFarmer already has -- without
+// it, deactivating now (since deactivation actually locks the account out
+// of every page, guards included) could strand an in-flight order with no
+// one able to reach the page that would act on it.
 export async function deactivateAdminFarmer(farmerId: string) {
   const supabase = createClient();
   const { data: farmer, error: farmerError } = await supabase.from("farmers").select("user_id").eq("id", farmerId).single();
   if (farmerError || !farmer) return { res: { ok: false } as Response, payload: { error: "Farmer not found" } };
+
+  const { res: eligibilityRes, payload: eligibilityPayload } = await getAdminFarmerSuspensionEligibility(farmerId);
+  if (!eligibilityRes.ok) return { res: { ok: false } as Response, payload: { error: eligibilityPayload.error } };
+  if ((eligibilityPayload.activeOrdersCount ?? 0) > 0) {
+    return { res: { ok: false } as Response, payload: { error: "This farmer has active orders and cannot be deactivated." } };
+  }
+  if (eligibilityPayload.hasPendingEscrow) {
+    return { res: { ok: false } as Response, payload: { error: "This farmer cannot be deactivated because they have unreleased payments in escrow." } };
+  }
 
   const { error } = await supabase.from("profiles").update({ status: "deactivated" }).eq("id", farmer.user_id);
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
@@ -1161,9 +1175,16 @@ export async function unsuspendAdminBuyer(userId: string) {
 }
 
 // See deactivateAdminFarmer above for why this deactivates rather than
-// hard-deletes.
+// hard-deletes, and for why it needs the same active-order guard
+// suspendAdminBuyer already has.
 export async function deactivateAdminBuyer(userId: string) {
   const supabase = createClient();
+  const { res: eligibilityRes, payload: eligibilityPayload } = await getAdminBuyerSuspensionEligibility(userId);
+  if (!eligibilityRes.ok) return { res: { ok: false } as Response, payload: { error: eligibilityPayload.error } };
+  if ((eligibilityPayload.activeOrdersCount ?? 0) > 0) {
+    return { res: { ok: false } as Response, payload: { error: "This buyer has an active order and cannot be deactivated." } };
+  }
+
   const { error } = await supabase.from("profiles").update({ status: "deactivated" }).eq("id", userId);
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   return { res: { ok: true } as Response, payload: { ok: true } };
