@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { name: "Notifications", href: "/buyer/notifications", icon: "notifications" },
   { name: "Refunds", href: "/buyer/refunds", icon: "money_off" },
   { name: "Wishlist", href: "/buyer/wishlist", icon: "favorite" },
+  { name: "Refer & Earn", href: "/buyer/referrals", icon: "redeem" },
   { name: "Profile", href: "/buyer/profile", icon: "person" },
 ];
 

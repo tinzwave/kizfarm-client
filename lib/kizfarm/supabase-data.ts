@@ -1872,3 +1872,124 @@ export async function getBuyerRecentActivity() {
 
   return { res: { ok: true } as Response, payload: { ok: true, items } };
 }
+
+// ===================== REFERRALS =====================
+
+export async function getMyReferrals() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
+
+  const [profileRes, settingsRes, referralsRes, rewardsRes] = await Promise.all([
+    supabase.from("profiles").select("referral_code").eq("id", user.id).single(),
+    supabase.from("referral_settings").select("reward_amount, min_referrals_for_payout").eq("id", true).single(),
+    supabase
+      .from("referrals")
+      .select("id, referred_id, first_purchase_rewarded, created_at, profiles!referred_id(name, email)")
+      .eq("referrer_id", user.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("referral_rewards")
+      .select("id, reward_type, amount, status, created_at, released_at")
+      .eq("referrer_id", user.id)
+      .order("created_at", { ascending: false }),
+  ]);
+  if (referralsRes.error) return { res: { ok: false } as Response, payload: { error: referralsRes.error.message } };
+  if (rewardsRes.error) return { res: { ok: false } as Response, payload: { error: rewardsRes.error.message } };
+
+  const referrals = (referralsRes.data || []).map((r: any) => ({
+    id: r.id,
+    referredName: r.profiles?.name || "Unknown",
+    referredEmail: r.profiles?.email || null,
+    hasPurchased: r.first_purchase_rewarded,
+    createdAt: r.created_at,
+  }));
+
+  const rewards = (rewardsRes.data || []).map((r: any) => ({
+    id: r.id,
+    type: r.reward_type,
+    amount: Number(r.amount || 0),
+    status: r.status,
+    createdAt: r.created_at,
+    releasedAt: r.released_at,
+  }));
+
+  const pendingAmount = rewards.filter((r) => r.status === "pending").reduce((s, r) => s + r.amount, 0);
+  const releasedAmount = rewards.filter((r) => r.status === "released").reduce((s, r) => s + r.amount, 0);
+  const referralCount = referrals.length;
+  const minReferrals = settingsRes.data?.min_referrals_for_payout ?? 0;
+
+  return {
+    res: { ok: true } as Response,
+    payload: {
+      ok: true,
+      referralCode: profileRes.data?.referral_code || null,
+      rewardAmount: Number(settingsRes.data?.reward_amount || 0),
+      minReferralsForPayout: minReferrals,
+      referralCount,
+      eligibleForPayout: referralCount >= minReferrals,
+      referrals,
+      rewards,
+      pendingAmount,
+      releasedAmount,
+    },
+  };
+}
+
+export async function getAdminReferrals() {
+  const supabase = createClient();
+
+  const [settingsRes, referralsRes, rewardsRes] = await Promise.all([
+    supabase.from("referral_settings").select("reward_amount, min_referrals_for_payout").eq("id", true).single(),
+    supabase
+      .from("referrals")
+      .select("id, referrer_id, first_purchase_rewarded, created_at, profiles!referrer_id(name, email, bank_name, account_holder_name, account_number)"),
+    supabase.from("referral_rewards").select("referrer_id, amount, status"),
+  ]);
+  if (referralsRes.error) return { res: { ok: false } as Response, payload: { error: referralsRes.error.message } };
+  if (rewardsRes.error) return { res: { ok: false } as Response, payload: { error: rewardsRes.error.message } };
+
+  const minReferrals = settingsRes.data?.min_referrals_for_payout ?? 0;
+
+  const byReferrer = new Map<string, any>();
+  for (const r of referralsRes.data || []) {
+    const referrer = (r as any).profiles;
+    const entry = byReferrer.get(r.referrer_id) || {
+      referrerId: r.referrer_id,
+      name: referrer?.name || "Unknown",
+      email: referrer?.email || null,
+      bankName: referrer?.bank_name || null,
+      accountHolderName: referrer?.account_holder_name || null,
+      accountNumber: referrer?.account_number || null,
+      referralCount: 0,
+      purchaseCount: 0,
+      pendingAmount: 0,
+      releasedAmount: 0,
+    };
+    entry.referralCount += 1;
+    if (r.first_purchase_rewarded) entry.purchaseCount += 1;
+    byReferrer.set(r.referrer_id, entry);
+  }
+  for (const rw of rewardsRes.data || []) {
+    const entry = byReferrer.get(rw.referrer_id);
+    if (!entry) continue;
+    if (rw.status === "pending") entry.pendingAmount += Number(rw.amount || 0);
+    else entry.releasedAmount += Number(rw.amount || 0);
+  }
+
+  const referrers = Array.from(byReferrer.values())
+    .map((e) => ({ ...e, eligibleForPayout: e.referralCount >= minReferrals }))
+    .sort((a, b) => b.pendingAmount - a.pendingAmount);
+
+  return {
+    res: { ok: true } as Response,
+    payload: {
+      ok: true,
+      rewardAmount: Number(settingsRes.data?.reward_amount || 0),
+      minReferralsForPayout: minReferrals,
+      referrers,
+    },
+  };
+}

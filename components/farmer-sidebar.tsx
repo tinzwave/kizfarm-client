@@ -112,6 +112,14 @@ function NavLinks({
         <span className="material-symbols-outlined">payments</span>
         {!linksCollapsed && "Payments History"}
       </Link>
+      <Link
+        href="/farmer/referrals"
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/referrals") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+      >
+        <span className="material-symbols-outlined">redeem</span>
+        {!linksCollapsed && "Refer & Earn"}
+      </Link>
     </nav>
   );
 }

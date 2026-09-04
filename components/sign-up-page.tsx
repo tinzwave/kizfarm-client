@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/kizfarm/supabase-client";
 import { getSession, setPendingVerificationEmail } from "@/lib/kizfarm/supabase-auth";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const refCode = searchParams.get("ref");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -30,7 +32,7 @@ export default function SignUpPage() {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name, phone } },
+        options: { data: { name, phone, ref_code: refCode || undefined } },
       });
       if (signUpError) throw new Error(signUpError.message);
       // Supabase silently no-ops signUp (no error) for an email that's

@@ -1212,6 +1212,27 @@ export async function addToWishlist(productId: string) {
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
+// ===================== ADMIN: REFERRALS =====================
+
+export async function updateReferralSettings(rewardAmount: number, minReferrals: number) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("admin_update_referral_settings", {
+    p_reward_amount: rewardAmount,
+    p_min_referrals: minReferrals,
+  });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, settings: data } };
+}
+
+export async function releaseReferralRewards(referrerId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("admin_release_referral_rewards", {
+    p_referrer_id: referrerId,
+  });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, totalReleased: data } };
+}
+
 export async function removeFromWishlist(productId: string) {
   const supabase = createClient();
   const {

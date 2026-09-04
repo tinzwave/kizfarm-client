@@ -189,6 +189,19 @@ export default function AdminShell({
             </span>
           </Link>
 
+          {/* Referrals */}
+          <Link
+            href="/admin/referrals"
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 scale-100 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined" data-icon="redeem">
+              redeem
+            </span>
+            <span className="font-inter text-sm antialiased">
+              Referral Program
+            </span>
+          </Link>
+
           {/* Buyers Management */}
           <Link
             href="/admin/users"
