@@ -21,6 +21,9 @@ interface Farmer {
 export default function AllFarmersListPage() {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("approved");
@@ -37,15 +40,32 @@ export default function AllFarmersListPage() {
   const fetchFarmers = async () => {
     try {
       setLoading(true);
-      const { res, payload } = await getAdminFarmers({ status: statusFilter, search: searchQ || undefined });
+      const { res, payload } = await getAdminFarmers({ status: statusFilter, search: searchQ || undefined, offset: 0, limit: PAGE_SIZE });
       if (res.ok) {
         setFarmers(payload.farmers || []);
         setTotal(payload.total || 0);
+        setOffset(0);
       }
     } catch (err) {
       console.error("Fetch farmers failed:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreFarmers = async () => {
+    const nextOffset = offset + PAGE_SIZE;
+    setLoadingMore(true);
+    try {
+      const { res, payload } = await getAdminFarmers({ status: statusFilter, search: searchQ || undefined, offset: nextOffset, limit: PAGE_SIZE });
+      if (res.ok) {
+        setFarmers((prev) => [...prev, ...(payload.farmers || [])]);
+        setOffset(nextOffset);
+      }
+    } catch (err) {
+      console.error("Load more farmers failed:", err);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -452,6 +472,17 @@ export default function AllFarmersListPage() {
                 </table>
               )}
             </div>
+            {!loading && farmers.length < total && (
+              <div className="flex justify-center py-4 border-t border-gray-100">
+                <button
+                  onClick={loadMoreFarmers}
+                  disabled={loadingMore}
+                  className="px-4 py-2 text-sm font-semibold text-[#1B6D24] hover:bg-green-50 rounded-lg disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading..." : `Load more (${farmers.length} of ${total})`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>

@@ -23,6 +23,7 @@ export default function LearningCheckoutPage() {
   const returnTo = params.get("returnTo") || "/learning";
   const [course, setCourse] = useState<Course | null>(null);
   const [email, setEmail] = useState("");
+  const [userId, setUserId] = useState("");
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,6 +41,9 @@ export default function LearningCheckoutPage() {
         }
         if (profile?.email) {
           setEmail(profile.email);
+        }
+        if (profile?.id) {
+          setUserId(profile.id);
         }
       } catch (err) {
         console.error("Error loading course details:", err);
@@ -96,6 +100,8 @@ export default function LearningCheckoutPage() {
         currency: "NGN",
         metadata: {
           brand: "KIZ FARM",
+          course_id: courseId,
+          user_id: userId,
           custom_fields: [
             {
               display_name: "Merchant",

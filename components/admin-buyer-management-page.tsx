@@ -22,6 +22,10 @@ interface BuyerStats {
 
 export default function AdminBuyerManagementPage() {
   const [buyers, setBuyers] = useState<Buyer[]>([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -38,14 +42,32 @@ export default function AdminBuyerManagementPage() {
     try {
       setLoading(true);
       setError(null);
-      const { res, payload } = await getAdminBuyers({ status: statusFilter, search: searchQ || undefined });
+      const { res, payload } = await getAdminBuyers({ status: statusFilter, search: searchQ || undefined, offset: 0, limit: PAGE_SIZE });
       if (!res.ok) throw new Error(payload?.error || "Failed to fetch buyers");
       setBuyers(payload.users || []);
+      setTotal(payload.total || 0);
+      setOffset(0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch buyers");
       console.error("Fetch buyers failed:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMoreBuyers = async () => {
+    const nextOffset = offset + PAGE_SIZE;
+    setLoadingMore(true);
+    try {
+      const { res, payload } = await getAdminBuyers({ status: statusFilter, search: searchQ || undefined, offset: nextOffset, limit: PAGE_SIZE });
+      if (res.ok) {
+        setBuyers((prev) => [...prev, ...(payload.users || [])]);
+        setOffset(nextOffset);
+      }
+    } catch (err) {
+      console.error("Load more buyers failed:", err);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -287,6 +309,17 @@ export default function AdminBuyerManagementPage() {
               </table>
             )}
           </div>
+          {!loading && buyers.length < total && (
+            <div className="flex justify-center py-4 border-t border-gray-100">
+              <button
+                onClick={loadMoreBuyers}
+                disabled={loadingMore}
+                className="px-4 py-2 text-sm font-semibold text-[#1B6D24] hover:bg-green-50 rounded-lg disabled:opacity-60"
+              >
+                {loadingMore ? "Loading..." : `Load more (${buyers.length} of ${total})`}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Empty State Helper */}

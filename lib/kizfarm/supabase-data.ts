@@ -395,7 +395,7 @@ export async function getAdminDashboard() {
     supabase.from("farmers").select("id", { count: "exact", head: true }),
     supabase.from("products").select("id", { count: "exact", head: true }),
     supabase.from("orders").select("id", { count: "exact", head: true }),
-    supabase.from("orders").select("total").eq("payment_status", "paid"),
+    supabase.from("orders").select("total, service_fee").eq("payment_status", "paid"),
     supabase.from("farmers").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase
       .from("orders")
@@ -421,7 +421,12 @@ export async function getAdminDashboard() {
   ].find((r) => r.error)?.error;
   if (firstError) return { res: { ok: false } as Response, payload: { error: firstError.message } };
 
-  const totalRevenue = (paidOrdersRes.data || []).reduce((s, o: any) => s + Number(o.total || 0), 0);
+  // "Revenue" is ambiguous for a marketplace where most of the order total
+  // is money owed to farmers via escrow -- surface both: gross order value
+  // (what buyers paid in total) and platform revenue (service_fee only,
+  // the part KIZ FARM actually keeps).
+  const totalOrderValue = (paidOrdersRes.data || []).reduce((s, o: any) => s + Number(o.total || 0), 0);
+  const platformRevenue = (paidOrdersRes.data || []).reduce((s, o: any) => s + Number(o.service_fee || 0), 0);
 
   const recentOrders = (recentOrdersRes.data || []).map((o: any) => ({
     _id: o.id,
@@ -450,7 +455,8 @@ export async function getAdminDashboard() {
         totalFarmers: farmersCountRes.count || 0,
         totalProducts: productsCountRes.count || 0,
         totalOrders: ordersCountRes.count || 0,
-        totalRevenue,
+        totalOrderValue,
+        platformRevenue,
         pendingFarmers: pendingFarmersRes.count || 0,
       },
       recentOrders,
@@ -1485,13 +1491,18 @@ function toAdminFarmerListItem(f: any) {
   };
 }
 
-export async function getAdminFarmers({ status, search }: { status?: string; search?: string } = {}) {
+export async function getAdminFarmers({
+  status,
+  search,
+  offset = 0,
+  limit = 20,
+}: { status?: string; search?: string; offset?: number; limit?: number } = {}) {
   const supabase = createClient();
   let query = supabase
     .from("farmers")
     .select("*, profiles!user_id(email, phone, status)", { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(20);
+    .range(offset, offset + limit - 1);
   if (status && status !== "all") query = query.eq("status", status);
   if (search) query = query.or(`full_name.ilike.%${search}%,farm_name.ilike.%${search}%,phone.ilike.%${search}%`);
 
@@ -1540,15 +1551,25 @@ function toAdminBuyer(p: any) {
   };
 }
 
-export async function getAdminBuyers({ status, search }: { status?: string; search?: string } = {}) {
+export async function getAdminBuyers({
+  status,
+  search,
+  offset = 0,
+  limit = 20,
+}: { status?: string; search?: string; offset?: number; limit?: number } = {}) {
   const supabase = createClient();
-  let query = supabase.from("profiles").select("*").eq("role", "user").order("created_at", { ascending: false });
+  let query = supabase
+    .from("profiles")
+    .select("*", { count: "exact" })
+    .eq("role", "user")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
   if (status && status !== "all") query = query.eq("status", status);
   if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, users: (data || []).map(toAdminBuyer) } };
+  return { res: { ok: true } as Response, payload: { ok: true, users: (data || []).map(toAdminBuyer), total: count || 0 } };
 }
 
 export async function getAdminBuyerById(userId: string) {

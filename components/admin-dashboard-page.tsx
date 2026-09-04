@@ -30,7 +30,8 @@ interface DashboardPayload {
     totalFarmers: number;
     totalProducts: number;
     totalOrders: number;
-    totalRevenue: number;
+    totalOrderValue: number;
+    platformRevenue: number;
     pendingFarmers: number;
   };
   recentOrders: RecentOrder[];
@@ -76,7 +77,8 @@ export default function AdminDashboardPage() {
     { label: "Total Users", value: stats?.totalUsers, icon: "group", color: "bg-emerald-50 text-emerald-700" },
     { label: "Total Farmers", value: stats?.totalFarmers, icon: "agriculture", color: "bg-blue-50 text-blue-700" },
     { label: "Total Orders", value: stats?.totalOrders, icon: "shopping_cart", color: "bg-orange-50 text-orange-700" },
-    { label: "Total Revenue", value: money(stats?.totalRevenue || 0), icon: "payments", color: "bg-emerald-700 text-white" },
+    { label: "Gross Order Value", value: money(stats?.totalOrderValue || 0), icon: "payments", color: "bg-emerald-700 text-white" },
+    { label: "Platform Revenue", value: money(stats?.platformRevenue || 0), icon: "savings", color: "bg-blue-700 text-white" },
   ];
 
   return (
