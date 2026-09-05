@@ -1324,16 +1324,19 @@ export async function getFarmerProductById(id: string) {
 
 export async function getFarmerPayoutHistory() {
   const supabase = createClient();
-  const { error, farmer, userId } = await getOwnFarmer(supabase);
+  const { error, farmer } = await getOwnFarmer(supabase);
   if (error || !farmer) return { res: { ok: false } as Response, payload: { error: error || "Farmer record not found" } };
 
-  const [ledgerRes, profileRes] = await Promise.all([
+  const [ledgerRes, farmerRes] = await Promise.all([
     supabase
       .from("released_funds_ledger")
       .select("*, released_by_profile:profiles!released_by(name, email)")
       .eq("farmer_id", farmer.id)
       .order("released_at", { ascending: false }),
-    supabase.from("profiles").select("account_balance").eq("id", userId).single(),
+    // account_balance for order-escrow payouts lives on farmers, not profiles
+    // (profiles.account_balance is for buyer refunds / course-creator /
+    // referral earnings) -- reading profiles here showed the wrong balance.
+    supabase.from("farmers").select("account_balance").eq("id", farmer.id).single(),
   ]);
   if (ledgerRes.error) return { res: { ok: false } as Response, payload: { error: ledgerRes.error.message } };
 
@@ -1351,7 +1354,7 @@ export async function getFarmerPayoutHistory() {
     res: { ok: true } as Response,
     payload: {
       ok: true,
-      accountBalance: profileRes.data?.account_balance || 0,
+      accountBalance: farmerRes.data?.account_balance || 0,
       releasedFundsLedger,
       totalReleased,
     },

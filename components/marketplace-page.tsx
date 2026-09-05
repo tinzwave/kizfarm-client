@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { getMarketplaceProducts } from "@/lib/kizfarm/supabase-data";
 import { useCart } from "@/lib/kizfarm/cart-context";
@@ -28,8 +28,15 @@ export default function MarketplacePage() {
   
   const { totalItems } = useCart();
 
+  // Guards against an out-of-order response: if the category or search text
+  // changes again before the previous request resolves, the older request
+  // can otherwise land after the newer one and briefly overwrite it with
+  // stale results.
+  const searchRequestId = useRef(0);
+
   useEffect(() => {
-    const fetchProducts = async () => {
+    const timeout = window.setTimeout(async () => {
+      const requestId = ++searchRequestId.current;
       try {
         setLoading(true);
         setError(null);
@@ -38,6 +45,7 @@ export default function MarketplacePage() {
           category: selectedCategory && selectedCategory !== "all" ? selectedCategory : undefined,
           q: searchQuery.trim() || undefined,
         });
+        if (requestId !== searchRequestId.current) return;
 
         if (!res.ok) {
           setError(payload?.error || "Failed to fetch products");
@@ -47,16 +55,14 @@ export default function MarketplacePage() {
 
         setProducts(payload?.products || []);
       } catch (err) {
+        if (requestId !== searchRequestId.current) return;
         console.error("Error fetching products:", err);
         setError("Failed to load products");
         setProducts([]);
       } finally {
-        setLoading(false);
+        if (requestId === searchRequestId.current) setLoading(false);
       }
-    };
-
-    fetchProducts();
-    const timeout = window.setTimeout(fetchProducts, searchQuery ? 250 : 0);
+    }, searchQuery ? 250 : 0);
     return () => window.clearTimeout(timeout);
   }, [selectedCategory, searchQuery]);
 
