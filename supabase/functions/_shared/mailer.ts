@@ -13,7 +13,7 @@ const ADMIN_NOTIFICATION_EMAILS = (
   .map((e) => e.trim())
   .filter(Boolean);
 
-function escapeHtml(value: unknown): string {
+export function escapeHtml(value: unknown): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -30,7 +30,7 @@ export function orderRef(order: { master_order_id?: string | null; id?: string }
   return order?.master_order_id || `KF-${String(order?.id || "").slice(-6).toUpperCase()}`;
 }
 
-function layout(title: string, body: string): string {
+export function layout(title: string, body: string): string {
   return `
     <div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.55">
       <h2 style="color:#166534;margin:0 0 16px">${escapeHtml(title)}</h2>
@@ -70,6 +70,58 @@ export async function sendEmail({
     throw new Error(`Email send failed (${response.status}): ${text}`);
   }
   return response.json().catch(() => ({ ok: true }));
+}
+
+const RESEND_BATCH_URL = "https://api.resend.com/emails/batch";
+const BATCH_CHUNK_SIZE = 100;
+
+export type BulkSendResult = { email: string; status: "sent" | "failed"; error?: string };
+
+// Sends the same subject/html to many independent recipients without ever
+// putting more than one address in a single `to` field -- Resend's normal
+// multi-recipient `to` array exposes every recipient's address to every
+// other recipient on that same call, which is unacceptable for an admin
+// broadcast to farmers/buyers. The batch endpoint accepts up to 100
+// independent single-recipient emails per HTTP call; this chunks
+// accordingly and treats each chunk as pass/fail atomically, since Resend
+// doesn't give a reliable per-address error within a batch response.
+export async function sendBulkEmail(
+  recipients: string[],
+  subject: string,
+  html: string,
+): Promise<BulkSendResult[]> {
+  if (!RESEND_API_KEY || !FROM_EMAIL) {
+    console.warn("[email] Missing RESEND_API_KEY/FROM_EMAIL. Skipping bulk send:", subject);
+    return recipients.map((email) => ({ email, status: "failed" as const, error: "Email not configured" }));
+  }
+
+  const results: BulkSendResult[] = [];
+  for (let i = 0; i < recipients.length; i += BATCH_CHUNK_SIZE) {
+    const chunk = recipients.slice(i, i + BATCH_CHUNK_SIZE);
+    try {
+      const response = await fetch(RESEND_BATCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify(chunk.map((to) => ({ from: FROM_EMAIL, to, subject, html }))),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        const error = `Batch send failed (${response.status}): ${text}`.slice(0, 500);
+        for (const email of chunk) results.push({ email, status: "failed", error });
+        continue;
+      }
+
+      for (const email of chunk) results.push({ email, status: "sent" });
+    } catch (err) {
+      const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
+      for (const email of chunk) results.push({ email, status: "failed", error: message });
+    }
+  }
+  return results;
 }
 
 // Fire-and-forget, matching the original's non-blocking notifyEmail — kept

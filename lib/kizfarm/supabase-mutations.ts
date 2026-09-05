@@ -1322,6 +1322,24 @@ export async function addToWishlist(productId: string) {
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
+// ===================== ADMIN: EMAILS =====================
+
+export async function adminSendEmail(input: {
+  audienceType: "single" | "all_farmers" | "all_buyers" | "custom_list";
+  singleEmail?: string;
+  customEmails?: string[];
+  subject: string;
+  body: string;
+}) {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("admin-send-email", { body: input });
+  if (error) {
+    const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
+    return { res: { ok: false } as Response, payload: { error: message } };
+  }
+  return { res: { ok: true } as Response, payload: data };
+}
+
 // ===================== ADMIN: REFERRALS =====================
 
 export async function updateReferralSettings(rewardAmount: number, minReferrals: number) {

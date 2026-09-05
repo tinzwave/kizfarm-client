@@ -1616,6 +1616,35 @@ export async function getAdminBuyerById(userId: string) {
   };
 }
 
+function toAdminEmailCampaign(c: any) {
+  return {
+    _id: c.id,
+    subject: c.subject,
+    body: c.body,
+    audienceType: c.audience_type,
+    recipientCount: c.recipient_count,
+    sentCount: c.sent_count,
+    failedCount: c.failed_count,
+    status: c.status,
+    sentBy: c.sent_by,
+    createdAt: c.created_at,
+  };
+}
+
+export async function getAdminEmailCampaigns({ offset = 0, limit = 20 }: { offset?: number; limit?: number } = {}) {
+  const supabase = createClient();
+  const { data, error, count } = await supabase
+    .from("admin_email_campaigns")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return {
+    res: { ok: true } as Response,
+    payload: { ok: true, campaigns: (data || []).map(toAdminEmailCampaign), total: count || 0 },
+  };
+}
+
 export async function getAdminBuyerStats() {
   const supabase = createClient();
   const [totalRes, activeRes, suspendedRes] = await Promise.all([
