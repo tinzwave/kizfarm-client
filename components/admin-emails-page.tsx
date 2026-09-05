@@ -69,6 +69,10 @@ export default function AdminEmailsPage() {
   const [matches, setMatches] = useState<RecipientMatch[]>([]);
   const [searching, setSearching] = useState(false);
   const searchRequestId = useRef(0);
+  // Set right before setSingleEmail() when the value comes from picking a
+  // match, so the search effect below doesn't immediately re-run and
+  // re-open the dropdown with that same match.
+  const justPickedMatch = useRef(false);
 
   // All-farmers / all-buyers live count preview
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
@@ -100,6 +104,10 @@ export default function AdminEmailsPage() {
   // Debounced search across farmers + buyers, guarded against out-of-order
   // responses the same way the farmer picker on the add-product page is.
   useEffect(() => {
+    if (justPickedMatch.current) {
+      justPickedMatch.current = false;
+      return;
+    }
     if (audienceType !== "single" || singleEmail.trim().length < 2) {
       void Promise.resolve().then(() => setMatches([]));
       return;
@@ -267,6 +275,7 @@ export default function AdminEmailsPage() {
                       type="button"
                       key={`${m.source}-${m.email}`}
                       onClick={() => {
+                        justPickedMatch.current = true;
                         setSingleEmail(m.email);
                         setMatches([]);
                       }}
