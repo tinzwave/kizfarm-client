@@ -27,6 +27,10 @@ interface Props {
   hideSidebar?: boolean;
 }
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) {
   const [activeTab, setActiveTab] = useState<'history' | 'bank' | 'profile'>('history');
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -76,6 +80,11 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
 
   const handleSaveBankDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.accountNumber.length < 10 || formData.accountNumber.length > 12) {
+      alert("Account number must be 10-12 digits.");
+      return;
+    }
+
     setSaving(true);
     try {
       const { res, payload } = await saveFarmerBankDetails(formData);
@@ -195,9 +204,13 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
                     <input
                       type="text"
                       value={formData.accountNumber}
-                      onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, accountNumber: onlyDigits(e.target.value).slice(0, 12) })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder="10-12 digits"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      minLength={10}
+                      maxLength={12}
                     />
                   </div>
                   <div>

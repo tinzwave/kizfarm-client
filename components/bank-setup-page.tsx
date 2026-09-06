@@ -6,6 +6,10 @@ import { saveFarmerBankDetails } from "@/lib/kizfarm/supabase-mutations";
 
 type Props = { hideSidebar?: boolean };
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export default function BankSetupPage({ hideSidebar = false }: Props) {
   const [bankName, setBankName] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
@@ -40,8 +44,15 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setMessage("");
+
+    if (accountNumber.length < 10 || accountNumber.length > 12) {
+      setMessageType("error");
+      setMessage("Account number must be 10-12 digits.");
+      return;
+    }
+
+    setSaving(true);
 
     try {
       const { res, payload } = await saveFarmerBankDetails({
@@ -145,9 +156,13 @@ export default function BankSetupPage({ hideSidebar = false }: Props) {
                     <input
                       type="text"
                       value={accountNumber}
-                      onChange={(e) => setAccountNumber(e.target.value)}
+                      onChange={(e) => setAccountNumber(onlyDigits(e.target.value).slice(0, 12))}
                       className="w-full h-12 px-4 bg-white border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary-container/20 focus:border-primary-container transition-all font-body-md outline-none"
                       placeholder="10-12 digits"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      minLength={10}
+                      maxLength={12}
                       required
                     />
                   </div>

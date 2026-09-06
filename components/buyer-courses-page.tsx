@@ -28,6 +28,10 @@ interface Subscription {
   paidAt: string;
 }
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 const emptyCourse = {
   title: "",
   description: "",
@@ -80,8 +84,13 @@ export default function BuyerCoursesPage() {
   }, []);
 
   async function saveBankDetails() {
-    setBankSaving(true);
     setBankMessage("");
+    if (bankForm.accountNumber.length < 10 || bankForm.accountNumber.length > 12) {
+      setBankMessage("Account number must be 10-12 digits.");
+      return;
+    }
+
+    setBankSaving(true);
     try {
       const { res, payload } = await saveCreatorBankDetails(bankForm);
       setBankMessage(res.ok ? "Bank details saved." : payload?.error || "Could not save bank details.");
@@ -326,9 +335,13 @@ export default function BuyerCoursesPage() {
                 />
                 <input
                   value={bankForm.accountNumber}
-                  onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
+                  onChange={(e) => setBankForm({ ...bankForm, accountNumber: onlyDigits(e.target.value).slice(0, 12) })}
                   className="rounded-lg border border-gray-300 px-4 py-2"
-                  placeholder="Account number"
+                  placeholder="Account number (10-12 digits)"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  minLength={10}
+                  maxLength={12}
                 />
               </div>
               {bankMessage && <p className="mt-2 text-sm text-slate-600">{bankMessage}</p>}
