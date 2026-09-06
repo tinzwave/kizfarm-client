@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases } from "@/lib/kizfarm/supabase-data";
+import DOMPurify from "isomorphic-dompurify";
+import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, getCourseContent } from "@/lib/kizfarm/supabase-data";
 import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 
@@ -21,7 +22,6 @@ interface Course {
   price: number;
   finalPrice?: number;
   commission?: number;
-  content: string;
   tutor?: Tutor;
   status?: "pending" | "approved" | "rejected";
   rejectionReason?: string;
@@ -60,6 +60,10 @@ export default function LearningHubAdminPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [reviewingId, setReviewingId] = useState("");
+  // course.content no longer comes back with the list (gated behind
+  // getCourseContent's authorization check) -- fetched on demand per course
+  // when its review panel is opened.
+  const [reviewContent, setReviewContent] = useState<Record<string, string>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<"approved" | "rejected" | "">("");
   const [releasingPayoutId, setReleasingPayoutId] = useState("");
   const [reviewForm, setReviewForm] = useState({ commission: "", rejectionReason: "" });
@@ -331,10 +335,14 @@ export default function LearningHubAdminPage() {
                             <h4 className="mt-3 max-w-3xl text-2xl font-bold">{course.title}</h4>
                             <p className="mt-3 max-w-2xl text-sm leading-6 text-green-50">{course.description}</p>
                           </div>
-                          <div
-                            className="prose max-w-none p-5 prose-headings:text-green-950 prose-a:text-green-800 [&_iframe]:aspect-video [&_iframe]:h-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_iframe]:border-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:rounded-lg [&_img]:object-contain"
-                            dangerouslySetInnerHTML={{ __html: course.content }}
-                          />
+                          {reviewContent[course._id] === undefined ? (
+                            <div className="p-5 text-sm text-slate-500">Loading content…</div>
+                          ) : (
+                            <div
+                              className="prose max-w-none p-5 prose-headings:text-green-950 prose-a:text-green-800 [&_iframe]:aspect-video [&_iframe]:h-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_iframe]:border-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:rounded-lg [&_img]:object-contain"
+                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(reviewContent[course._id]) }}
+                            />
+                          )}
                         </div>
                         <div className="space-y-3 rounded-lg bg-slate-50 p-4">
                           <input min="0" type="number" value={reviewForm.commission} onChange={(e) => setReviewForm({ ...reviewForm, commission: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm" placeholder="Admin commission to add, e.g. 3000" />
@@ -347,7 +355,19 @@ export default function LearningHubAdminPage() {
                         </div>
                       </div>
                     ) : (
-                      <button type="button" onClick={() => { setReviewingId(course._id); setReviewForm({ commission: String(course.commission ?? ""), rejectionReason: course.rejectionReason ?? "" }); }} className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewingId(course._id);
+                          setReviewForm({ commission: String(course.commission ?? ""), rejectionReason: course.rejectionReason ?? "" });
+                          if (reviewContent[course._id] === undefined) {
+                            void getCourseContent(course._id).then(({ res, payload }) => {
+                              if (res.ok) setReviewContent((prev) => ({ ...prev, [course._id]: payload.content as string }));
+                            });
+                          }
+                        }}
+                        className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50"
+                      >
                         Review Course
                       </button>
                     )}

@@ -583,7 +583,7 @@ export async function createAdminCourse(input: { title: string; description: str
     .select(COURSE_SELECT)
     .single();
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, course: toCourse(data) } };
+  return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
 export async function createBuyerCourse(input: { title: string; description: string; price: number; content: string }) {
@@ -610,7 +610,7 @@ export async function createBuyerCourse(input: { title: string; description: str
     .select(COURSE_SELECT)
     .single();
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, course: toCourse(data) } };
+  return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
 export async function updateBuyerCourse(id: string, input: { title: string; description: string; price: number; content: string }) {
@@ -634,7 +634,7 @@ export async function updateBuyerCourse(id: string, input: { title: string; desc
     .select(COURSE_SELECT)
     .single();
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, course: toCourse(data) } };
+  return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
 export async function adminReviewBuyerCourse(courseId: string, approved: boolean, commission?: number, rejectionReason?: string) {

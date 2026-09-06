@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
+import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
@@ -16,7 +16,7 @@ interface BuyerCourse {
   price: number;
   finalPrice?: number;
   commission?: number;
-  content: string;
+  content?: string;
   status?: ReviewStatus;
   rejectionReason?: string;
   createdAt?: string;
@@ -103,16 +103,20 @@ export default function BuyerCoursesPage() {
     );
   });
 
-  function startEdit(course: BuyerCourse) {
+  async function startEdit(course: BuyerCourse) {
     setEditingCourse(course);
+    setMessage("");
+    // course.content isn't in the list payload anymore (gated behind
+    // getCourseContent's authorization check) -- fetched here instead,
+    // authorized since this buyer is the course's own creator.
+    const { res, payload } = await getCourseContent(course._id);
     setForm({
       title: course.title,
       description: course.description,
       price: String(course.price),
-      content: course.content || emptyCourse.content,
+      content: (res.ok ? payload.content : undefined) || emptyCourse.content,
     });
     setActiveTab("create");
-    setMessage("");
   }
 
   async function submitCourse(e: React.FormEvent) {

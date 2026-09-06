@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import { getCourseAccess, getCourseById, getCourseReviews } from "@/lib/kizfarm/supabase-data";
+import DOMPurify from "isomorphic-dompurify";
+import { getCourseAccess, getCourseById, getCourseContent, getCourseReviews } from "@/lib/kizfarm/supabase-data";
 import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
 
 interface Tutor {
@@ -20,7 +21,7 @@ interface Course {
   description: string;
   price: number;
   finalPrice?: number;
-  content: string;
+  content?: string;
   coverImage?: string;
   source?: "admin" | "buyer";
   tutor?: Tutor;
@@ -57,7 +58,10 @@ export default function CourseDetailPage() {
   const source = params.get("source") === "buyer" ? "buyer" : "admin";
   const returnTo = params.get("returnTo") || "/learning";
   const [course, setCourse] = useState<Course | null>(null);
-  const [hasAccess, setHasAccess] = useState(wantsAccess);
+  // Never trust wantsAccess (a client-controlled URL param) for this --
+  // it must only flip true once getCourseAccess has actually confirmed an
+  // active subscription server-side.
+  const [hasAccess, setHasAccess] = useState(false);
   const [showCoach, setShowCoach] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,19 +77,28 @@ export default function CourseDetailPage() {
     async function loadCourse() {
       if (!courseId) return;
       setError("");
-      const { res, payload } = wantsAccess
-        ? await getCourseAccess(courseId, { source })
-        : await getCourseById(courseId, { source });
-      if (!res.ok) {
-        setError(payload?.error || "Could not load course.");
-        if (wantsAccess) {
-          const fallback = await getCourseById(courseId, { source });
-          if (fallback.payload?.ok) setCourse(fallback.payload.course);
-        }
+      setHasAccess(false);
+
+      // Base metadata (title, price, description, cover) is always safe to
+      // show -- it's public preview info. The lesson content itself is
+      // fetched separately below, only once access is actually confirmed.
+      const base = await getCourseById(courseId, { source });
+      if (!base.res.ok) {
+        setError(base.payload?.error || "Could not load course.");
         return;
       }
-      setCourse((payload.course as Course) ?? null);
-      if (wantsAccess) setHasAccess(true);
+      setCourse((base.payload.course as Course) ?? null);
+
+      if (!wantsAccess) return;
+
+      const access = await getCourseAccess(courseId, { source });
+      if (!access.res.ok) return; // not subscribed -- hasAccess stays false
+
+      const content = await getCourseContent(courseId);
+      if (!content.res.ok) return;
+
+      setCourse((prev) => (prev ? { ...prev, content: content.payload.content as string } : prev));
+      setHasAccess(true);
     }
     loadCourse();
   }, [courseId, source, wantsAccess]);
@@ -180,7 +193,7 @@ export default function CourseDetailPage() {
 
             <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               {hasAccess ? (
-                <div className="prose max-w-none prose-headings:text-green-950 prose-a:text-green-800" dangerouslySetInnerHTML={{ __html: course.content }} />
+                <div className="prose max-w-none prose-headings:text-green-950 prose-a:text-green-800" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.content ?? "") }} />
               ) : (
                 <div>
                   <h2 className="text-xl font-bold">About this course</h2>

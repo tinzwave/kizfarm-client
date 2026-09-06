@@ -953,7 +953,6 @@ function toCourse(c: any) {
     price: c.price,
     finalPrice: c.final_price,
     commission: c.commission,
-    content: c.content,
     coverImage: c.cover_image,
     source: c.source,
     audience: c.audience,
@@ -966,7 +965,20 @@ function toCourse(c: any) {
   };
 }
 
-const COURSE_SELECT = "*, tutors(*), profiles!creator_id(id, name, email)";
+// Deliberately excludes `content` (the paid lesson body) -- SELECT on that
+// column is revoked for anon/authenticated (0032_gate_course_content_and_xss.sql)
+// since row-level RLS alone can't stop it leaking to non-subscribers, so a
+// bare "*" here would make every one of these queries fail outright.
+// Content is only ever readable through getCourseContent()'s gated RPC.
+const COURSE_SELECT =
+  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email)";
+
+export async function getCourseContent(courseId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_course_content", { p_course_id: courseId });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, content: data as string } };
+}
 
 export async function getTutors() {
   const supabase = createClient();

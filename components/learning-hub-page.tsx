@@ -19,7 +19,7 @@ interface Course {
   title: string;
   description: string;
   price: number;
-  content: string;
+  content?: string;
   coverImage?: string;
   tutor?: Tutor;
 }
