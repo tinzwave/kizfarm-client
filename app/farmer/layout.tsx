@@ -100,7 +100,8 @@ export default function FarmerLayout({
 
   if (checkingAccess) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-sm text-zinc-500">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-3 text-sm text-zinc-500">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-850"></div>
         Loading seller portal...
       </div>
     );

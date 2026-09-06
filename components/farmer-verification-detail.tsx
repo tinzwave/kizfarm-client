@@ -78,7 +78,13 @@ export default function FarmerVerificationDetail({ id }: { id: string }) {
     }
   };
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  if (loading)
+    return (
+      <div className="flex items-center gap-2 p-6">
+        <span className="material-symbols-outlined animate-spin">autorenew</span>
+        Loading...
+      </div>
+    );
   if (error) return <div className="p-6 text-red-600">{error}</div>;
   if (!farmer) return <div className="p-6">Farmer not found</div>;
 

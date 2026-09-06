@@ -197,11 +197,18 @@ export default function LoginPage() {
 
             {/* Primary Action */}
             <button
-              className="w-full h-12 bg-primary-container text-on-primary font-label-sm uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-sm disabled:opacity-60"
+              className="w-full h-12 bg-primary-container text-on-primary font-label-sm uppercase tracking-widest rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
               type="submit"
               disabled={isLoading}
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin">autorenew</span>
+                  Logging in...
+                </>
+              ) : (
+                "Login"
+              )}
             </button>
             {error && <div className="text-sm text-red-600 mt-2">{error}</div>}
           </form>

@@ -109,7 +109,10 @@ export default function ChatPage() {
         {/* Chat List - Bento Style Modern Cards */}
         <section className="grid grid-cols-1 gap-xs">
           {loading ? (
-            <div className="py-16 text-center text-on-surface-variant">Loading conversations...</div>
+            <div className="flex items-center justify-center gap-2 py-16 text-center text-on-surface-variant">
+              <span className="material-symbols-outlined animate-spin">autorenew</span>
+              Loading conversations...
+            </div>
           ) : error ? (
             <div className="py-16 text-center text-error">{error}</div>
           ) : filteredChats.length === 0 ? (

@@ -34,7 +34,8 @@ export default function AdminGuard({
 
   if (authorized === null) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-sm text-gray-500">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-3 text-sm text-gray-500">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-emerald-850"></div>
         Loading admin...
       </div>
     );

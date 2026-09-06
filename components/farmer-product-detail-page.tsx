@@ -190,7 +190,10 @@ export default function FarmerProductDetailPage({ id }: { id: string }) {
 
       <main className="max-w-[1440px] mx-auto w-full p-4 md:p-8">
         {loading ? (
-          <div className="py-16 text-center text-zinc-500">Loading...</div>
+          <div className="flex items-center justify-center gap-2 py-16 text-center text-zinc-500">
+            <span className="material-symbols-outlined animate-spin">autorenew</span>
+            Loading...
+          </div>
         ) : error ? (
           <div className="py-16 text-center">
             <div className="text-red-600 font-medium">{error}</div>

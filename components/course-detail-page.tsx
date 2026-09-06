@@ -142,7 +142,12 @@ export default function CourseDetailPage() {
   }
 
   if (!course && !error) {
-    return <div className="p-8 text-sm text-slate-600">Loading course...</div>;
+    return (
+      <div className="flex items-center gap-2 p-8 text-sm text-slate-600">
+        <span className="material-symbols-outlined animate-spin">autorenew</span>
+        Loading course...
+      </div>
+    );
   }
 
   if (!course) {

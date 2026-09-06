@@ -114,11 +114,18 @@ export default function ResetPasswordPage() {
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             <button
-              className="w-full h-12 bg-primary text-on-primary font-label-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60"
+              className="w-full h-12 bg-primary text-on-primary font-label-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
               type="submit"
               disabled={isLoading || !ready}
             >
-              {isLoading ? "Updating..." : "Update password"}
+              {isLoading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin">autorenew</span>
+                  Updating...
+                </>
+              ) : (
+                "Update password"
+              )}
             </button>
           </form>
         </div>

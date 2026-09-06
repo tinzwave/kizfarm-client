@@ -269,7 +269,7 @@ export default function SignUpPage() {
               {isLoading ? (
                 <>
                   <span>Creating...</span>
-                  <span className="material-symbols-outlined">autorenew</span>
+                  <span className="material-symbols-outlined animate-spin">autorenew</span>
                 </>
               ) : (
                 <>

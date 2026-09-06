@@ -84,7 +84,10 @@ export default function EscrowManagementPage() {
             </div>
             <div className="overflow-x-auto">
               {loading ? (
-                <div className="p-8 text-center text-gray-500">Loading...</div>
+                <div className="flex items-center justify-center gap-2 p-8 text-center text-gray-500">
+                  <span className="material-symbols-outlined animate-spin">autorenew</span>
+                  Loading...
+                </div>
               ) : escrows.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">No escrow transactions</div>
               ) : (

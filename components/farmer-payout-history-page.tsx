@@ -128,7 +128,10 @@ export default function FarmerPayoutHistoryPage({ hideSidebar = false }: Props) 
               <div>
                 <h2 className="text-xl font-semibold mb-4">Payment History</h2>
                 {loading ? (
-                  <p className="text-gray-500">Loading...</p>
+                  <p className="flex items-center gap-2 text-gray-500">
+                    <span className="material-symbols-outlined animate-spin">autorenew</span>
+                    Loading...
+                  </p>
                 ) : payments.length === 0 ? (
                   <p className="text-gray-500">No payments yet</p>
                 ) : (

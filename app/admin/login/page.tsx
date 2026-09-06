@@ -59,11 +59,18 @@ export default function AdminLoginPage() {
             />
           </div>
           <button
-            className="w-full bg-[#1B6D24] text-white py-2 rounded disabled:opacity-60"
+            className="w-full bg-[#1B6D24] text-white py-2 rounded disabled:opacity-60 flex items-center justify-center gap-2"
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? (
+              <>
+                <span className="material-symbols-outlined animate-spin">autorenew</span>
+                Signing in...
+              </>
+            ) : (
+              "Sign in"
+            )}
           </button>
           {error && <div className="text-red-600">{error}</div>}
         </form>
