@@ -1,32 +1,22 @@
-// Port of buyer.mjs POST /orders/:id/pay. Called directly by the buyer's
-// client after Paystack's checkout widget succeeds. Verifies the payment
-// with Paystack itself (never trusts the client's say-so), then hands off
-// to the pay_order RPC for the atomic state change.
+// Port of buyer.mjs POST /orders/:id/pay, since adapted for OPay's
+// redirect-based checkout. Called by the buyer's client once they're
+// redirected back from OPay's hosted cashier page. Verifies the payment
+// with OPay itself (never trusts the client's say-so), then hands off to
+// the pay_order RPC for the atomic state change.
+//
+// Unlike the old Paystack version, the payment reference is never taken
+// from the client -- it's read back from the order row, where
+// create-opay-order-payment staged it (via set_order_payment_reference)
+// before the buyer was ever sent to OPay.
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { queryOpayStatus } from "../_shared/opay.ts";
 import {
   notifyEmail,
   sendBuyerPaymentSuccessfulEmail,
   sendFarmerNewPaidOrderEmail,
   sendAdminOrderPaidEmail,
 } from "../_shared/mailer.ts";
-
-const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY")!;
-
-async function verifyPaystackPayment(reference: string) {
-  const response = await fetch(
-    `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } },
-  );
-  if (!response.ok) {
-    return { success: false, message: "Paystack API responded with an error status." };
-  }
-  const data = await response.json();
-  if (data?.status && data?.data?.status === "success") {
-    return { success: true, amount: data.data.amount / 100 };
-  }
-  return { success: false, message: data?.message || "Transaction verification failed on Paystack." };
-}
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -37,9 +27,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orderId, paymentReference, paymentMethod } = await req.json();
-    if (!orderId || !paymentReference) {
-      return jsonResponse({ error: "orderId and paymentReference are required." }, { status: 400 });
+    const { orderId, paymentMethod } = await req.json();
+    if (!orderId) {
+      return jsonResponse({ error: "orderId is required." }, { status: 400 });
     }
 
     const caller = callerClient(req);
@@ -72,15 +62,11 @@ Deno.serve(async (req) => {
     if (order.payment_status === "paid") {
       return jsonResponse({ error: "Order has already been paid." }, { status: 400 });
     }
-    // Must be the reference set by set_order_payment_reference before checkout
-    // opened -- otherwise a buyer could replay a reference from a different
-    // order/course of theirs (pay_order enforces this too; checked here first
-    // so it fails fast instead of spending a Paystack API call).
-    if (order.payment_reference !== paymentReference) {
-      return jsonResponse({ error: "Payment reference does not match this order." }, { status: 400 });
+    if (!order.payment_reference) {
+      return jsonResponse({ error: "No payment has been initiated for this order yet." }, { status: 400 });
     }
 
-    const verification = await verifyPaystackPayment(paymentReference);
+    const verification = await queryOpayStatus(order.payment_reference);
     if (!verification.success) {
       return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }
@@ -94,7 +80,7 @@ Deno.serve(async (req) => {
     const admin = adminClient();
     const { data: updatedOrder, error: payErr } = await admin.rpc("pay_order", {
       p_order_id: orderId,
-      p_payment_reference: paymentReference,
+      p_payment_reference: order.payment_reference,
       p_payment_method: paymentMethod ?? null,
     });
     if (payErr) {

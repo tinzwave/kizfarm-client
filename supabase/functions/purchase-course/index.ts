@@ -1,29 +1,21 @@
 // Port of learning.mjs POST /subscriptions. Same shape as
-// verify-and-pay-order: verify with Paystack directly, never trust the
+// verify-and-pay-order: verify with OPay directly, never trust the
 // client, then hand off to the activate_subscription RPC.
+//
+// paymentReference here is the reference create-opay-course-payment
+// generated and round-tripped through the returnUrl (?ref=...) -- courses
+// have no pre-staged reference column the way orders do, so this is the
+// only way the client can hand it back. queryOpayStatus independently
+// confirms it with OPay before anything is activated.
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
+import { queryOpayStatus } from "../_shared/opay.ts";
 import {
   notifyEmail,
   sendCoursePurchaseBuyerEmail,
   sendCourseSaleCreatorEmail,
   sendAdminCoursePurchaseEmail,
 } from "../_shared/mailer.ts";
-
-const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY")!;
-
-async function verifyPaystackPayment(reference: string) {
-  const response = await fetch(
-    `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } },
-  );
-  if (!response.ok) return { success: false, message: "Paystack API responded with an error status." };
-  const data = await response.json();
-  if (data?.status && data?.data?.status === "success") {
-    return { success: true, amount: data.data.amount / 100 };
-  }
-  return { success: false, message: data?.message || "Transaction verification failed on Paystack." };
-}
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -63,7 +55,7 @@ Deno.serve(async (req) => {
 
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);
 
-    const verification = await verifyPaystackPayment(paymentReference);
+    const verification = await queryOpayStatus(paymentReference);
     if (!verification.success) {
       return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }

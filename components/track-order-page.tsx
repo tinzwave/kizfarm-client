@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getBuyerOrderById } from "@/lib/kizfarm/supabase-data";
-import { confirmReceipt, rateDriver, setOrderPaymentReference, payOrder } from "@/lib/kizfarm/supabase-mutations";
+import { confirmReceipt, rateDriver, initiateOpayOrderPayment, payOrder } from "@/lib/kizfarm/supabase-mutations";
 import { getSession } from "@/lib/kizfarm/supabase-auth";
 
 interface OrderItem {
@@ -133,107 +133,77 @@ export default function TrackOrderPage() {
     }
   };
 
-  const loadPaystackScript = () => {
-    return new Promise((resolve) => {
-      if ((window as any).PaystackPop) {
-        resolve(true);
-        return;
-      }
-      const existingScript = document.querySelector<HTMLScriptElement>(
-        'script[src="https://js.paystack.co/v1/inline.js"]',
-      );
-      if (existingScript) {
-        existingScript.addEventListener("load", () => resolve(!!(window as any).PaystackPop), { once: true });
-        existingScript.addEventListener("error", () => resolve(false), { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://js.paystack.co/v1/inline.js";
-      script.onload = () => resolve(!!(window as any).PaystackPop);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
+  // OPay's checkout is a hosted page, not an inline widget -- this
+  // redirects the whole tab to it. OPay redirects back to the same
+  // track-order URL (returnUrl) once the buyer finishes or cancels; the
+  // effect below detects that return and finalizes the payment.
   const handlePayNow = async () => {
     if (!order || !orderId) return;
     setPaymentError(null);
     setPaying(true);
-    const scriptLoaded = await loadPaystackScript();
-    if (!scriptLoaded || !(window as any).PaystackPop) {
-      setPaymentError("Failed to load payment gateway. Please check your internet connection.");
-      setPaying(false);
-      return;
-    }
 
     try {
-      // Generate our own reference and record it on the order *before*
-      // opening the checkout widget, so the paystack-webhook Edge Function
-      // can match this order even if it arrives before this tab's own
-      // callback does (e.g. the buyer closes the tab right after paying).
-      const reference = `KFM-PAY-${order._id}-${Date.now()}`;
-      const { res: refRes, payload: refPayload } = await setOrderPaymentReference(orderId, reference);
-      if (!refRes.ok) {
-        setPaymentError(refPayload?.error || "Could not start payment. Please try again.");
-        setPaying(false);
-        return;
-      }
-
-      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-      if (!paystackPublicKey) {
-        setPaymentError("Payment gateway is not configured. Please contact support.");
-        setPaying(false);
-        return;
-      }
-
       const session = await getSession();
-      if (!session?.user?.email) {
+      if (!session?.user) {
         setPaymentError("Could not verify your account. Please log in again.");
         setPaying(false);
         return;
       }
 
-      const handler = (window as any).PaystackPop.setup({
-        key: paystackPublicKey,
-        email: session.user.email,
-        amount: Math.round(order.total * 100),
-        currency: "NGN",
-        ref: reference,
-        metadata: {
-          brand: "KIZ FARM",
-          orderId: order._id,
-        },
-        callback: function (response: any) {
-          const method = order.paymentMethod === "bank_transfer" ? "bank_transfer" : order.paymentMethod === "mpesa" ? "mpesa" : "card";
-          payOrder(orderId, response.reference, method)
-            .then(async ({ res, payload }) => {
-            if (!res.ok) {
-              setPaymentError(payload?.error || "Payment succeeded, but order activation failed. Please contact support.");
-              setPaying(false);
-              return;
-            }
-            await fetchOrderDetails(orderId);
-            })
-            .catch(() => {
-              setPaymentError("Payment succeeded, but connection failed. Please contact support with your reference.");
-            })
-            .finally(() => {
-              setPaying(false);
-            });
-        },
-        onClose: () => {
-          setPaying(false);
-          setPaymentError("Payment was cancelled.");
-        },
-      });
+      const returnUrl = `${window.location.origin}${window.location.pathname}?id=${orderId}&opay=return`;
+      const { res, payload } = await initiateOpayOrderPayment(orderId, returnUrl);
+      if (!res.ok || !payload.cashierUrl) {
+        setPaymentError(payload?.error || "Could not start payment. Please try again.");
+        setPaying(false);
+        return;
+      }
 
-      handler.openIframe();
+      window.location.href = payload.cashierUrl;
     } catch (err) {
-      console.error("Paystack initialization error:", err);
+      console.error("OPay initialization error:", err);
       setPaymentError("Failed to initialize payment gateway. Please try again.");
       setPaying(false);
     }
   };
+
+  // Detects the redirect back from OPay's hosted checkout (returnUrl set
+  // above carries `opay=return`) and finalizes the payment server-side --
+  // verify-and-pay-order independently confirms it with OPay before
+  // marking the order paid, it never trusts this redirect alone.
+  useEffect(() => {
+    if (typeof window === "undefined" || !orderId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("opay") !== "return") return;
+
+    // Strip the marker immediately so a manual refresh doesn't re-trigger
+    // finalization (payOrder/pay_order are idempotent anyway, but there's
+    // no reason to re-hit OPay's API on every reload).
+    window.history.replaceState(null, "", `${window.location.pathname}?id=${orderId}`);
+
+    // Deferred a tick so the state updates below don't run synchronously
+    // within the effect body itself.
+    void Promise.resolve().then(() => {
+      setPaying(true);
+      setPaymentError(null);
+    });
+    const method = order?.paymentMethod === "bank_transfer" ? "bank_transfer" : order?.paymentMethod === "mpesa" ? "mpesa" : "card";
+    payOrder(orderId, method)
+      .then(async ({ res, payload }) => {
+        if (!res.ok) {
+          setPaymentError(payload?.error || "Payment could not be confirmed. If you completed payment, please contact support.");
+          return;
+        }
+        await fetchOrderDetails(orderId);
+      })
+      .catch(() => {
+        setPaymentError("Payment could not be confirmed. If you completed payment, please contact support.");
+      })
+      .finally(() => {
+        setPaying(false);
+      });
+    // Only ever run once per landing on the page with the return marker.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   if (!orderId) {
     return (
