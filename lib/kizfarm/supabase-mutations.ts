@@ -142,25 +142,33 @@ export async function cancelOrder(orderId: string, reason?: string) {
   return { res: { ok: true } as Response, payload: { ok: true, order: toOrder(data) } };
 }
 
-// Sets the reference the checkout is about to pay with *before* the
-// Paystack widget opens, so the paystack-webhook Edge Function has
-// something reliable to match against even if it arrives before this
-// tab's own callback does. Must be called with the exact same reference
-// passed as `ref` into PaystackPop.setup(...).
-export async function setOrderPaymentReference(orderId: string, reference: string) {
+// Calls the create-opay-order-payment Edge Function, which stages the
+// order's payment reference and creates the OPay checkout server-side
+// (needs the merchant's keys, which must never reach the browser). Returns
+// a cashierUrl for the caller to redirect the browser to -- OPay's
+// checkout is a hosted page, not an inline widget.
+export async function initiateOpayOrderPayment(orderId: string, returnUrl: string, cancelUrl?: string) {
   const supabase = createClient();
-  const { error } = await supabase.rpc("set_order_payment_reference", { p_order_id: orderId, p_reference: reference });
-  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true } };
+  const { data, error } = await supabase.functions.invoke("create-opay-order-payment", {
+    body: { orderId, returnUrl, cancelUrl },
+  });
+  if (error) {
+    const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
+    return { res: { ok: false } as Response, payload: { error: message } };
+  }
+  return { res: { ok: true } as Response, payload: { ok: true, cashierUrl: data.cashierUrl as string } };
 }
 
 // Calls the verify-and-pay-order Edge Function, which independently
-// re-verifies the payment with Paystack before marking the order paid --
-// never trusts the client's word that payment succeeded.
-export async function payOrder(orderId: string, paymentReference: string, paymentMethod?: string) {
+// re-verifies the payment with OPay before marking the order paid -- never
+// trusts the client's word that payment succeeded. The payment reference
+// itself is read server-side from the order row (staged by
+// initiateOpayOrderPayment before the buyer was sent to OPay), not passed
+// in from here.
+export async function payOrder(orderId: string, paymentMethod?: string) {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("verify-and-pay-order", {
-    body: { orderId, paymentReference, paymentMethod },
+    body: { orderId, paymentMethod },
   });
   if (error) {
     const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
@@ -656,9 +664,26 @@ export async function releaseCoursePayout(subscriptionId: string) {
   return { res: { ok: true } as Response, payload: { ok: true, purchase: data } };
 }
 
+// Calls the create-opay-course-payment Edge Function, which creates the
+// OPay checkout server-side and returns a cashierUrl to redirect to. The
+// payment reference is round-tripped back to us via the returnUrl's `ref`
+// query param (courses have no pre-staged reference column the way orders
+// do) -- see create-opay-course-payment for why.
+export async function initiateOpayCoursePayment(courseId: string, returnUrl: string, cancelUrl?: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("create-opay-course-payment", {
+    body: { courseId, returnUrl, cancelUrl },
+  });
+  if (error) {
+    const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
+    return { res: { ok: false } as Response, payload: { error: message } };
+  }
+  return { res: { ok: true } as Response, payload: { ok: true, cashierUrl: data.cashierUrl as string } };
+}
+
 // Calls the purchase-course Edge Function, which independently re-verifies
-// the payment with Paystack before activating the subscription -- never
-// trusts the client's word that payment succeeded.
+// the payment with OPay before activating the subscription -- never trusts
+// the client's word that payment succeeded.
 export async function purchaseCourse(courseId: string, paymentReference: string) {
   const supabase = createClient();
   const { data, error } = await supabase.functions.invoke("purchase-course", {

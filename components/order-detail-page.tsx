@@ -162,7 +162,7 @@ export default function OrderDetailPage() {
               <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
               <div>
                 <p className="font-label-xs text-primary uppercase">Payment Status</p>
-                <p className="font-body-md text-on-surface font-semibold">Paid via Paystack</p>
+                <p className="font-body-md text-on-surface font-semibold">Paid via OPay</p>
               </div>
             </div>
           </section>

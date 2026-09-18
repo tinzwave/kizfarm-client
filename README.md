@@ -78,7 +78,7 @@ Buyer checkout no longer takes payment immediately.
 2. Backend creates unpaid order(s) with status `awaiting_transport_quote`.
 3. Admin opens `/admin/order-control`, adds the transport fare.
 4. Order status becomes `awaiting_payment`.
-5. Buyer opens order detail and pays through Paystack.
+5. Buyer opens order detail and pays through OPay.
 6. Backend verifies payment, creates escrow, and moves the order to `pending`.
 7. Farmer/admin/driver fulfillment continues from the existing lifecycle.
 
