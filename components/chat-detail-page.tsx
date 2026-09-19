@@ -1,13 +1,11 @@
 "use client"
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useRouter, useParams, usePathname } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { getChatDetails, getMessages, getChatAttachmentUrl } from '@/lib/kizfarm/supabase-data';
 import { markMessagesAsRead } from '@/lib/kizfarm/supabase-mutations';
 import { getCurrentProfile } from '@/lib/kizfarm/supabase-auth';
 import { useChat, type ChatMessage, type ChatParticipant } from '@/hooks/use-chat';
-
-type CurrentRole = 'buyer' | 'farmer';
 
 interface Chat {
   _id: string;
@@ -32,14 +30,9 @@ function isMessageRead(message: ChatMessage) {
   return message.isRead || message.deliveryStatus === 'read';
 }
 
-type Props = {
-  currentRole?: CurrentRole;
-};
-
-export default function ChatDetailPage({ currentRole }: Props) {
+export default function ChatDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const pathname = usePathname();
   const chatId = (params?.chatId || params?.id) as string | undefined;
 
   const [chat, setChat] = useState<Chat | null>(null);
@@ -51,9 +44,6 @@ export default function ChatDetailPage({ currentRole }: Props) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const resolvedRole: CurrentRole =
-    currentRole || (pathname.startsWith('/farmer') ? 'farmer' : 'buyer');
 
   // Memoized on the stable identity fields (not the `chat` object itself,
   // which is only ever set once) so the realtime subscription inside
@@ -243,9 +233,13 @@ export default function ChatDetailPage({ currentRole }: Props) {
     router.back();
   };
 
+  // Never trust the route/prop for "who am I" here -- a farmer account can
+  // also chat as a buyer (see chat-list-page.tsx's header comment for why),
+  // so the party that ISN'T the signed-in user is determined from the
+  // actual participant ids, not from which URL this page was opened at.
   const getOtherUser = () => {
     if (!chat) return null;
-    return resolvedRole === 'farmer' ? chat.buyerId : chat.farmerId;
+    return getId(chat.buyerId) === currentUserId ? chat.farmerId : chat.buyerId;
   };
 
   const otherUser = getOtherUser();
