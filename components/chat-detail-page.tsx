@@ -320,7 +320,10 @@ export default function ChatDetailPage({ currentRole }: Props) {
       </header>
 
       {/* Main Content Area */}
-      <main className="pt-16 pb-24 min-h-screen max-w-3xl mx-auto px-4 flex flex-col">
+      <main
+        className="pt-16 min-h-screen max-w-3xl mx-auto px-4 flex flex-col"
+        style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         {/* Warning Banner */}
         <div className="mt-4 mb-6 p-4 bg-tertiary-fixed rounded-xl border border-tertiary/10 flex items-start gap-3">
           <span
@@ -445,7 +448,12 @@ export default function ChatDetailPage({ currentRole }: Props) {
       </main>
 
       {/* Bottom Message Input Shell */}
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-50">
+      {/* Extra bottom padding for the home-indicator/gesture-bar safe area
+          on notched phones, so the reply row never sits under it. */}
+      <div
+        className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-gray-100 p-4 z-50"
+        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <label className="flex items-center justify-center w-10 h-10 text-gray-500 hover:bg-gray-50 rounded-full active:scale-90 transition-all cursor-pointer">
             <input type="file" onChange={handleFileUpload} className="hidden" />

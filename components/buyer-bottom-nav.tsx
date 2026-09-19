@@ -22,6 +22,14 @@ export default function BuyerBottomNav() {
   const pathname = usePathname();
   const { totalItems } = useCart();
 
+  // The chat conversation screen renders its own full-width, fixed reply
+  // bar at this same bottom:0 position. Painted later in the DOM, this nav
+  // would otherwise render on top of it and hide the reply box entirely --
+  // exactly the "can't see the place to reply" symptom. The chat list
+  // (/buyer/chat) keeps the nav; only an individual conversation
+  // (/buyer/chat/<id>) hides it.
+  if (/^\/buyer\/chat\/[^/]+/.test(pathname)) return null;
+
   const isActive = (href: string) => {
     if (href === "/buyer/dashboard") {
       return pathname === href;

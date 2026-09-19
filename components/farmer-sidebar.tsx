@@ -132,6 +132,14 @@ export default function FarmerSidebar({
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
+  // An individual chat conversation renders its own full-screen mobile
+  // header (back button, the other party's name, online status) fixed at
+  // this same top:0 position. At z-[70] this bar was rendering on top of
+  // and completely hiding that header. The chat list (/farmer/chats)
+  // keeps the normal seller-portal chrome; only a conversation
+  // (/farmer/chats/<id>) hides it.
+  const isChatDetail = /^\/farmer\/chats\/[^/]+/.test(pathname);
+
   const handleSignOut = async () => {
     await signOut();
     router.push("/login");
@@ -175,20 +183,22 @@ export default function FarmerSidebar({
       </aside>
 
       {/* Mobile top bar (hamburger) */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-[70] bg-white dark:bg-zinc-950 border-b border-zinc-100 flex items-center justify-between px-4 py-2 h-16">
-        <div className="flex items-center gap-3">
-          <button
-            aria-label="Open menu"
-            onClick={() => setOpen(true)}
-            className="p-2 rounded bg-transparent text-zinc-700"
-          >
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-          <span className="text-lg font-semibold text-[#1B6D24]">
-            Seller Portal
-          </span>
+      {!isChatDetail && (
+        <div className="md:hidden fixed top-0 left-0 right-0 z-[70] bg-white dark:bg-zinc-950 border-b border-zinc-100 flex items-center justify-between px-4 py-2 h-16">
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Open menu"
+              onClick={() => setOpen(true)}
+              className="p-2 rounded bg-transparent text-zinc-700"
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            <span className="text-lg font-semibold text-[#1B6D24]">
+              Seller Portal
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mobile drawer */}
       {open && (

@@ -40,6 +40,15 @@ export default function FarmerLayout({
     return collapsed ? "md:pl-[80px]" : "md:pl-[280px]";
   }, [collapsed]);
 
+  // An individual chat conversation (/farmer/chats/<id>) renders its own
+  // full-screen header and hides FarmerSidebar's mobile top bar (see
+  // farmer-sidebar.tsx) -- so it no longer needs the pt-16 reserved here to
+  // clear that bar. Without this, the chat page got a redundant 64px of
+  // blank space stacked on top of the 64px its own header already
+  // reserves, needlessly pushing the whole conversation (messages, reply
+  // bar included) further down the page.
+  const isChatDetail = /^\/farmer\/chats\/[^/]+/.test(pathname);
+
   useEffect(() => {
     // Client-side guard:
     // - Not logged in -> /login
@@ -116,7 +125,7 @@ export default function FarmerLayout({
         />
       ) : null}
       <div
-        className={`${pathname !== "/farmer/become" && pathname !== "/farmer/verify" ? contentPaddingClass : ""} pt-16 md:pt-0`}
+        className={`${pathname !== "/farmer/become" && pathname !== "/farmer/verify" ? contentPaddingClass : ""} ${isChatDetail ? "" : "pt-16 md:pt-0"}`}
       >
         <main className="min-h-screen w-full">{children}</main>
       </div>
