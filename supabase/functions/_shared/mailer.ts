@@ -213,3 +213,58 @@ export function sendAdminCoursePurchaseEmail(courseTitle: string, amount: number
     ),
   });
 }
+
+// `orders` is every sub-order from one checkout (create_split_orders returns
+// one row per farmer in the cart, all sharing master_order_id) -- summarized
+// into a single email rather than one per sub-order, so a multi-farmer
+// checkout doesn't spam the buyer.
+export function sendBuyerTransportFareRequestedEmail(orders: any[], buyerEmail: string) {
+  const ref = orderRef(orders[0]);
+  const subtotal = orders.reduce((sum, o) => sum + Number(o.subtotal || 0), 0);
+  const splitNote = orders.length > 1 ? ` (split across ${orders.length} farmers)` : "";
+  return sendEmail({
+    to: buyerEmail,
+    subject: "We've received your order — transport fare review in progress",
+    html: layout(
+      "Transport fare request received",
+      `
+        <p>Thanks for your order <strong>${escapeHtml(ref)}</strong>${splitNote}.</p>
+        <p>Subtotal: <strong>${money(subtotal)}</strong></p>
+        <p>Our team will review your goods and delivery address, then get back to you with the transport fare <strong>within 60 minutes during working hours</strong>.</p>
+        <p>You'll get another email (and an update in the app) the moment the fare is added, so you can complete payment.</p>
+      `,
+    ),
+  });
+}
+
+export function sendAdminTransportFareRequestEmail(orders: any[]) {
+  const ref = orderRef(orders[0]);
+  const splitNote = orders.length > 1 ? ` (${orders.length} sub-orders)` : "";
+  return sendEmail({
+    to: adminEmails(),
+    subject: `New transport fare request — ${ref}`,
+    html: layout(
+      "Transport fare request",
+      `
+        <p>Order <strong>${escapeHtml(ref)}</strong>${splitNote} is awaiting a transport fare.</p>
+        <p>The buyer has been told to expect it within 60 minutes during working hours — please add it from the order control page.</p>
+      `,
+    ),
+  });
+}
+
+export function sendBuyerTransportFareAddedEmail(order: any, buyerEmail: string) {
+  return sendEmail({
+    to: buyerEmail,
+    subject: "Your transport fare is ready — complete your payment",
+    html: layout(
+      "Transport fare added",
+      `
+        <p>The transport fare for your order <strong>${escapeHtml(orderRef(order))}</strong> has been added.</p>
+        <p>Transport fare: <strong>${money(order.delivery_fee)}</strong></p>
+        <p>New total: <strong>${money(order.total)}</strong></p>
+        <p>Open your order to complete payment.</p>
+      `,
+    ),
+  });
+}

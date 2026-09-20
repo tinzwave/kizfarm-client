@@ -221,6 +221,12 @@ export async function adminSetTransportFare(orderId: string, transportFare: numb
     p_notes: notes || null,
   });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+
+  // Fire-and-forget -- see placeOrder's notify-transport-fare-requested call.
+  supabase.functions.invoke("notify-transport-fare-added", { body: { orderId } }).catch((err) => {
+    console.error("notify-transport-fare-added failed:", err);
+  });
+
   return { res: { ok: true } as Response, payload: { ok: true, order: data } };
 }
 
@@ -824,6 +830,18 @@ export async function placeOrder(input: {
     p_payment_method: input.paymentMethod || "card",
   });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+
+  // Fire-and-forget: the order itself is already saved above, this only
+  // sends the "we've got your request, expect the fare within 60 minutes"
+  // email (buyer) + heads-up (admin). Never block the checkout UI on it,
+  // and a failure here shouldn't surface as a failed checkout.
+  const orderIds = (data || []).map((o: { id: string }) => o.id);
+  if (orderIds.length > 0) {
+    supabase.functions.invoke("notify-transport-fare-requested", { body: { orderIds } }).catch((err) => {
+      console.error("notify-transport-fare-requested failed:", err);
+    });
+  }
+
   return { res: { ok: true } as Response, payload: { ok: true, orders: (data || []).map(toOrder) } };
 }
 

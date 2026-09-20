@@ -1886,6 +1886,41 @@ export async function getWishlist() {
   return { res: { ok: true } as Response, payload: { ok: true, items } };
 }
 
+// Human-readable per-status message for the activity feed below, in place
+// of the raw `Order #XXXXXXXX is now "awaiting_transport_quote"` -- same
+// status vocabulary as getStatusDisplay() in track-order-page.tsx, just
+// phrased as a sentence instead of a badge label.
+function orderActivityMessage(order: { id: string; status: string }): string {
+  const ref = `Order #${order.id.slice(0, 8)}`;
+  switch (order.status) {
+    case "awaiting_transport_quote":
+      return `${ref}: transport fare request received — our team will get back to you within 60 minutes`;
+    case "awaiting_payment":
+      return `${ref}: transport fare added — complete your payment`;
+    case "pending":
+      return `${ref}: payment received, awaiting farmer confirmation`;
+    case "accepted_by_farmer":
+      return `${ref}: accepted by the farmer`;
+    case "confirmed":
+      return `${ref}: confirmed by the farmer`;
+    case "packed":
+      return `${ref}: packed and ready for pickup`;
+    case "assigned":
+      return `${ref}: a driver has been assigned`;
+    case "in_transit":
+      return `${ref}: on its way to you`;
+    case "delivered":
+      return `${ref}: delivered — please confirm receipt`;
+    case "receipt_confirmed":
+    case "completed":
+      return `${ref}: completed`;
+    case "cancelled":
+      return `${ref}: cancelled`;
+    default:
+      return `${ref} is now "${order.status}"`;
+  }
+}
+
 // Lightweight "recent activity" feed derived from existing tables -- no
 // dedicated notifications table/triggers, just a read of things that
 // already changed recently for this buyer (order status, refunds, unread
@@ -1924,7 +1959,7 @@ export async function getBuyerRecentActivity() {
   const orderEvents = (ordersRes.data || []).map((o) => ({
     id: `order-${o.id}`,
     type: "order" as const,
-    message: `Order #${o.id.slice(0, 8)} is now "${o.status}"`,
+    message: orderActivityMessage(o),
     amount: o.total,
     createdAt: o.updated_at,
     link: `/buyer/orders`,

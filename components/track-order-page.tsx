@@ -316,7 +316,7 @@ export default function TrackOrderPage() {
                 Transport fare is being reviewed
               </h3>
               <p className="text-sm text-amber-800 mt-1">
-                Admin will contact you with the transport fare for moving these goods to your address. Payment will open once the fare is added.
+                Our team will get back to you with the transport fare for moving these goods to your address <strong>within 60 minutes, during working hours</strong>. We&apos;ve sent you a confirmation email — payment opens once the fare is added.
               </p>
             </div>
             <span className="px-4 py-2 rounded-full bg-white border border-amber-200 text-amber-800 text-xs font-bold uppercase tracking-wider">
