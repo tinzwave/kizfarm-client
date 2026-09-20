@@ -345,7 +345,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between font-body-md text-body-md text-on-surface-variant">
                     <span>Transport Fare</span>
-                    <span className="text-amber-700 font-semibold">Admin will contact you</span>
+                    <span className="text-amber-700 font-semibold">Added within 60 minutes</span>
                   </div>
                   <div className="flex justify-between font-body-md text-body-md text-on-surface-variant">
                     <span>Service Charge</span>
@@ -362,7 +362,7 @@ export default function CheckoutPage() {
                     Transport fare review required
                   </p>
                   <p className="mt-1 text-xs leading-relaxed">
-                    Submit this order and KIZ FARM admin will review the goods and delivery address, then contact you with the transport fare. Payment will open after the fare is added to your order summary.
+                    Submit this order and our team will review the goods and delivery address, then get back to you with the transport fare <strong>within 60 minutes, during working hours</strong>. We&apos;ll email you the moment it&apos;s added, and you&apos;ll see it here too — payment opens once the fare is in your order summary.
                   </p>
                 </div>
                 <div className="p-md">
@@ -380,7 +380,7 @@ export default function CheckoutPage() {
                   </button>
                   <p className="text-center font-label-xs text-label-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
                     <span className="material-symbols-outlined text-xs">info</span>
-                    You will pay after admin adds the transport fare.
+                    Our team will get back to you within 60 minutes with the transport fare — you&apos;ll pay once it&apos;s added.
                   </p>
                 </div>
               </div>
