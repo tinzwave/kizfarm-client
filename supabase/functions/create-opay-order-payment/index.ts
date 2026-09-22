@@ -58,7 +58,11 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Order has already been paid." }, { status: 400 });
     }
 
-    const reference = `KFM-PAY-${orderId}-${Date.now()}`;
+    // OPay rejects references longer than 50 chars, and the full order UUID
+    // alone is 36 -- nothing decodes the order id back out of this string
+    // (unlike the course-payment reference), it's only ever matched back to
+    // the order via payment_reference, so a short random suffix is enough.
+    const reference = `KFM-PAY-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
 
     // Stash the reference before we ever contact OPay -- same reasoning as
     // the old client-side setOrderPaymentReference call: the webhook (or a

@@ -2,12 +2,12 @@
 // redirect-based reasoning as create-opay-order-payment.
 //
 // Courses have no pre-staged reference column the way orders get one from
-// set_order_payment_reference, and OPay's create-order API has no generic
-// metadata field to round-trip a course_id/user_id the way Paystack's did
-// -- so the reference itself encodes them: "KFM-CRS_<courseId>_<userId>_<ms>"
-// (an underscore separator, since UUIDs themselves only ever contain
-// hex digits and hyphens). purchase-course and the opay-webhook fallback
-// both rely on this shape.
+// set_order_payment_reference -- stage_course_payment_intent (see
+// course_payment_intents) fills the same role: courseId/userId are staged
+// against a short reference before OPay is ever contacted, since OPay
+// rejects references over 50 chars and the raw UUIDs alone don't fit.
+// purchase-course gets the reference back via the returnUrl (?ref=...);
+// the opay-webhook fallback looks it up in course_payment_intents.
 import { callerClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { createOpayCheckout } from "../_shared/opay.ts";
@@ -51,7 +51,14 @@ Deno.serve(async (req) => {
     }
 
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);
-    const reference = `KFM-CRS_${courseId}_${user.id}_${Date.now()}`;
+    const reference = `KFM-CRS-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    const { error: stageErr } = await caller.rpc("stage_course_payment_intent", {
+      p_reference: reference,
+      p_course_id: courseId,
+    });
+    if (stageErr) {
+      return jsonResponse({ error: stageErr.message }, { status: 400 });
+    }
 
     const separator = returnUrl.includes("?") ? "&" : "?";
     const returnUrlWithRef = `${returnUrl}${separator}ref=${encodeURIComponent(reference)}`;

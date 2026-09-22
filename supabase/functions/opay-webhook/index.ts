@@ -8,10 +8,11 @@
 // and .../callback-signature.
 //
 // Course-subscription activation is a second branch below. Courses have
-// no pre-staged reference row like orders get, and OPay's create-order API
-// has no generic metadata field to round-trip a course_id/user_id the way
-// Paystack's did -- so create-opay-course-payment encodes them directly
-// into the reference: "KFM-CRS_<courseId>_<userId>_<timestamp>".
+// no pre-staged reference column like orders get, but create-opay-course-
+// payment stages courseId/userId into course_payment_intents (via
+// stage_course_payment_intent) against the same short reference before
+// ever contacting OPay, so this fallback looks them up there instead of
+// decoding them from the reference string.
 import { adminClient } from "../_shared/supabase-admin.ts";
 import { verifyOpayCallbackSignature } from "../_shared/opay.ts";
 import {
@@ -24,7 +25,7 @@ import {
   sendAdminCoursePurchaseEmail,
 } from "../_shared/mailer.ts";
 
-const COURSE_REF_PREFIX = "KFM-CRS_";
+const COURSE_REF_PREFIX = "KFM-CRS-";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
@@ -93,7 +94,13 @@ Deno.serve(async (req) => {
       }
 
       if (reference.startsWith(COURSE_REF_PREFIX)) {
-        const [courseId, userId] = reference.slice(COURSE_REF_PREFIX.length).split("_");
+        const { data: intent } = await admin
+          .from("course_payment_intents")
+          .select("course_id, user_id")
+          .eq("reference", reference)
+          .maybeSingle();
+        const courseId = intent?.course_id;
+        const userId = intent?.user_id;
 
         // Pre-check before calling activate_subscription, same pattern as
         // the orders branch above -- without it, this fires (and re-sends
