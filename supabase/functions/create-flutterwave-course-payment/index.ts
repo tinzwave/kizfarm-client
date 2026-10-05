@@ -1,18 +1,15 @@
-// Initiates an OPay Cashier checkout for a course subscription. Same
-// redirect-based reasoning as create-opay-order-payment.
+// Initiates a Flutterwave Standard checkout for a course subscription.
+// Same redirect-based reasoning as create-flutterwave-order-payment.
 //
 // Courses have no pre-staged reference column the way orders get one from
 // set_order_payment_reference -- stage_course_payment_intent (see
 // course_payment_intents) fills the same role: courseId/userId are staged
-// against a short reference before OPay is ever contacted, since OPay
-// rejects references over 50 chars and the raw UUIDs alone don't fit.
+// against a short reference before Flutterwave is ever contacted.
 // purchase-course gets the reference back via the returnUrl (?ref=...);
-// the opay-webhook fallback looks it up in course_payment_intents.
+// the flutterwave-webhook fallback looks it up in course_payment_intents.
 import { callerClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
-import { createOpayCheckout } from "../_shared/opay.ts";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+import { createFlutterwaveCheckout } from "../_shared/flutterwave.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -23,7 +20,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { courseId, returnUrl, cancelUrl } = await req.json();
+    const { courseId, returnUrl } = await req.json();
     if (!courseId || !returnUrl) {
       return jsonResponse({ error: "courseId and returnUrl are required." }, { status: 400 });
     }
@@ -63,19 +60,16 @@ Deno.serve(async (req) => {
     const separator = returnUrl.includes("?") ? "&" : "?";
     const returnUrlWithRef = `${returnUrl}${separator}ref=${encodeURIComponent(reference)}`;
 
-    const checkout = await createOpayCheckout({
+    const checkout = await createFlutterwaveCheckout({
       reference,
-      amountKobo: Math.round(payableAmount * 100),
-      returnUrl: returnUrlWithRef,
-      cancelUrl: cancelUrl || returnUrlWithRef,
-      callbackUrl: `${SUPABASE_URL}/functions/v1/opay-webhook`,
-      productName: course.title,
-      productDescription: `KIZ FARM course subscription: ${course.title}`,
-      userId: user.id,
-      userEmail: user.email ?? undefined,
+      amountNaira: payableAmount,
+      redirectUrl: returnUrlWithRef,
+      title: "KIZ FARM",
+      description: `KIZ FARM course subscription: ${course.title}`,
+      customerEmail: user.email ?? "",
     });
 
-    return jsonResponse({ ok: true, cashierUrl: checkout.cashierUrl });
+    return jsonResponse({ ok: true, checkoutUrl: checkout.link });
   } catch (err) {
     console.error(err);
     return jsonResponse({ error: err instanceof Error ? err.message : "Server error" }, { status: 500 });

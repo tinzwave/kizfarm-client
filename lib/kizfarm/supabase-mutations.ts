@@ -142,28 +142,28 @@ export async function cancelOrder(orderId: string, reason?: string) {
   return { res: { ok: true } as Response, payload: { ok: true, order: toOrder(data) } };
 }
 
-// Calls the create-opay-order-payment Edge Function, which stages the
-// order's payment reference and creates the OPay checkout server-side
-// (needs the merchant's keys, which must never reach the browser). Returns
-// a cashierUrl for the caller to redirect the browser to -- OPay's
-// checkout is a hosted page, not an inline widget.
-export async function initiateOpayOrderPayment(orderId: string, returnUrl: string, cancelUrl?: string) {
+// Calls the create-flutterwave-order-payment Edge Function, which stages
+// the order's payment reference and creates the Flutterwave checkout
+// server-side (needs the merchant's secret key, which must never reach the
+// browser). Returns a checkoutUrl for the caller to redirect the browser
+// to -- Flutterwave Standard is a hosted page, not an inline widget.
+export async function initiateOrderPayment(orderId: string, returnUrl: string) {
   const supabase = createClient();
-  const { data, error } = await supabase.functions.invoke("create-opay-order-payment", {
-    body: { orderId, returnUrl, cancelUrl },
+  const { data, error } = await supabase.functions.invoke("create-flutterwave-order-payment", {
+    body: { orderId, returnUrl },
   });
   if (error) {
     const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
     return { res: { ok: false } as Response, payload: { error: message } };
   }
-  return { res: { ok: true } as Response, payload: { ok: true, cashierUrl: data.cashierUrl as string } };
+  return { res: { ok: true } as Response, payload: { ok: true, checkoutUrl: data.checkoutUrl as string } };
 }
 
 // Calls the verify-and-pay-order Edge Function, which independently
-// re-verifies the payment with OPay before marking the order paid -- never
-// trusts the client's word that payment succeeded. The payment reference
-// itself is read server-side from the order row (staged by
-// initiateOpayOrderPayment before the buyer was sent to OPay), not passed
+// re-verifies the payment with Flutterwave before marking the order paid --
+// never trusts the client's word that payment succeeded. The payment
+// reference itself is read server-side from the order row (staged by
+// initiateOrderPayment before the buyer was sent to Flutterwave), not passed
 // in from here.
 export async function payOrder(orderId: string, paymentMethod?: string) {
   const supabase = createClient();
@@ -670,25 +670,25 @@ export async function releaseCoursePayout(subscriptionId: string) {
   return { res: { ok: true } as Response, payload: { ok: true, purchase: data } };
 }
 
-// Calls the create-opay-course-payment Edge Function, which creates the
-// OPay checkout server-side and returns a cashierUrl to redirect to. The
-// payment reference is round-tripped back to us via the returnUrl's `ref`
-// query param (courses have no pre-staged reference column the way orders
-// do) -- see create-opay-course-payment for why.
-export async function initiateOpayCoursePayment(courseId: string, returnUrl: string, cancelUrl?: string) {
+// Calls the create-flutterwave-course-payment Edge Function, which creates
+// the Flutterwave checkout server-side and returns a checkoutUrl to
+// redirect to. The payment reference is round-tripped back to us via the
+// returnUrl's `ref` query param (courses have no pre-staged reference
+// column the way orders do) -- see create-flutterwave-course-payment.
+export async function initiateCoursePayment(courseId: string, returnUrl: string) {
   const supabase = createClient();
-  const { data, error } = await supabase.functions.invoke("create-opay-course-payment", {
-    body: { courseId, returnUrl, cancelUrl },
+  const { data, error } = await supabase.functions.invoke("create-flutterwave-course-payment", {
+    body: { courseId, returnUrl },
   });
   if (error) {
     const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
     return { res: { ok: false } as Response, payload: { error: message } };
   }
-  return { res: { ok: true } as Response, payload: { ok: true, cashierUrl: data.cashierUrl as string } };
+  return { res: { ok: true } as Response, payload: { ok: true, checkoutUrl: data.checkoutUrl as string } };
 }
 
 // Calls the purchase-course Edge Function, which independently re-verifies
-// the payment with OPay before activating the subscription -- never trusts
+// the payment with Flutterwave before activating the subscription -- never trusts
 // the client's word that payment succeeded.
 export async function purchaseCourse(courseId: string, paymentReference: string) {
   const supabase = createClient();

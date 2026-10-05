@@ -4,6 +4,49 @@
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL");
+// Optional: a real, monitored inbox for replies. Mail from a bare
+// noreply@ address with nowhere to reply scores worse with spam filters.
+const REPLY_TO_EMAIL = Deno.env.get("REPLY_TO_EMAIL");
+const SENDER_NAME = "KIZ FARM";
+
+// Gives the From header a display name ("KIZ FARM <noreply@kizfarm.com>")
+// unless FROM_EMAIL already carries one -- a bare address with no name is
+// a small but real spam signal.
+function fromHeader(): string {
+  const from = FROM_EMAIL ?? "";
+  return from.includes("<") ? from : `${SENDER_NAME} <${from}>`;
+}
+
+// Plain-text alternative generated from the HTML body. HTML-only mail is
+// one of the more common reasons transactional email lands in spam.
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/i, "")
+    .replace(/<(br|\/p|\/h[1-6]|\/div|\/tr)\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line, i, all) => line || (i > 0 && all[i - 1]))
+    .join("\n")
+    .trim();
+}
+
+function emailPayload(to: string | string[], subject: string, html: string) {
+  return {
+    from: fromHeader(),
+    to,
+    subject,
+    html,
+    text: htmlToText(html),
+    ...(REPLY_TO_EMAIL ? { reply_to: REPLY_TO_EMAIL } : {}),
+  };
+}
 const ADMIN_NOTIFICATION_EMAILS = (
   Deno.env.get("ADMIN_NOTIFICATION_EMAILS") ||
   Deno.env.get("ADMIN_DEMO_EMAIL") ||
@@ -30,14 +73,26 @@ export function orderRef(order: { master_order_id?: string | null; id?: string }
   return order?.master_order_id || `KF-${String(order?.id || "").slice(-6).toUpperCase()}`;
 }
 
+// A complete HTML document (doctype, lang, charset, title) rather than a
+// bare <div> fragment -- malformed/fragment HTML is scored as spammy. The
+// footer says why the recipient is getting this, which filters also like.
 export function layout(title: string, body: string): string {
-  return `
-    <div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.55">
-      <h2 style="color:#166534;margin:0 0 16px">${escapeHtml(title)}</h2>
-      ${body}
-      <p style="margin-top:24px;color:#64748b;font-size:13px">Kiz Farm</p>
-    </div>
-  `;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f8fafc">
+<div style="max-width:560px;margin:0 auto;padding:24px;background:#ffffff;font-family:Arial,sans-serif;color:#1f2937;line-height:1.55">
+<h2 style="color:#166534;margin:0 0 16px">${escapeHtml(title)}</h2>
+${body}
+<p style="margin-top:24px;color:#64748b;font-size:13px">KIZ FARM</p>
+<p style="color:#94a3b8;font-size:12px">You are receiving this email because of activity on your KIZ FARM account.</p>
+</div>
+</body>
+</html>`;
 }
 
 export async function sendEmail({
@@ -62,7 +117,7 @@ export async function sendEmail({
       "Content-Type": "application/json",
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
-    body: JSON.stringify({ from: FROM_EMAIL, to: recipients, subject, html }),
+    body: JSON.stringify(emailPayload(recipients, subject, html)),
   });
 
   if (!response.ok) {
@@ -105,7 +160,7 @@ export async function sendBulkEmail(
           "Content-Type": "application/json",
           Authorization: `Bearer ${RESEND_API_KEY}`,
         },
-        body: JSON.stringify(chunk.map((to) => ({ from: FROM_EMAIL, to, subject, html }))),
+        body: JSON.stringify(chunk.map((to) => emailPayload(to, subject, html))),
       });
 
       if (!response.ok) {
@@ -140,7 +195,7 @@ export function adminEmails(): string[] {
 export function sendBuyerPaymentSuccessfulEmail(order: any, buyerEmail: string) {
   return sendEmail({
     to: buyerEmail,
-    subject: "Payment successful",
+    subject: `KIZ FARM: payment received for order ${orderRef(order)}`,
     html: layout(
       "Payment received",
       `
@@ -155,7 +210,7 @@ export function sendBuyerPaymentSuccessfulEmail(order: any, buyerEmail: string) 
 export function sendFarmerNewPaidOrderEmail(order: any, farmerEmail: string) {
   return sendEmail({
     to: farmerEmail,
-    subject: "New paid order received",
+    subject: `KIZ FARM: new paid order ${orderRef(order)}`,
     html: layout(
       "New paid order",
       `
@@ -169,7 +224,7 @@ export function sendFarmerNewPaidOrderEmail(order: any, farmerEmail: string) {
 export function sendAdminOrderPaidEmail(order: any) {
   return sendEmail({
     to: adminEmails(),
-    subject: "Order paid and awaiting farmer response",
+    subject: `KIZ FARM: order ${orderRef(order)} paid, awaiting farmer`,
     html: layout(
       "Order paid",
       `
@@ -184,7 +239,7 @@ export function sendAdminOrderPaidEmail(order: any) {
 export function sendCoursePurchaseBuyerEmail(courseTitle: string, amount: number, buyerEmail: string) {
   return sendEmail({
     to: buyerEmail,
-    subject: "Course purchase successful",
+    subject: `KIZ FARM: you now have access to ${courseTitle}`,
     html: layout(
       "Course purchase successful",
       `<p>You now have access to <strong>${escapeHtml(courseTitle)}</strong>.</p><p>Amount paid: <strong>${money(amount)}</strong></p>`,
@@ -195,7 +250,7 @@ export function sendCoursePurchaseBuyerEmail(courseTitle: string, amount: number
 export function sendCourseSaleCreatorEmail(courseTitle: string, creatorEmail: string) {
   return sendEmail({
     to: creatorEmail,
-    subject: "Someone purchased your course",
+    subject: `KIZ FARM: new sale of your course ${courseTitle}`,
     html: layout(
       "New course sale",
       `<p>Your course <strong>${escapeHtml(courseTitle)}</strong> was purchased.</p><p>Your payout is pending admin release.</p>`,
@@ -206,7 +261,7 @@ export function sendCourseSaleCreatorEmail(courseTitle: string, creatorEmail: st
 export function sendAdminCoursePurchaseEmail(courseTitle: string, amount: number) {
   return sendEmail({
     to: adminEmails(),
-    subject: "New course purchase",
+    subject: `KIZ FARM: new course purchase (${courseTitle})`,
     html: layout(
       "New course purchase",
       `<p><strong>${escapeHtml(courseTitle)}</strong> was purchased for ${money(amount)}.</p>`,

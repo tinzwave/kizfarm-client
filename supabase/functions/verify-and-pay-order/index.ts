@@ -1,16 +1,16 @@
-// Port of buyer.mjs POST /orders/:id/pay, since adapted for OPay's
+// Port of buyer.mjs POST /orders/:id/pay, since adapted for Flutterwave's
 // redirect-based checkout. Called by the buyer's client once they're
-// redirected back from OPay's hosted cashier page. Verifies the payment
-// with OPay itself (never trusts the client's say-so), then hands off to
+// redirected back from Flutterwave's hosted checkout page. Verifies the
+// payment with Flutterwave itself (never trusts the client's say-so), then hands off to
 // the pay_order RPC for the atomic state change.
 //
-// Unlike the old Paystack version, the payment reference is never taken
-// from the client -- it's read back from the order row, where
-// create-opay-order-payment staged it (via set_order_payment_reference)
-// before the buyer was ever sent to OPay.
+// The payment reference is never taken from the client -- it's read back
+// from the order row, where create-flutterwave-order-payment staged it
+// (via set_order_payment_reference) before the buyer was ever sent to
+// Flutterwave.
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
-import { queryOpayStatus } from "../_shared/opay.ts";
+import { verifyFlutterwaveTransaction } from "../_shared/flutterwave.ts";
 import {
   notifyEmail,
   sendBuyerPaymentSuccessfulEmail,
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "No payment has been initiated for this order yet." }, { status: 400 });
     }
 
-    const verification = await queryOpayStatus(order.payment_reference);
+    const verification = await verifyFlutterwaveTransaction(order.payment_reference);
     if (!verification.success) {
       return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }
