@@ -47,6 +47,21 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "You cannot subscribe to a course you created" }, { status: 400 });
     }
 
+    // Subscriptions never expire (one row per user+course), so a second
+    // checkout would only charge the buyer twice for access they already
+    // have -- e.g. reopening the course from a browse list that doesn't
+    // know they own it.
+    const { data: existing } = await caller
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (existing) {
+      return jsonResponse({ error: "You already have access to this course." }, { status: 409 });
+    }
+
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);
     const reference = `KFM-CRS-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const { error: stageErr } = await caller.rpc("stage_course_payment_intent", {
