@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getBuyerOrderById } from "@/lib/kizfarm/supabase-data";
-import { confirmReceipt, rateDriver, initiateOpayOrderPayment, payOrder } from "@/lib/kizfarm/supabase-mutations";
+import { confirmReceipt, rateDriver, initiateOrderPayment, payOrder } from "@/lib/kizfarm/supabase-mutations";
 import { getSession } from "@/lib/kizfarm/supabase-auth";
 
 interface OrderItem {
@@ -133,8 +133,8 @@ export default function TrackOrderPage() {
     }
   };
 
-  // OPay's checkout is a hosted page, not an inline widget -- this
-  // redirects the whole tab to it. OPay redirects back to the same
+  // Flutterwave's checkout is a hosted page, not an inline widget -- this
+  // redirects the whole tab to it. Flutterwave redirects back to the same
   // track-order URL (returnUrl) once the buyer finishes or cancels; the
   // effect below detects that return and finalizes the payment.
   const handlePayNow = async () => {
@@ -150,35 +150,43 @@ export default function TrackOrderPage() {
         return;
       }
 
-      const returnUrl = `${window.location.origin}${window.location.pathname}?id=${orderId}&opay=return`;
-      const { res, payload } = await initiateOpayOrderPayment(orderId, returnUrl);
-      if (!res.ok || !payload.cashierUrl) {
+      const returnUrl = `${window.location.origin}${window.location.pathname}?id=${orderId}&payment=return`;
+      const { res, payload } = await initiateOrderPayment(orderId, returnUrl);
+      if (!res.ok || !payload.checkoutUrl) {
         setPaymentError(payload?.error || "Could not start payment. Please try again.");
         setPaying(false);
         return;
       }
 
-      window.location.href = payload.cashierUrl;
+      window.location.href = payload.checkoutUrl;
     } catch (err) {
-      console.error("OPay initialization error:", err);
+      console.error("Flutterwave initialization error:", err);
       setPaymentError("Failed to initialize payment gateway. Please try again.");
       setPaying(false);
     }
   };
 
-  // Detects the redirect back from OPay's hosted checkout (returnUrl set
-  // above carries `opay=return`) and finalizes the payment server-side --
-  // verify-and-pay-order independently confirms it with OPay before
+  // Detects the redirect back from Flutterwave's hosted checkout (returnUrl
+  // set above carries `payment=return`) and finalizes the payment
+  // server-side -- verify-and-pay-order independently confirms it with
+  // Flutterwave before
   // marking the order paid, it never trusts this redirect alone.
   useEffect(() => {
     if (typeof window === "undefined" || !orderId) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("opay") !== "return") return;
+    if (params.get("payment") !== "return") return;
+    // Flutterwave appends ?status=successful|cancelled to the return URL.
+    const cancelled = params.get("status") === "cancelled";
 
     // Strip the marker immediately so a manual refresh doesn't re-trigger
     // finalization (payOrder/pay_order are idempotent anyway, but there's
-    // no reason to re-hit OPay's API on every reload).
+    // no reason to re-hit Flutterwave's API on every reload).
     window.history.replaceState(null, "", `${window.location.pathname}?id=${orderId}`);
+
+    if (cancelled) {
+      void Promise.resolve().then(() => setPaymentError("Payment was cancelled. You can try again whenever you're ready."));
+      return;
+    }
 
     // Deferred a tick so the state updates below don't run synchronously
     // within the effect body itself.

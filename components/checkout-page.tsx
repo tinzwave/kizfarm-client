@@ -253,7 +253,7 @@ export default function CheckoutPage() {
                   {paymentMethod === "card" && (
                     <div className="space-y-xs mt-4 p-md rounded-lg bg-green-50/50 border border-green-100 text-sm text-slate-700">
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">shield</span> Secured via OPay
+                        <span className="material-symbols-outlined text-sm">shield</span> Secured via Flutterwave
                       </p>
                       <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
@@ -277,7 +277,7 @@ export default function CheckoutPage() {
                   {paymentMethod === "bank" && (
                     <div className="space-y-xs mt-4 p-md rounded-lg bg-green-50/50 border border-green-100 text-sm text-slate-700">
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">shield</span> Secured via OPay
+                        <span className="material-symbols-outlined text-sm">shield</span> Secured via Flutterwave
                       </p>
                       <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
@@ -295,13 +295,13 @@ export default function CheckoutPage() {
                         className="text-primary focus:ring-primary h-4 w-4" 
                       />
                       <span className="material-symbols-outlined text-gray-500">smartphone</span>
-                      <span className="font-body-md text-body-md font-semibold text-gray-700">Mobile Money / OPAY / M-Pesa</span>
+                      <span className="font-body-md text-body-md font-semibold text-gray-700">Mobile Money / USSD</span>
                     </div>
                   </label>
                   {paymentMethod === "mobile_money" && (
                     <div className="space-y-xs mt-4 p-md rounded-lg bg-green-50/50 border border-green-100 text-sm text-slate-700">
                       <p className="font-semibold text-green-900 mb-1 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-sm">shield</span> Secured via OPay
+                        <span className="material-symbols-outlined text-sm">shield</span> Secured via Flutterwave
                       </p>
                       <p className="text-xs text-slate-500">This method will be used after the admin adds your transport fare.</p>
                     </div>
