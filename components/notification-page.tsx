@@ -1,22 +1,16 @@
 "use client"
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { getBuyerRecentActivity } from "@/lib/kizfarm/supabase-data";
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { notificationHrefFor, useNotifications, type AppNotification } from "@/hooks/use-notifications";
 
-interface ActivityItem {
-  id: string;
-  type: "order" | "refund" | "chat";
-  message: string;
-  amount: number | null;
-  createdAt: string;
-  link: string;
-}
-
-const TYPE_ICON: Record<ActivityItem["type"], string> = {
+const TYPE_ICON: Record<AppNotification["type"], string> = {
   order: "shopping_bag",
+  payment: "payments",
+  message: "forum",
+  course: "school",
+  farmer: "agriculture",
   refund: "money_off",
-  chat: "forum",
 };
 
 function timeAgo(iso: string) {
@@ -31,24 +25,14 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function NotificationPage() {
-  const [items, setItems] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function NotificationPage({ role = "buyer" }: { role?: "buyer" | "farmer" }) {
+  const router = useRouter();
+  const { items, unreadCount, loading, error, reload, markRead, markAllRead } = useNotifications();
 
-  useEffect(() => {
-    const fetchActivity = async () => {
-      setLoading(true);
-      try {
-        const { res, payload } = await getBuyerRecentActivity();
-        if (res.ok) {
-          setItems((payload.items as ActivityItem[]) || []);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchActivity();
-  }, []);
+  const open = (n: AppNotification) => {
+    if (!n.readAt) void markRead(n.id);
+    router.push(notificationHrefFor(role, n));
+  };
 
   return (
     <>
@@ -60,41 +44,75 @@ export default function NotificationPage() {
       </header>
 
       <main className="max-w-[1440px] mx-auto pt-8 pb-24 px-margin md:px-lg">
-        <section className="mb-lg">
-          <h1 className="font-headline-lg text-primary mb-xs">Notifications</h1>
-          <p className="font-body-md text-on-surface-variant">Recent activity on your orders, refunds and chats.</p>
+        <section className="mb-lg flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-headline-lg text-primary mb-xs">Notifications</h1>
+            <p className="font-body-md text-on-surface-variant">
+              {unreadCount > 0 ? `${unreadCount} unread` : "Updates on your orders, payments, chats and courses."}
+            </p>
+          </div>
+          {unreadCount > 0 && (
+            <button
+              onClick={() => void markAllRead()}
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-[#1B6D24] hover:bg-green-50"
+            >
+              Mark all as read
+            </button>
+          )}
         </section>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">autorenew</span>
+          <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden" aria-label="Loading notifications">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-start gap-4 p-md animate-pulse">
+                <div className="w-10 h-10 rounded-full bg-gray-200 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-1/3 rounded bg-gray-200" />
+                  <div className="h-3 w-2/3 rounded bg-gray-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center flex flex-col items-center justify-center">
+            <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">wifi_off</span>
+            <p className="text-lg font-semibold text-on-surface mb-4">Couldn&apos;t load notifications</p>
+            <button onClick={() => void reload()} className="rounded-lg bg-[#1B6D24] px-5 py-2 text-sm font-semibold text-white">
+              Try again
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-12 text-center flex flex-col items-center justify-center">
             <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">notifications_off</span>
-            <p className="text-lg font-semibold text-on-surface mb-2">No recent activity</p>
-            <p className="text-sm text-on-surface-variant">Updates on your orders, refunds, and chats will show up here.</p>
+            <p className="text-lg font-semibold text-on-surface mb-2">You&apos;re all caught up</p>
+            <p className="text-sm text-on-surface-variant">Updates on your orders, payments, chats and courses will show up here.</p>
           </div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
-            {items.map((item) => (
-              <Link
-                key={item.id}
-                href={item.link}
-                className="flex items-start gap-4 p-md hover:bg-surface-container-low transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-[20px]">{TYPE_ICON[item.type]}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-body-md text-on-surface">{item.message}</p>
-                  {item.amount != null && (
-                    <p className="font-label-sm text-on-surface-variant">₦{item.amount.toLocaleString()}</p>
-                  )}
-                </div>
-                <span className="font-label-xs text-outline shrink-0">{timeAgo(item.createdAt)}</span>
-              </Link>
-            ))}
+            {items.map((item) => {
+              const unread = !item.readAt;
+              const urgent = unread && item.type === "payment" && /pay now/i.test(item.title);
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => open(item)}
+                  className={`w-full text-left flex items-start gap-4 p-md transition-colors hover:bg-surface-container-low ${unread ? "bg-green-50/60" : ""}`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${urgent ? "bg-amber-100" : "bg-primary-container"}`}>
+                    <span className={`material-symbols-outlined text-[20px] ${urgent ? "text-amber-700" : "text-primary"}`}>{TYPE_ICON[item.type] ?? "notifications"}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-body-md text-on-surface ${unread ? "font-semibold" : ""}`}>{item.title}</p>
+                    {item.body && <p className="text-sm text-on-surface-variant mt-0.5">{item.body}</p>}
+                    {urgent && <span className="mt-2 inline-block rounded-md bg-[#1B6D24] px-3 py-1 text-xs font-bold text-white">Pay now</span>}
+                  </div>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className="font-label-xs text-outline">{timeAgo(item.createdAt)}</span>
+                    {unread && <span className="h-2.5 w-2.5 rounded-full bg-[#1B6D24]" aria-label="Unread" />}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </main>

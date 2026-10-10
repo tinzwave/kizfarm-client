@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentProfile, getSession, signOut } from "@/lib/kizfarm/supabase-auth";
+import { getCurrentProfile, getSession, loginPathWithRedirect, signOut } from "@/lib/kizfarm/supabase-auth";
 
 type AuthGuardProps = {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
       const session = await getSession();
       if (!session) {
         if (!cancelled) setAuthorized(false);
-        router.replace("/login");
+        router.replace(loginPathWithRedirect());
         return;
       }
 
@@ -36,7 +36,7 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
         // truthy getSession() and try to bounce back in here.
         await signOut();
         if (!cancelled) setAuthorized(false);
-        router.replace("/login");
+        router.replace(loginPathWithRedirect());
         return;
       }
 

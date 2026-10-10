@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useCart } from "@/lib/kizfarm/cart-context";
 import { getBuyerDashboard, getFarmerStatus } from "@/lib/kizfarm/supabase-data";
+import BuyerActionItems from "@/components/buyer-action-items";
 
 interface Product {
   _id: string;
@@ -149,7 +150,10 @@ export default function UserDashboardPage() {
       </header>
 
       <main className="max-w-[1440px] mx-auto px-6 pb-24 md:pb-12">
-        <section className="mt-8 mb-lg">
+        <div className="mt-6">
+          <BuyerActionItems />
+        </div>
+        <section className="mt-2 mb-lg">
           <div className="relative min-h-[320px] rounded-3xl overflow-hidden bg-[#1B6D24]">
             <img className="absolute inset-0 h-full w-full object-cover opacity-35" alt="Farm produce" src={data?.products?.[0]?.images?.[0] || "/placeholder.jpg"} />
             <div className="relative z-10 flex min-h-[320px] flex-col justify-center px-8 md:px-16 text-white">

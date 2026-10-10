@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getProductById, getProductReviews, getWishlist } from "@/lib/kizfarm/supabase-data";
+import { getBuyerOpenOrders, getProductById, getProductReviews, getWishlist, type BuyerOpenOrder } from "@/lib/kizfarm/supabase-data";
+import { BuyerOrderActionCard } from "@/components/buyer-action-items";
 import { startChat, submitReview, addToWishlist, removeFromWishlist } from "@/lib/kizfarm/supabase-mutations";
 import { useCart } from "@/lib/kizfarm/cart-context";
 
@@ -54,6 +55,20 @@ type Props = {
 export default function ProductDetailPage({ productId }: Props) {
   const router = useRouter();
   const { addItem, isInCart } = useCart();
+
+  // An open order for this exact product (waiting on the fare, ready to
+  // pay, or delivered) -- shown above "Add to Cart" so a buyer coming back
+  // from the "fare is ready" email sees how to continue instead of being
+  // nudged into ordering again.
+  const [openOrders, setOpenOrders] = useState<BuyerOpenOrder[]>([]);
+  useEffect(() => {
+    if (!productId) return;
+    getBuyerOpenOrders({ productId })
+      .then(({ res, payload }) => {
+        if (res.ok) setOpenOrders(payload.orders);
+      })
+      .catch(() => {});
+  }, [productId]);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -442,6 +457,15 @@ export default function ProductDetailPage({ productId }: Props) {
               </div>
               <span className="text-on-surface-variant font-label-sm">{product.unit || "units"}</span>
             </div>
+
+            {openOrders.length > 0 && (
+              <div className="mt-base space-y-2">
+                <p className="text-sm font-semibold text-slate-700">You already have an order for this product</p>
+                {openOrders.map((o) => (
+                  <BuyerOrderActionCard key={o.id} order={o} />
+                ))}
+              </div>
+            )}
 
             {/* Desktop Action Buttons */}
             <div className="hidden md:flex gap-gutter mt-base">

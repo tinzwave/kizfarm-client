@@ -6,6 +6,7 @@ import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCour
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
+import CourseCoverInput from "./course-cover-input";
 
 type ReviewStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -17,6 +18,7 @@ interface BuyerCourse {
   finalPrice?: number;
   commission?: number;
   content?: string;
+  coverImage?: string;
   status?: ReviewStatus;
   rejectionReason?: string;
   createdAt?: string;
@@ -37,6 +39,7 @@ const emptyCourse = {
   description: "",
   price: "",
   content: "<h2>Course overview</h2><p>Add lessons, images, and YouTube videos here.</p>",
+  coverImage: null as string | null,
 };
 
 export default function BuyerCoursesPage() {
@@ -124,6 +127,7 @@ export default function BuyerCoursesPage() {
       description: course.description,
       price: String(course.price),
       content: (res.ok ? payload.content : undefined) || emptyCourse.content,
+      coverImage: course.coverImage ?? null,
     });
     setActiveTab("create");
   }
@@ -137,6 +141,7 @@ export default function BuyerCoursesPage() {
       description: form.description,
       price: Number(form.price),
       content: form.content,
+      coverImage: form.coverImage,
     };
     const { res, payload } = editingCourse
       ? await updateBuyerCourse(editingCourse._id, body)
@@ -229,7 +234,10 @@ export default function BuyerCoursesPage() {
             ) : (
               visibleCourses.map((course) => (
                 <article key={course._id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-                  <div className="h-32 bg-gradient-to-br from-green-900 to-cyan-800 p-5 text-white">
+                  <div
+                    className={`h-32 bg-cover bg-center p-5 text-white ${course.coverImage ? "" : "bg-gradient-to-br from-green-900 to-cyan-800"}`}
+                    style={course.coverImage ? { backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.15)), url(${course.coverImage})` } : undefined}
+                  >
                     <p className="text-xs font-bold uppercase tracking-widest opacity-80">Buyer Course</p>
                     <h3 className="mt-3 line-clamp-2 text-xl font-bold">{course.title}</h3>
                   </div>
@@ -282,7 +290,10 @@ export default function BuyerCoursesPage() {
                   myCourses.map((course) => (
                     <article key={course._id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                       <div className="flex items-start justify-between gap-4">
-                        <div>
+                        {course.coverImage && (
+                          <img src={course.coverImage} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
+                        )}
+                        <div className="flex-1">
                           <h3 className="text-lg font-bold">{course.title}</h3>
                           <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{course.description}</p>
                         </div>
@@ -363,6 +374,7 @@ export default function BuyerCoursesPage() {
             <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2" placeholder="Course title" />
             <textarea required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2" placeholder="Course description" rows={3} />
             <input required min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2 md:w-72" placeholder="Base price" type="number" />
+            <CourseCoverInput value={form.coverImage} onChange={(coverImage) => setForm({ ...form, coverImage })} />
             <LearningRichEditor value={form.content} onChange={(content) => setForm({ ...form, content })} />
             <div className="flex flex-wrap gap-3">
               <button className="rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900">{editingCourse ? "Submit Changes" : "Submit for Review"}</button>

@@ -5,6 +5,7 @@ import DOMPurify from "isomorphic-dompurify";
 import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, getCourseContent } from "@/lib/kizfarm/supabase-data";
 import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
+import CourseCoverInput from "./course-cover-input";
 
 interface Tutor {
   _id: string;
@@ -81,6 +82,7 @@ export default function LearningHubAdminPage() {
     price: "",
     tutor: "",
     content: "<h2>Course overview</h2><p>Add modules, images, and videos here.</p>",
+    coverImage: null as string | null,
   });
 
   async function loadData() {
@@ -150,6 +152,7 @@ export default function LearningHubAdminPage() {
       price: Number(courseForm.price),
       tutorId: courseForm.tutor,
       content: courseForm.content,
+      coverImage: courseForm.coverImage,
     });
     if (!res.ok) {
       setMessage(payload?.error || "Could not publish course.");
@@ -162,6 +165,7 @@ export default function LearningHubAdminPage() {
       price: "",
       tutor: tutors[0]?._id || "",
       content: "<h2>Course overview</h2><p>Add modules, images, and videos here.</p>",
+      coverImage: null,
     });
     setMessage("Course published successfully.");
     await loadData();
@@ -439,6 +443,7 @@ export default function LearningHubAdminPage() {
                   {tutors.map((tutor) => <option key={tutor._id} value={tutor._id}>{tutor.name}</option>)}
                 </select>
               </div>
+              <CourseCoverInput value={courseForm.coverImage} onChange={(coverImage) => setCourseForm({ ...courseForm, coverImage })} />
               <LearningRichEditor value={courseForm.content} onChange={(content) => setCourseForm({ ...courseForm, content })} />
               <button className="rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900">Publish Course</button>
             </form>

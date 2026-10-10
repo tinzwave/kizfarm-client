@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, setRememberMe } from "@/lib/kizfarm/supabase-client";
-import { getCurrentProfile, getSession, redirectPathForRole, setPendingVerificationEmail, signOut } from "@/lib/kizfarm/supabase-auth";
+import { getCurrentProfile, getSession, redirectPathForRole, safeRedirectPath, setPendingVerificationEmail, signOut } from "@/lib/kizfarm/supabase-auth";
+
+function redirectParam() {
+  if (typeof window === "undefined") return null;
+  return safeRedirectPath(new URLSearchParams(window.location.search).get("redirect"));
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -27,7 +32,7 @@ export default function LoginPage() {
       const profile = await getCurrentProfile();
       if (cancelled) return;
       if (profile) {
-        router.push("/");
+        router.push(redirectParam() ?? "/");
       } else {
         await signOut();
       }
@@ -65,7 +70,7 @@ export default function LoginPage() {
           );
           return;
         }
-        router.push(redirectPathForRole(profile?.role));
+        router.push(redirectParam() ?? redirectPathForRole(profile?.role));
       } catch (err: any) {
         setError(err.message || "Login failed");
       } finally {

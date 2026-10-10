@@ -21,6 +21,22 @@ export function isAdminProfile(profile: KizfarmProfile | null | undefined) {
   return profile?.role === "admin";
 }
 
+// Where to send someone after login when a protected page bounced them
+// there (e.g. the "Complete payment" link in an email). Only same-site
+// paths are accepted -- never "//evil.com" or "/\\evil.com" -- so the
+// parameter can't be abused as an open redirect to a phishing site.
+export function safeRedirectPath(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
+  if (value.startsWith("/login")) return null;
+  return value;
+}
+
+export function loginPathWithRedirect() {
+  if (typeof window === "undefined") return "/login";
+  const here = window.location.pathname + window.location.search;
+  return `/login?redirect=${encodeURIComponent(here)}`;
+}
+
 export function redirectPathForRole(role: string | undefined | null) {
   if (role === "admin") return "/admin/dashboard";
   if (role === "farmer") return "/farmer/dashboard";

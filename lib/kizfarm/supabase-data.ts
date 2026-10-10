@@ -2110,3 +2110,56 @@ export async function getAdminReferrals() {
     },
   };
 }
+
+// ===================== BUYER ACTION ITEMS =====================
+
+export type BuyerOpenOrder = {
+  id: string;
+  ref: string;
+  status: "awaiting_transport_quote" | "awaiting_payment" | "delivered";
+  total: number;
+  deliveryFee: number;
+  updatedAt: string;
+  items: { productId: string | null; name: string; quantity: number; image?: string | null }[];
+};
+
+const BUYER_ACTION_STATUSES = ["awaiting_transport_quote", "awaiting_payment", "delivered"] as const;
+
+// Orders that need the buyer to do something (pay, confirm receipt) or
+// that they're waiting on (transport fare). Drives the dashboard's
+// "Action needed" panel and the product page's "you already ordered this"
+// banner -- without these, a buyer who got the "fare is ready" email had no
+// obvious place in the app to continue from.
+export async function getBuyerOpenOrders(opts: { productId?: string } = {}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated", orders: [] as BuyerOpenOrder[] } };
+
+  let query = supabase
+    .from("orders")
+    .select(opts.productId ? "id, master_order_id, status, total, delivery_fee, updated_at, order_items!inner(product_id, name, quantity, image)" : "id, master_order_id, status, total, delivery_fee, updated_at, order_items(product_id, name, quantity, image)")
+    .eq("buyer_id", user.id)
+    .in("status", BUYER_ACTION_STATUSES as unknown as string[])
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  if (opts.productId) query = query.eq("order_items.product_id", opts.productId);
+
+  const { data, error } = await query;
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message, orders: [] as BuyerOpenOrder[] } };
+
+  const orders: BuyerOpenOrder[] = (data || []).map((o: any) => ({
+    id: o.id,
+    ref: o.master_order_id || `KF-${String(o.id).slice(-6).toUpperCase()}`,
+    status: o.status,
+    total: Number(o.total || 0),
+    deliveryFee: Number(o.delivery_fee || 0),
+    updatedAt: o.updated_at,
+    items: (o.order_items || []).map((i: any) => ({ productId: i.product_id, name: i.name, quantity: i.quantity, image: i.image })),
+  }));
+  // Most urgent first: pay now, then confirm receipt, then waiting.
+  const rank = { awaiting_payment: 0, delivered: 1, awaiting_transport_quote: 2 } as const;
+  orders.sort((a, b) => rank[a.status] - rank[b.status]);
+  return { res: { ok: true } as Response, payload: { ok: true, orders } };
+}

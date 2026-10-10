@@ -8,6 +8,9 @@ const FROM_EMAIL = Deno.env.get("FROM_EMAIL");
 // noreply@ address with nowhere to reply scores worse with spam filters.
 const REPLY_TO_EMAIL = Deno.env.get("REPLY_TO_EMAIL");
 const SENDER_NAME = "KIZ FARM";
+// Public web app address, for buttons that take the reader straight to the
+// order/page the email is about.
+const SITE_URL = (Deno.env.get("SITE_URL") || "https://www.kizfarm.com").replace(/\/+$/, "");
 
 // Gives the From header a display name ("KIZ FARM <noreply@kizfarm.com>")
 // unless FROM_EMAIL already carries one -- a bare address with no name is
@@ -22,6 +25,8 @@ function fromHeader(): string {
 export function htmlToText(html: string): string {
   return html
     .replace(/<head[\s\S]*?<\/head>/i, "")
+    // Keep link targets in the plain-text part: "Complete payment: https://..."
+    .replace(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, label) => `${label.replace(/<[^>]+>/g, "").trim()}: ${href}`)
     .replace(/<(br|\/p|\/h[1-6]|\/div|\/tr)\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
@@ -94,6 +99,21 @@ ${body}
 </body>
 </html>`;
 }
+
+// Email-client-safe call-to-action button (a single-cell table renders
+// consistently in Gmail/Outlook/Apple Mail, unlike a styled <a> alone).
+export function actionButton(path: string, label: string): string {
+  const href = `${SITE_URL}${path}`;
+  return `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0">
+      <tr><td style="border-radius:8px;background:#166534">
+        <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px">${escapeHtml(label)}</a>
+      </td></tr>
+    </table>`;
+}
+
+const buyerOrderPath = (order: { id?: string }) => `/buyer/track-order?id=${encodeURIComponent(String(order?.id || ""))}`;
+const farmerOrderPath = (order: { id?: string }) => `/farmer/orders/${encodeURIComponent(String(order?.id || ""))}`;
 
 export async function sendEmail({
   to,
@@ -202,6 +222,7 @@ export function sendBuyerPaymentSuccessfulEmail(order: any, buyerEmail: string) 
         <p>Your payment for order <strong>${escapeHtml(orderRef(order))}</strong> was successful.</p>
         <p>The farmer has been notified and will accept or reject the order.</p>
         <p>Total paid: <strong>${money(order.total)}</strong></p>
+        ${actionButton(buyerOrderPath(order), "Track your order")}
       `,
     ),
   });
@@ -215,7 +236,8 @@ export function sendFarmerNewPaidOrderEmail(order: any, farmerEmail: string) {
       "New paid order",
       `
         <p>You have a new paid order <strong>${escapeHtml(orderRef(order))}</strong>.</p>
-        <p>Please open your farmer orders page to accept or reject it.</p>
+        <p>Please accept or reject it as soon as possible.</p>
+        ${actionButton(farmerOrderPath(order), "View order")}
       `,
     ),
   });
@@ -286,7 +308,8 @@ export function sendBuyerTransportFareRequestedEmail(orders: any[], buyerEmail: 
         <p>Thanks for your order <strong>${escapeHtml(ref)}</strong>${splitNote}.</p>
         <p>Subtotal: <strong>${money(subtotal)}</strong></p>
         <p>Our team will review your goods and delivery address, then get back to you with the transport fare <strong>within 60 minutes during working hours</strong>.</p>
-        <p>You'll get another email (and an update in the app) the moment the fare is added, so you can complete payment.</p>
+        <p>You'll get another email (and a notification in the app) the moment the fare is added, so you can complete payment.</p>
+        ${actionButton(buyerOrderPath(orders[0]), "View your order")}
       `,
     ),
   });
@@ -318,7 +341,8 @@ export function sendBuyerTransportFareAddedEmail(order: any, buyerEmail: string)
         <p>The transport fare for your order <strong>${escapeHtml(orderRef(order))}</strong> has been added.</p>
         <p>Transport fare: <strong>${money(order.delivery_fee)}</strong></p>
         <p>New total: <strong>${money(order.total)}</strong></p>
-        <p>Open your order to complete payment.</p>
+        <p>Tap below to review your order and complete payment. You can also find it under <strong>Orders</strong> or on your dashboard in the KIZ FARM app.</p>
+        ${actionButton(buyerOrderPath(order), "Complete payment")}
       `,
     ),
   });

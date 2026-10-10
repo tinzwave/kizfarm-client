@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/kizfarm/cart-context";
+import { UnreadBadge, useUnreadNotificationCount } from "@/hooks/use-notifications";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ export default function BuyerSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { totalItems } = useCart();
+  const unreadNotifications = useUnreadNotificationCount();
 
   const isActive = (href: string) => {
     if (href === "/buyer/dashboard") {
@@ -71,6 +73,7 @@ export default function BuyerSidebar() {
                     {totalItems > 9 ? "9+" : totalItems}
                   </span>
                 )}
+                {item.href === "/buyer/notifications" && <UnreadBadge count={unreadNotifications} />}
               </span>
               {item.name}
             </Link>

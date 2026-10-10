@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCart } from "@/lib/kizfarm/cart-context";
+import { UnreadBadge, useUnreadNotificationCount } from "@/hooks/use-notifications";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: "home" },
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
 export default function BuyerBottomNav() {
   const pathname = usePathname();
   const { totalItems } = useCart();
+  const unreadNotifications = useUnreadNotificationCount();
 
   // The chat conversation screen renders its own full-width, fixed reply
   // bar at this same bottom:0 position. Painted later in the DOM, this nav
@@ -66,6 +68,7 @@ export default function BuyerBottomNav() {
                     {totalItems > 9 ? "9+" : totalItems}
                   </span>
                 )}
+                {item.href === "/buyer/notifications" && <UnreadBadge count={unreadNotifications} />}
               </span>
               <span className="text-[10px] font-semibold uppercase tracking-wider">{item.name}</span>
             </Link>

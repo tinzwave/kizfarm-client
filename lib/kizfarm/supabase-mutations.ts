@@ -536,6 +536,7 @@ function toTutor(t: any) {
 function toCourse(c: any) {
   return {
     _id: c.id,
+    coverImage: c.cover_image ?? undefined,
     title: c.title,
     description: c.description,
     price: c.price,
@@ -578,7 +579,25 @@ export async function createTutor(input: { name: string; description: string; ph
   return { res: { ok: true } as Response, payload: { ok: true, tutor: toTutor(data) } };
 }
 
-export async function createAdminCourse(input: { title: string; description: string; price: number; tutorId: string; content: string }) {
+// Uploads a course cover into the caller's own folder of the public
+// course-covers bucket (storage RLS only allows "<auth.uid()>/...") and
+// returns its public URL for courses.cover_image.
+export async function uploadCourseCover(file: File): Promise<string> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  if (!file.type.startsWith("image/")) throw new Error("Cover must be an image.");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Cover image must be under 5 MB.");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from("course-covers").upload(path, file, { contentType: file.type });
+  if (error) throw new Error(error.message);
+  return supabase.storage.from("course-covers").getPublicUrl(path).data.publicUrl;
+}
+
+export async function createAdminCourse(input: { title: string; description: string; price: number; tutorId: string; content: string; coverImage?: string | null }) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("courses")
@@ -589,6 +608,7 @@ export async function createAdminCourse(input: { title: string; description: str
       final_price: input.price,
       content: input.content,
       tutor_id: input.tutorId,
+      cover_image: input.coverImage || null,
       source: "admin",
       audience: "farmers",
       status: "approved",
@@ -600,7 +620,7 @@ export async function createAdminCourse(input: { title: string; description: str
   return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
-export async function createBuyerCourse(input: { title: string; description: string; price: number; content: string }) {
+export async function createBuyerCourse(input: { title: string; description: string; price: number; content: string; coverImage?: string | null }) {
   const supabase = createClient();
   const {
     data: { user },
@@ -616,6 +636,7 @@ export async function createBuyerCourse(input: { title: string; description: str
       final_price: input.price,
       content: input.content,
       creator_id: user.id,
+      cover_image: input.coverImage || null,
       source: "buyer",
       audience: "all",
       status: "pending",
@@ -627,7 +648,7 @@ export async function createBuyerCourse(input: { title: string; description: str
   return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
-export async function updateBuyerCourse(id: string, input: { title: string; description: string; price: number; content: string }) {
+export async function updateBuyerCourse(id: string, input: { title: string; description: string; price: number; content: string; coverImage?: string | null }) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("courses")
@@ -638,6 +659,7 @@ export async function updateBuyerCourse(id: string, input: { title: string; desc
       final_price: input.price,
       commission: 0,
       content: input.content,
+      ...(input.coverImage !== undefined ? { cover_image: input.coverImage } : {}),
       status: "pending",
       is_published: false,
       rejection_reason: null,

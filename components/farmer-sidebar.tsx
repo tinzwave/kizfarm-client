@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
+import { UnreadBadge, useUnreadNotificationCount } from "@/hooks/use-notifications";
 
 type FarmerSidebarProps = {
   collapsed?: boolean;
@@ -22,6 +23,7 @@ function NavLinks({
   onClick?: () => void;
   collapsed?: boolean;
 }) {
+  const unreadNotifications = useUnreadNotificationCount();
   return (
     <nav className="flex-1 space-y-1 px-3 pt-2">
       <Link
@@ -79,6 +81,17 @@ function NavLinks({
       >
         <span className="material-symbols-outlined">chat</span>
         {!linksCollapsed && "Chats"}
+      </Link>
+      <Link
+        href="/farmer/notifications"
+        onClick={onClick}
+        className={`flex items-center gap-3 px-3 py-3 rounded ${linksCollapsed ? "justify-center" : ""} ${isActive(pathname, "/farmer/notifications") ? "bg-green-50 text-[#1B6D24] font-semibold border-r-4 border-[#1B6D24]" : "text-zinc-600"}`}
+      >
+        <span className="relative flex">
+          <span className="material-symbols-outlined">notifications</span>
+          <UnreadBadge count={unreadNotifications} />
+        </span>
+        {!linksCollapsed && "Notifications"}
       </Link>
       <Link
         href="/buyer/marketplace"
