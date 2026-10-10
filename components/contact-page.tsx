@@ -1,9 +1,29 @@
 "use client";
 
+import { useState } from "react";
 import TopNav from "@/components/top-nav";
 import SiteFooter from "@/components/site-footer";
 
+const CONTACT_EMAIL = "hello@kizfarm.com";
+const PHONE_DISPLAY = "+234 703 167 2282";
+const PHONE_E164 = "+2347031672282";
+const WHATSAPP_URL = "https://wa.me/2347031672282";
+
 export default function ContactPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+
+  // Opens the visitor's email app with the message ready to send to us --
+  // no server endpoint for bots to spam, and replies go straight back to
+  // their own address.
+  function send(e: React.FormEvent) {
+    e.preventDefault();
+    const subject = `Message from ${name.trim() || "a KIZ FARM visitor"}`;
+    const body = `${message.trim()}\n\n— ${name.trim()}${email.trim() ? ` (${email.trim()})` : ""}`;
+    window.location.href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+
   return (
     <>
       <TopNav />
@@ -45,12 +65,14 @@ export default function ContactPage() {
                   </span>
                 </div>
                 <h3 className="font-headline-md text-headline-md text-on-surface mb-xs">
-                  The Homestead
+                  Our Office
                 </h3>
                 <p className="font-body-md text-on-surface-variant">
-                  882 Harvest Ridge Road
+                  KIZ EMPIREX LTD
                   <br />
-                  Emerald Valley, AG 50210
+                  Ekwulobia, Anambra State
+                  <br />
+                  Nigeria
                 </p>
               </div>
 
@@ -70,9 +92,17 @@ export default function ContactPage() {
                 <div className="flex flex-col gap-2">
                   <a
                     className="font-body-md text-primary font-semibold hover:underline"
-                    href="tel:+15550123456"
+                    href={`tel:${PHONE_E164}`}
                   >
-                    +1 (555) 012-3456
+                    {PHONE_DISPLAY}
+                  </a>
+                  <a
+                    className="font-body-md text-primary font-semibold hover:underline"
+                    href={WHATSAPP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Chat on WhatsApp
                   </a>
                   <a
                     className="font-body-md text-primary font-semibold hover:underline"
@@ -106,15 +136,18 @@ export default function ContactPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter bg-white border border-outline-variant rounded-xl overflow-hidden soil-shadow">
                 {/* Contact Form */}
                 <div className="p-lg">
-                  <form className="flex flex-col gap-md">
+                  <form className="flex flex-col gap-md" onSubmit={send}>
                     <div className="flex flex-col gap-xs">
                       <label className="font-label-md text-on-surface-variant">
                         FULL NAME
                       </label>
                       <input
                         className="w-full bg-white border border-outline-variant rounded-lg px-md py-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-body-md"
-                        placeholder="John Doe"
+                        placeholder="Your full name"
                         type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                       />
                     </div>
                     <div className="flex flex-col gap-xs">
@@ -123,8 +156,10 @@ export default function ContactPage() {
                       </label>
                       <input
                         className="w-full bg-white border border-outline-variant rounded-lg px-md py-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-body-md"
-                        placeholder="john@example.com"
+                        placeholder="you@example.com"
                         type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                       />
                     </div>
                     <div className="flex flex-col gap-xs">
@@ -135,6 +170,9 @@ export default function ContactPage() {
                         className="w-full bg-white border border-outline-variant rounded-lg px-md py-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all font-body-md"
                         placeholder="How can we help your farm grow today?"
                         rows={4}
+                        required
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
                       ></textarea>
                     </div>
                     <button

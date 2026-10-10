@@ -12,7 +12,7 @@ const CONTACT = "hello@kizfarm.com";
 
 export default function Page() {
   return (
-    <LegalPageLayout title="Privacy Policy" updated="10 October 2026">
+    <LegalPageLayout title="Privacy Policy" updated="11 October 2026">
       <p>
         KIZ FARM (&quot;KIZ FARM&quot;, &quot;we&quot;, &quot;us&quot;) is operated by KIZ EMPIREX LTD. KIZ FARM is a marketplace that connects buyers
         with verified farmers, together with a learning hub for agricultural courses. This policy explains what personal data we collect
@@ -119,7 +119,9 @@ export default function Page() {
       <h2>9. Contact us</h2>
       <p>
         KIZ EMPIREX LTD (KIZ FARM)<br />
-        Email: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>
+        Ekwulobia, Anambra State, Nigeria<br />
+        Email: <a href={`mailto:${CONTACT}`}>{CONTACT}</a><br />
+        Phone: <a href="tel:+2347031672282">+234 703 167 2282</a>
       </p>
     </LegalPageLayout>
   );

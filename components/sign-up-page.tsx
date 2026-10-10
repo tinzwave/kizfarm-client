@@ -168,7 +168,7 @@ export default function SignUpPage() {
                 <input
                   className="form-input w-full h-[48px] pl-10 pr-base border border-outline-variant rounded-lg font-body-md text-body-md focus:border-primary focus:ring-0 transition-all outline-none"
                   id="email"
-                  placeholder="john@example.com"
+                  placeholder="you@example.com"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -194,7 +194,7 @@ export default function SignUpPage() {
                 <input
                   className="form-input w-full h-[48px] pl-10 pr-base border border-outline-variant rounded-lg font-body-md text-body-md focus:border-primary focus:ring-0 transition-all outline-none"
                   id="phone"
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="0803 000 0000"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}

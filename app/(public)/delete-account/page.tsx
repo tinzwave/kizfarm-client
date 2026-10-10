@@ -35,7 +35,7 @@ export default function Page() {
       <h2>Can&apos;t sign in?</h2>
       <p>
         Email <a href={`mailto:${CONTACT}?subject=Delete%20my%20KIZ%20FARM%20account`}>{CONTACT}</a> from the email address on your account
-        with the subject &quot;Delete my KIZ FARM account&quot;. We will verify the request and delete the account within 30 days.
+        with the subject &quot;Delete my KIZ FARM account&quot;, or call <a href="tel:+2347031672282">+234 703 167 2282</a>. We will verify the request and delete the account within 30 days.
       </p>
 
       <h2>What is deleted</h2>
