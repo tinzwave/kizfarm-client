@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { getFarmerDashboard } from "@/lib/kizfarm/supabase-data";
+import BuyerActionItems from "@/components/buyer-action-items";
 
 interface Product {
   _id: string;
@@ -102,6 +103,10 @@ export default function FarmerDashboardPage() {
       </header>
 
       <main className="p-4 md:p-8 space-y-8 max-w-[1440px] mx-auto w-full">
+        {/* Farmers can buy too -- their own purchases waiting on payment etc. */}
+        <div className="mt-6">
+          <BuyerActionItems />
+        </div>
         {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
