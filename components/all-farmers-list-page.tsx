@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { getAdminFarmers, getAdminFarmerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
 import { suspendAdminFarmer, unsuspendAdminFarmer, deactivateAdminFarmer } from "@/lib/kizfarm/supabase-mutations";
+import DeleteAccountButton from "@/components/delete-account-button";
 
 interface Farmer {
   _id: string;
@@ -12,6 +13,7 @@ interface Farmer {
   status: "approved" | "pending" | "rejected";
   createdAt: string;
   userId?: {
+    _id?: string;
     email: string;
     phone: string;
     status: string;
@@ -464,6 +466,15 @@ export default function AllFarmersListPage() {
                             >
                               Deactivate
                             </button>
+                            {farmer.userId?._id && (
+                              <DeleteAccountButton
+                                userId={farmer.userId._id}
+                                name={farmer.fullName || farmer.farmName}
+                                label="Delete"
+                                className="px-3 py-1.5 bg-white border border-red-300 text-red-700 rounded-lg font-bold text-xs hover:bg-red-50 transition-colors"
+                                onDeleted={() => fetchFarmers()}
+                              />
+                            )}
                           </div>
                         </td>
                       </tr>

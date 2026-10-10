@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAdminBuyerById, getAdminBuyerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
 import { suspendAdminBuyer, unsuspendAdminBuyer, deactivateAdminBuyer } from "@/lib/kizfarm/supabase-mutations";
+import DeleteAccountButton from "@/components/delete-account-button";
 
 interface Buyer {
   _id: string;
@@ -225,6 +226,13 @@ export default function AdminUserDetailPage() {
                 Deactivate Buyer
               </button>
             )}
+            <DeleteAccountButton
+              userId={userId}
+              name={buyer.name}
+              onDeleted={() => {
+                window.location.href = "/admin/buyers";
+              }}
+            />
           </div>
         </div>
 

@@ -1512,7 +1512,7 @@ function toAdminFarmerListItem(f: any) {
     phone: f.phone,
     status: f.status,
     createdAt: f.created_at,
-    userId: f.profiles ? { email: f.profiles.email, phone: f.profiles.phone, status: f.profiles.status } : undefined,
+    userId: f.profiles ? { _id: f.user_id, email: f.profiles.email, phone: f.profiles.phone, status: f.profiles.status } : undefined,
   };
 }
 

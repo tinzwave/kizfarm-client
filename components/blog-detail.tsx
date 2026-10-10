@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getBlogPostBySlug } from "@/lib/kizfarm/supabase-data";
+import BlogShareButtons from "@/components/blog-share-buttons";
 
 interface Block {
   type: "heading" | "paragraph" | "image" | "video";
@@ -199,6 +200,7 @@ export default function BlogDetail({ slug, onBack }: { slug: string; onBack?: ()
               {post.readTime} min read
             </span>
           </div>
+          <BlogShareButtons title={post.title} slug={post.slug || slug} summary={post.summary} />
         </div>
 
         {/* Cover Image */}

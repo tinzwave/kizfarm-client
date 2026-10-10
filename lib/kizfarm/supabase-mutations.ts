@@ -1441,3 +1441,19 @@ export async function removeFromWishlist(productId: string) {
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
+
+// ===================== ACCOUNT DELETION =====================
+
+// Calls the delete-account Edge Function. With no userId the signed-in
+// user deletes their own account; an admin passes the target's user id.
+// Accounts with order/payment history are anonymised (records kept),
+// others are removed entirely -- see migration 0040.
+export async function deleteAccount(userId?: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.functions.invoke("delete-account", { body: userId ? { userId } : {} });
+  if (error) {
+    const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
+    return { res: { ok: false } as Response, payload: { error: message } };
+  }
+  return { res: { ok: true } as Response, payload: data as { ok: true; removed: "deleted" | "anonymised" } };
+}

@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { getMyFullProfile } from "@/lib/kizfarm/supabase-data";
 import { updateMyFullProfile } from "@/lib/kizfarm/supabase-mutations";
+import DeleteAccountButton from "@/components/delete-account-button";
+import { signOut } from "@/lib/kizfarm/supabase-auth";
 
 interface FarmerProfile {
   user: {
@@ -308,6 +310,19 @@ export default function FarmProfilePage({ hideSidebar = false }: Props) {
             </div>
           </div>
         </div>
+        <section className="mt-8 rounded-xl border border-red-200 bg-red-50/40 p-6">
+          <h2 className="text-lg font-bold text-red-800">Delete account</h2>
+          <p className="mt-1 mb-4 text-sm text-slate-600">Permanently delete your KIZ FARM account, farm details and personal data. Your products are removed from the marketplace. This can&apos;t be undone.</p>
+          <div className="max-w-xs">
+            <DeleteAccountButton
+              self
+              onDeleted={async () => {
+                await signOut();
+                window.location.href = "/login";
+              }}
+            />
+          </div>
+        </section>
       </main>
 
       {/* Edit Modal */}
