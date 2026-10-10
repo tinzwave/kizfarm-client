@@ -22,6 +22,8 @@ const linkColumns = [
     links: [
       { label: "Sign In", href: "/login" },
       { label: "Create Account", href: "/signup" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Delete Account", href: "/delete-account" },
     ],
   },
 ];
