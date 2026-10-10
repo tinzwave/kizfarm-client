@@ -4,7 +4,7 @@ import { useState } from "react";
 import TopNav from "@/components/top-nav";
 import SiteFooter from "@/components/site-footer";
 
-const CONTACT_EMAIL = "hello@kizfarm.com";
+const CONTACT_EMAIL = "support@kizfarm.com";
 const PHONE_DISPLAY = "+234 703 167 2282";
 const PHONE_E164 = "+2347031672282";
 const WHATSAPP_URL = "https://wa.me/2347031672282";
@@ -106,9 +106,9 @@ export default function ContactPage() {
                   </a>
                   <a
                     className="font-body-md text-primary font-semibold hover:underline"
-                    href="mailto:hello@kizfarm.com"
+                    href="mailto:support@kizfarm.com"
                   >
-                    hello@kizfarm.com
+                    support@kizfarm.com
                   </a>
                 </div>
               </div>

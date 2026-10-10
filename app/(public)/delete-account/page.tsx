@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://www.kizfarm.com/delete-account" },
 };
 
-const CONTACT = "hello@kizfarm.com";
+const CONTACT = "support@kizfarm.com";
 
 export default function Page() {
   return (
