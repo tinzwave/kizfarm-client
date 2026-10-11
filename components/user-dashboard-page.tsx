@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useCart } from "@/lib/kizfarm/cart-context";
 import { getBuyerDashboard, getFarmerStatus } from "@/lib/kizfarm/supabase-data";
 import BuyerActionItems from "@/components/buyer-action-items";
+import { orderStatusLabel } from "@/lib/kizfarm/order-status";
 
 interface Product {
   _id: string;
@@ -329,7 +330,7 @@ export default function UserDashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-[#1B6D24]">{money(order.total)}</p>
-                    <p className="text-xs capitalize text-slate-500">{order.status.replaceAll("_", " ")}</p>
+                    <p className="text-xs text-slate-500">{orderStatusLabel(order.status, "buyer")}</p>
                   </div>
                 </div>
               </Link>

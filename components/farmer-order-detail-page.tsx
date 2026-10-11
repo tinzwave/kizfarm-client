@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { getFarmerOrderById } from "@/lib/kizfarm/supabase-data";
 import { farmerAcceptOrder, farmerPackOrder, farmerRejectOrder } from "@/lib/kizfarm/supabase-mutations";
+import { orderStatusLabel } from "@/lib/kizfarm/order-status";
 
 interface OrderItem {
   productId: string;
@@ -196,7 +197,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
           </div>
         </div>
         <div className="px-4 py-1.5 rounded-lg bg-[#1B6D24]/10 text-[#1B6D24] text-sm font-bold capitalize">
-          Status: {order.status}
+          Status: {orderStatusLabel(order.status, "farmer")}
         </div>
       </header>
 
@@ -331,7 +332,7 @@ export default function FarmerOrderDetailPage({ id }: { id: string }) {
                 <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
                   ₦{order.deliveryFee.toLocaleString()}
                 </h2>
-                <p className="text-zinc-400 text-sm mt-2">Status: {order.status}</p>
+                <p className="text-zinc-400 text-sm mt-2">Status: {orderStatusLabel(order.status, "farmer")}</p>
               </div>
             </div>
 

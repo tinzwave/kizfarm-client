@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { getFarmerDashboard } from "@/lib/kizfarm/supabase-data";
 import BuyerActionItems from "@/components/buyer-action-items";
+import { orderStatusLabel } from "@/lib/kizfarm/order-status";
 
 interface Product {
   _id: string;
@@ -166,7 +167,7 @@ export default function FarmerDashboardPage() {
                       <td className="px-6 py-4 text-label-sm font-semibold">{order.masterOrderId || order._id.slice(-8).toUpperCase()}</td>
                       <td className="px-6 py-4 text-label-sm">{order.buyerId?.name || order.buyerId?.email || "Buyer"}</td>
                       <td className="px-6 py-4 text-label-sm text-on-surface-variant">{order.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}</td>
-                      <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass(order.status)}`}>{order.status.replaceAll("_", " ")}</span></td>
+                      <td className="px-6 py-4"><span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass(order.status)}`}>{orderStatusLabel(order.status, "farmer")}</span></td>
                       <td className="px-6 py-4 font-bold text-right">{money(order.total)}</td>
                     </tr>
                   ))}
