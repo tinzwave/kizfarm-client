@@ -620,7 +620,7 @@ export async function createAdminCourse(input: { title: string; description: str
   return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
-export async function createBuyerCourse(input: { title: string; description: string; price: number; content: string; coverImage?: string | null }) {
+export async function createBuyerCourse(input: { title: string; description: string; price: number; content: string; coverImage?: string | null; whatsapp?: string | null }) {
   const supabase = createClient();
   const {
     data: { user },
@@ -637,6 +637,7 @@ export async function createBuyerCourse(input: { title: string; description: str
       content: input.content,
       creator_id: user.id,
       cover_image: input.coverImage || null,
+      creator_whatsapp: input.whatsapp || null,
       source: "buyer",
       audience: "all",
       status: "pending",
@@ -648,7 +649,7 @@ export async function createBuyerCourse(input: { title: string; description: str
   return { res: { ok: true } as Response, payload: { ok: true, course: { ...toCourse(data), content: input.content } } };
 }
 
-export async function updateBuyerCourse(id: string, input: { title: string; description: string; price: number; content: string; coverImage?: string | null }) {
+export async function updateBuyerCourse(id: string, input: { title: string; description: string; price: number; content: string; coverImage?: string | null; whatsapp?: string | null }) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("courses")
@@ -660,6 +661,7 @@ export async function updateBuyerCourse(id: string, input: { title: string; desc
       commission: 0,
       content: input.content,
       ...(input.coverImage !== undefined ? { cover_image: input.coverImage } : {}),
+      ...(input.whatsapp !== undefined ? { creator_whatsapp: input.whatsapp || null } : {}),
       status: "pending",
       is_published: false,
       rejection_reason: null,

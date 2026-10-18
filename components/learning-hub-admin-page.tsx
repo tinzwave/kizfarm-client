@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import DOMPurify from "isomorphic-dompurify";
-import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, getCourseContent } from "@/lib/kizfarm/supabase-data";
+import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 import CourseCoverInput from "./course-cover-input";
@@ -65,6 +65,9 @@ export default function LearningHubAdminPage() {
   // getCourseContent's authorization check) -- fetched on demand per course
   // when its review panel is opened.
   const [reviewContent, setReviewContent] = useState<Record<string, string>>({});
+  // Same on-demand pattern for the creator's WhatsApp (not in the list
+  // payload either); null means the creator didn't give one.
+  const [reviewWhatsapp, setReviewWhatsapp] = useState<Record<string, string | null>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<"approved" | "rejected" | "">("");
   const [releasingPayoutId, setReleasingPayoutId] = useState("");
   const [reviewForm, setReviewForm] = useState({ commission: "", rejectionReason: "" });
@@ -348,6 +351,12 @@ export default function LearningHubAdminPage() {
                             />
                           )}
                         </div>
+                        <div className="rounded-lg border border-gray-200 p-4 text-sm text-slate-700">
+                          <span className="font-bold">Creator WhatsApp (shown to subscribers for 30 days): </span>
+                          {reviewWhatsapp[course._id] === undefined
+                            ? "Loading…"
+                            : reviewWhatsapp[course._id] || "Not provided"}
+                        </div>
                         <div className="space-y-3 rounded-lg bg-slate-50 p-4">
                           <input min="0" type="number" value={reviewForm.commission} onChange={(e) => setReviewForm({ ...reviewForm, commission: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm" placeholder="Admin commission to add, e.g. 3000" />
                           <textarea value={reviewForm.rejectionReason} onChange={(e) => setReviewForm({ ...reviewForm, rejectionReason: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm" rows={3} placeholder="Rejection reason" />
@@ -367,6 +376,11 @@ export default function LearningHubAdminPage() {
                           if (reviewContent[course._id] === undefined) {
                             void getCourseContent(course._id).then(({ res, payload }) => {
                               if (res.ok) setReviewContent((prev) => ({ ...prev, [course._id]: payload.content as string }));
+                            });
+                          }
+                          if (reviewWhatsapp[course._id] === undefined) {
+                            void getCourseCreatorContact(course._id).then(({ res, payload }) => {
+                              setReviewWhatsapp((prev) => ({ ...prev, [course._id]: res.ok ? payload.whatsapp ?? null : null }));
                             });
                           }
                         }}

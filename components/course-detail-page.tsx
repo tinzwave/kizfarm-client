@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import DOMPurify from "isomorphic-dompurify";
-import { getCourseAccess, getCourseById, getCourseContent, getCourseReviews } from "@/lib/kizfarm/supabase-data";
+import { getCourseAccess, getCourseById, getCourseContent, getCourseCreatorContact, getCourseReviews } from "@/lib/kizfarm/supabase-data";
 import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
 
 interface Tutor {
@@ -25,6 +25,22 @@ interface Course {
   coverImage?: string;
   source?: "admin" | "buyer";
   tutor?: Tutor;
+  creator?: { _id: string; name: string };
+  hasWhatsappGuidance?: boolean;
+}
+
+interface CreatorContact {
+  whatsapp: string | null;
+  accessUntil: string | null;
+  expired: boolean;
+}
+
+// wa.me needs the number in international form with digits only. Nigerian
+// numbers are often typed locally ("0801..."), so swap the leading 0 for 234.
+function whatsappLink(number: string) {
+  let digits = number.replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = `234${digits.slice(1)}`;
+  return `https://wa.me/${digits}`;
 }
 
 interface Review {
@@ -63,6 +79,7 @@ export default function CourseDetailPage() {
   // active subscription server-side.
   const [hasAccess, setHasAccess] = useState(false);
   const [showCoach, setShowCoach] = useState(false);
+  const [creatorContact, setCreatorContact] = useState<CreatorContact | null>(null);
   const [error, setError] = useState("");
 
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -78,6 +95,7 @@ export default function CourseDetailPage() {
       if (!courseId) return;
       setError("");
       setHasAccess(false);
+      setCreatorContact(null);
 
       // Base metadata (title, price, description, cover) is always safe to
       // show -- it's public preview info. The lesson content itself is
@@ -99,6 +117,17 @@ export default function CourseDetailPage() {
 
       setCourse((prev) => (prev ? { ...prev, content: content.payload.content as string } : prev));
       setHasAccess(true);
+
+      if (base.payload.course?.source === "buyer") {
+        const contact = await getCourseCreatorContact(courseId);
+        if (contact.res.ok && (contact.payload.whatsapp || contact.payload.expired)) {
+          setCreatorContact({
+            whatsapp: contact.payload.whatsapp,
+            accessUntil: contact.payload.accessUntil,
+            expired: contact.payload.expired,
+          });
+        }
+      }
     }
     loadCourse();
   }, [courseId, source, wantsAccess]);
@@ -293,11 +322,52 @@ export default function CourseDetailPage() {
                   <div className="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">Course unlocked</div>
                 )
               ) : (
+                <>
+                {course.hasWhatsappGuidance && (
+                  <div className="mt-4 flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-900">
+                    <span className="material-symbols-outlined text-[18px]">chat</span>
+                    <span>Includes 30 days of WhatsApp guidance from {course.creator?.name || "the course creator"}.</span>
+                  </div>
+                )}
                 <Link href={`/learning/checkout?courseId=${course._id}&source=${source}&returnTo=${encodeURIComponent(returnTo)}`} className="mt-5 block w-full rounded-lg bg-green-800 px-4 py-3 text-center font-bold text-white hover:bg-green-900">
                   Subscribe
                 </Link>
+                </>
               )}
             </div>
+
+            {creatorContact && (
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-bold">Guidance on WhatsApp</h2>
+                {creatorContact.expired ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Your 30-day WhatsApp guidance period with {course.creator?.name || "the course creator"} ended on{" "}
+                    {new Date(creatorContact.accessUntil!).toLocaleDateString()}. You still have full access to the course.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Message {course.creator?.name || "the course creator"} for help while you put this course into practice on your farm.
+                    </p>
+                    <p className="mt-3 text-sm"><span className="font-bold">WhatsApp:</span> {creatorContact.whatsapp}</p>
+                    <a
+                      href={whatsappLink(creatorContact.whatsapp!)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-3 font-bold text-white hover:bg-[#1ebe5a]"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">chat</span>
+                      Chat on WhatsApp
+                    </a>
+                    {creatorContact.accessUntil && (
+                      <p className="mt-3 text-xs text-slate-500">
+                        Available until {new Date(creatorContact.accessUntil).toLocaleDateString()} (30 days from your purchase).
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {course.tutor && (
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">

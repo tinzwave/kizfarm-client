@@ -954,6 +954,7 @@ function toCourse(c: any) {
     finalPrice: c.final_price,
     commission: c.commission,
     coverImage: c.cover_image,
+    hasWhatsappGuidance: !!c.has_creator_whatsapp,
     source: c.source,
     audience: c.audience,
     status: c.status,
@@ -971,13 +972,23 @@ function toCourse(c: any) {
 // bare "*" here would make every one of these queries fail outright.
 // Content is only ever readable through getCourseContent()'s gated RPC.
 const COURSE_SELECT =
-  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email)";
+  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, has_creator_whatsapp, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email)";
 
 export async function getCourseContent(courseId: string) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("get_course_content", { p_course_id: courseId });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   return { res: { ok: true } as Response, payload: { ok: true, content: data as string } };
+}
+
+// The creator's WhatsApp is only handed out by this RPC: to the creator,
+// admins, and subscribers within 30 days of paying (expired: true after).
+export async function getCourseCreatorContact(courseId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_course_creator_contact", { p_course_id: courseId });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  const d = (data || {}) as { whatsapp: string | null; accessUntil: string | null; expired: boolean };
+  return { res: { ok: true } as Response, payload: { ok: true, whatsapp: d.whatsapp, accessUntil: d.accessUntil, expired: d.expired } };
 }
 
 export async function getTutors() {

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
-import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent } from "@/lib/kizfarm/supabase-data";
+import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
@@ -34,15 +35,25 @@ function onlyDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
+// Mirrors the courses_creator_whatsapp_format check in the database.
+function isValidWhatsapp(value: string) {
+  const digits = onlyDigits(value).length;
+  return /^\+?\d[\d -]*\d$/.test(value) && digits >= 7 && digits <= 15;
+}
+
 const emptyCourse = {
   title: "",
   description: "",
   price: "",
   content: "<h2>Course overview</h2><p>Add lessons, images, and YouTube videos here.</p>",
   coverImage: null as string | null,
+  whatsapp: "",
 };
 
 export default function BuyerCoursesPage() {
+  // Farmers reach this page at /learning/my-courses and buyers at
+  // /buyer/courses; course links come back to whichever one they used.
+  const returnTo = usePathname() || "/buyer/courses";
   const [activeTab, setActiveTab] = useState<"browse" | "mine" | "create">("browse");
   const [courses, setCourses] = useState<BuyerCourse[]>([]);
   const [myCourses, setMyCourses] = useState<BuyerCourse[]>([]);
@@ -121,13 +132,17 @@ export default function BuyerCoursesPage() {
     // course.content isn't in the list payload anymore (gated behind
     // getCourseContent's authorization check) -- fetched here instead,
     // authorized since this buyer is the course's own creator.
-    const { res, payload } = await getCourseContent(course._id);
+    const [{ res, payload }, contact] = await Promise.all([
+      getCourseContent(course._id),
+      getCourseCreatorContact(course._id),
+    ]);
     setForm({
       title: course.title,
       description: course.description,
       price: String(course.price),
       content: (res.ok ? payload.content : undefined) || emptyCourse.content,
       coverImage: course.coverImage ?? null,
+      whatsapp: (contact.res.ok ? contact.payload.whatsapp : null) || "",
     });
     setActiveTab("create");
   }
@@ -136,12 +151,19 @@ export default function BuyerCoursesPage() {
     e.preventDefault();
     setMessage("");
 
+    const whatsapp = form.whatsapp.trim();
+    if (whatsapp && !isValidWhatsapp(whatsapp)) {
+      setMessage("Enter a valid WhatsApp number, e.g. +234 801 234 5678, or leave it empty.");
+      return;
+    }
+
     const body = {
       title: form.title,
       description: form.description,
       price: Number(form.price),
       content: form.content,
       coverImage: form.coverImage,
+      whatsapp,
     };
     const { res, payload } = editingCourse
       ? await updateBuyerCourse(editingCourse._id, body)
@@ -172,7 +194,7 @@ export default function BuyerCoursesPage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div>
             <h1 className="text-xl font-bold text-green-900">Courses</h1>
-            <p className="text-xs text-slate-500">Buyer-created training, reviewed by KizFarm</p>
+            <p className="text-xs text-slate-500">Community-created training, reviewed by KizFarm</p>
           </div>
           <button onClick={() => setActiveTab("create")} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
             Create Course
@@ -184,8 +206,8 @@ export default function BuyerCoursesPage() {
         <section className="overflow-hidden rounded-lg bg-green-900 text-white">
           <div className="grid gap-5 p-6 md:grid-cols-[1fr_340px]">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-green-200">Buyer Learning Market</p>
-              <h2 className="mt-3 max-w-2xl text-3xl font-bold">Publish practical courses and buy approved buyer-led courses.</h2>
+              <p className="text-xs font-bold uppercase tracking-widest text-green-200">Community Learning Market</p>
+              <h2 className="mt-3 max-w-2xl text-3xl font-bold">Publish practical courses and buy approved community courses.</h2>
               <p className="mt-3 max-w-xl text-sm leading-6 text-green-50">Courses you create are reviewed by admins before they appear for buyers and farmers.</p>
             </div>
             <div className="grid grid-cols-3 gap-3 rounded-lg bg-white/10 p-4 text-center">
@@ -223,14 +245,14 @@ export default function BuyerCoursesPage() {
             ))}
           </div>
           {activeTab === "browse" && (
-            <input value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm md:w-80" placeholder="Search buyer courses" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm md:w-80" placeholder="Search community courses" />
           )}
         </div>
 
         {activeTab === "browse" && (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleCourses.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 md:col-span-2 xl:col-span-3">No new buyer courses to browse.</div>
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 md:col-span-2 xl:col-span-3">No new community courses to browse.</div>
             ) : (
               visibleCourses.map((course) => (
                 <article key={course._id} className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -238,14 +260,14 @@ export default function BuyerCoursesPage() {
                     className={`h-32 bg-cover bg-center p-5 text-white ${course.coverImage ? "" : "bg-gradient-to-br from-green-900 to-cyan-800"}`}
                     style={course.coverImage ? { backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.15)), url(${course.coverImage})` } : undefined}
                   >
-                    <p className="text-xs font-bold uppercase tracking-widest opacity-80">Buyer Course</p>
+                    <p className="text-xs font-bold uppercase tracking-widest opacity-80">Community Course</p>
                     <h3 className="mt-3 line-clamp-2 text-xl font-bold">{course.title}</h3>
                   </div>
                   <div className="space-y-4 p-5">
                     <p className="line-clamp-3 text-sm leading-6 text-slate-600">{course.description}</p>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-green-800">NGN {(course.finalPrice ?? course.price).toLocaleString()}</span>
-                      <Link href={`/learning/course?courseId=${course._id}${subscribedIds.has(course._id) ? "&access=1" : ""}&source=buyer&returnTo=/buyer/courses`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+                      <Link href={`/learning/course?courseId=${course._id}${subscribedIds.has(course._id) ? "&access=1" : ""}&source=buyer&returnTo=${encodeURIComponent(returnTo)}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
                         {subscribedIds.has(course._id) ? "Open" : "Details"}
                       </Link>
                     </div>
@@ -271,7 +293,7 @@ export default function BuyerCoursesPage() {
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{sub.course.description}</p>
                       <div className="mt-5 flex items-center justify-between">
                         <span className="font-bold text-green-800">NGN {(sub.course.finalPrice ?? sub.course.price).toLocaleString()}</span>
-                        <Link href={`/learning/course?courseId=${sub.course._id}&access=1&source=buyer&returnTo=/buyer/courses`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+                        <Link href={`/learning/course?courseId=${sub.course._id}&access=1&source=buyer&returnTo=${encodeURIComponent(returnTo)}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
                           Continue
                         </Link>
                       </div>
@@ -374,6 +396,18 @@ export default function BuyerCoursesPage() {
             <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2" placeholder="Course title" />
             <textarea required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2" placeholder="Course description" rows={3} />
             <input required min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full rounded-lg border border-gray-300 px-4 py-2 md:w-72" placeholder="Base price" type="number" />
+            <div>
+              <input
+                value={form.whatsapp}
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value.replace(/[^\d+\s-]/g, "").slice(0, 20) })}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2 md:w-72"
+                placeholder="WhatsApp number (optional), e.g. +234 801 234 5678"
+                inputMode="tel"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Subscribers can message you on WhatsApp for guidance during the first 30 days after they buy the course. It is never shown publicly.
+              </p>
+            </div>
             <CourseCoverInput value={form.coverImage} onChange={(coverImage) => setForm({ ...form, coverImage })} />
             <LearningRichEditor value={form.content} onChange={(content) => setForm({ ...form, content })} />
             <div className="flex flex-wrap gap-3">
