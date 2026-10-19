@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeCourseHtml } from "@/lib/kizfarm/sanitize-course-html";
 import { getCourseAccess, getCourseById, getCourseContent, getCourseCreatorContact, getCourseReviews } from "@/lib/kizfarm/supabase-data";
 import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
 
@@ -227,7 +227,7 @@ export default function CourseDetailPage() {
 
             <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               {hasAccess ? (
-                <div className="prose max-w-none prose-headings:text-green-950 prose-a:text-green-800" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(course.content ?? "") }} />
+                <div className="prose max-w-none prose-headings:text-green-950 prose-a:text-green-800 [&_iframe]:my-6 [&_iframe]:aspect-video [&_iframe]:h-auto [&_iframe]:w-full [&_iframe]:rounded-xl [&_img]:w-full [&_img]:rounded-xl [&_img]:shadow-sm" dangerouslySetInnerHTML={{ __html: sanitizeCourseHtml(course.content ?? "") }} />
               ) : (
                 <div>
                   <h2 className="text-xl font-bold">About this course</h2>

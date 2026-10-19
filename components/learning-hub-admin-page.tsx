@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import DOMPurify from "isomorphic-dompurify";
+import { sanitizeCourseHtml } from "@/lib/kizfarm/sanitize-course-html";
 import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
@@ -354,7 +354,7 @@ export default function LearningHubAdminPage() {
                           ) : (
                             <div
                               className="prose max-w-none p-5 prose-headings:text-green-950 prose-a:text-green-800 [&_iframe]:aspect-video [&_iframe]:h-auto [&_iframe]:w-full [&_iframe]:rounded-lg [&_iframe]:border-0 [&_img]:max-h-[520px] [&_img]:w-full [&_img]:rounded-lg [&_img]:object-contain"
-                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(reviewContent[course._id]) }}
+                              dangerouslySetInnerHTML={{ __html: sanitizeCourseHtml(reviewContent[course._id]) }}
                             />
                           )}
                         </div>
