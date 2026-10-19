@@ -19,8 +19,10 @@ export default function AdminShell({
       const { res, payload } = await getAdminRecentActivity();
       if (res.ok) {
         const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        // Recent activity, plus anything still waiting on an admin (pending
+        // courses) however old it is.
         const count = (payload.items || []).filter(
-          (i: { createdAt: string }) => new Date(i.createdAt).getTime() > dayAgo,
+          (i: { createdAt: string; needsAction?: boolean }) => i.needsAction || new Date(i.createdAt).getTime() > dayAgo,
         ).length;
         setRecentCount(count);
       }

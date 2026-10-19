@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { CartProvider } from "@/lib/kizfarm/cart-context";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "KIZ FARM",
@@ -50,6 +51,7 @@ export default function RootLayout({
         <CartProvider>
           {children}
         </CartProvider>
+        <Toaster position="top-center" richColors closeButton />
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

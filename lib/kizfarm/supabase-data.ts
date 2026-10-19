@@ -1761,7 +1761,7 @@ export async function getAdminReviews({ limit = 100 }: { limit?: number } = {}) 
 export async function getAdminRecentActivity() {
   const supabase = createClient();
 
-  const [ordersRes, farmersRes, buyersRes] = await Promise.all([
+  const [ordersRes, farmersRes, buyersRes, coursesRes] = await Promise.all([
     supabase
       .from("orders")
       .select("id, status, updated_at, total")
@@ -1779,10 +1779,20 @@ export async function getAdminRecentActivity() {
       .eq("role", "user")
       .order("created_at", { ascending: false })
       .limit(10),
+    // Every community course waiting for review -- not just recent ones --
+    // since each needs an admin decision before it can go live.
+    supabase
+      .from("courses")
+      .select("id, title, created_at, updated_at, profiles!creator_id(name)")
+      .eq("source", "buyer")
+      .eq("status", "pending")
+      .order("updated_at", { ascending: false })
+      .limit(50),
   ]);
   if (ordersRes.error) return { res: { ok: false } as Response, payload: { error: ordersRes.error.message } };
   if (farmersRes.error) return { res: { ok: false } as Response, payload: { error: farmersRes.error.message } };
   if (buyersRes.error) return { res: { ok: false } as Response, payload: { error: buyersRes.error.message } };
+  if (coursesRes.error) return { res: { ok: false } as Response, payload: { error: coursesRes.error.message } };
 
   const orderEvents = (ordersRes.data || []).map((o) => ({
     id: `order-${o.id}`,
@@ -1811,7 +1821,20 @@ export async function getAdminRecentActivity() {
     link: `/admin/buyers`,
   }));
 
-  const items = [...orderEvents, ...farmerEvents, ...buyerEvents].sort(
+  const courseEvents = (coursesRes.data || []).map((c: any) => {
+    const resubmitted = c.updated_at && new Date(c.updated_at).getTime() - new Date(c.created_at).getTime() > 60_000;
+    return {
+      id: `course-${c.id}`,
+      type: "course" as const,
+      message: `${resubmitted ? "Course updated and resubmitted" : "New course waiting for approval"}: "${c.title}"${c.profiles?.name ? ` by ${c.profiles.name}` : ""}`,
+      amount: null,
+      createdAt: c.updated_at || c.created_at,
+      link: `/learning/admin?tab=buyerCourses`,
+      needsAction: true,
+    };
+  });
+
+  const items = [...courseEvents, ...orderEvents, ...farmerEvents, ...buyerEvents].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 

@@ -54,19 +54,54 @@ Deno.serve(async (req) => {
     }
 
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);
+    const admin = adminClient();
+
+    // The reference must be one create-flutterwave-course-payment staged
+    // for this same buyer and course. Without this, a payment made for a
+    // cheaper course (or by someone else) could be replayed to unlock a
+    // different one.
+    const { data: intent } = await admin
+      .from("course_payment_intents")
+      .select("user_id, course_id")
+      .eq("reference", paymentReference)
+      .maybeSingle();
+    if (!intent || intent.user_id !== user.id || intent.course_id !== courseId) {
+      return jsonResponse({ error: "This payment reference does not belong to this course." }, { status: 400 });
+    }
+
+    // The webhook may already have activated it -- succeed without
+    // re-sending the purchase emails.
+    const { data: activated } = await admin
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("course_id", courseId)
+      .eq("payment_reference", paymentReference)
+      .eq("status", "active")
+      .maybeSingle();
+    if (activated) {
+      return jsonResponse({ ok: true, subscription: activated });
+    }
 
     const verification = await verifyFlutterwaveTransaction(paymentReference);
     if (!verification.success) {
+      // Bank transfer / USSD payments sit in "pending" for a while. Not an
+      // error: the client keeps checking, and the webhook activates the
+      // course once Flutterwave confirms it.
+      if (verification.status === "pending") {
+        return jsonResponse({ ok: false, pending: true, error: "Payment is still being confirmed." }, { status: 202 });
+      }
       return jsonResponse({ error: verification.message || "Payment verification failed." }, { status: 400 });
     }
-    if (Math.abs(verification.amount! - payableAmount) > 10) {
+    // Overpaying is harmless; anything short of the price is rejected
+    // (0.5 allows for kobo rounding only).
+    if (verification.amount! + 0.5 < payableAmount) {
       return jsonResponse(
         { error: `Payment amount mismatch. Expected: NGN${payableAmount}, Paid: NGN${verification.amount}` },
         { status: 400 },
       );
     }
 
-    const admin = adminClient();
     const { data: subscription, error: subErr } = await admin.rpc("activate_subscription", {
       p_user_id: user.id,
       p_course_id: courseId,

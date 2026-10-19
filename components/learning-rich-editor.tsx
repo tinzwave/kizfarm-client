@@ -6,15 +6,19 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Heading2, ImageIcon, Italic, List, Upload, Video, X } from "lucide-react";
 import React, { useRef, useState } from "react";
+import { uploadCourseCover } from "@/lib/kizfarm/supabase-mutations";
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-export default function LearningRichEditor({ value, onChange }: Props) {
+export default function LearningRichEditor({ value, onChange, onUploadingChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [urlModal, setUrlModal] = useState<{ type: "image" | "youtube"; value: string } | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState("");
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -34,14 +38,23 @@ export default function LearningRichEditor({ value, onChange }: Props) {
 
   if (!editor) return null;
 
-  const insertLocalImage = (file?: File) => {
+  // Upload to storage and insert the hosted URL. Embedding the photo as
+  // base64 put multi-megabyte images inside the course content, so saving
+  // a course with phone photos took minutes on mobile data or failed.
+  const insertLocalImage = async (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = String(reader.result || "");
-      if (src) editor.chain().focus().setImage({ src }).run();
-    };
-    reader.readAsDataURL(file);
+    setImageError("");
+    setUploadingImage(true);
+    onUploadingChange?.(true);
+    try {
+      const src = await uploadCourseCover(file);
+      editor.chain().focus().setImage({ src }).run();
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Could not upload the image.");
+    } finally {
+      setUploadingImage(false);
+      onUploadingChange?.(false);
+    }
   };
 
   const buttonClass =
@@ -107,6 +120,7 @@ export default function LearningRichEditor({ value, onChange }: Props) {
           className={buttonClass}
           type="button"
           title="Upload image"
+          disabled={uploadingImage}
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload size={16} />
@@ -130,6 +144,8 @@ export default function LearningRichEditor({ value, onChange }: Props) {
           }}
         />
       </div>
+      {uploadingImage && <p className="border-x border-gray-300 bg-green-50 px-4 py-2 text-xs font-semibold text-green-800">Uploading image...</p>}
+      {imageError && <p className="border-x border-gray-300 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700">{imageError}</p>}
       <EditorContent editor={editor} />
 
       {urlModal && (
@@ -148,7 +164,12 @@ export default function LearningRichEditor({ value, onChange }: Props) {
               value={urlModal.value}
               onChange={(e) => setUrlModal({ ...urlModal, value: e.target.value })}
               onKeyDown={(e) => {
-                if (e.key === "Enter") confirmUrlModal();
+                // The editor sits inside the course form: without
+                // preventDefault, Enter here would submit the whole course.
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  confirmUrlModal();
+                }
                 if (e.key === "Escape") setUrlModal(null);
               }}
               placeholder={urlModal.type === "image" ? "https://example.com/image.jpg" : "https://youtube.com/watch?v=..."}

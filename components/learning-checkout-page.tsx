@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { getCourseById } from "@/lib/kizfarm/supabase-data";
-import { initiateCoursePayment, purchaseCourse } from "@/lib/kizfarm/supabase-mutations";
+import { initiateCoursePayment, confirmCoursePurchase } from "@/lib/kizfarm/supabase-mutations";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
+import { toast } from "sonner";
 
 interface Course {
   _id: string;
@@ -28,6 +29,9 @@ export default function LearningCheckoutPage() {
   // Set once we've kicked off (or are auto-finalizing) a payment, so the
   // "Pay" button doesn't flash back in while we're confirming.
   const [finalizing, setFinalizing] = useState(false);
+  // Flutterwave took the money but hasn't settled it yet (bank transfer,
+  // USSD). The webhook will unlock the course -- never offer to pay again.
+  const [pendingRef, setPendingRef] = useState("");
 
   useEffect(() => {
     async function loadCourseAndProfile() {
@@ -61,8 +65,13 @@ export default function LearningCheckoutPage() {
     const ref = params.get("ref");
     if (!ref) return;
     // Flutterwave appends ?status=successful|cancelled to the return URL.
-    if (params.get("status") === "cancelled") {
-      void Promise.resolve().then(() => setError("Payment was cancelled. You can try again whenever you're ready."));
+    const status = params.get("status");
+    if (status === "cancelled") {
+      void Promise.resolve().then(() => setError("Payment was cancelled and you were not charged. You can try again whenever you're ready."));
+      return;
+    }
+    if (status === "failed") {
+      void Promise.resolve().then(() => setError("The payment failed and the course was not unlocked. Please try again or use another payment method."));
       return;
     }
 
@@ -72,18 +81,27 @@ export default function LearningCheckoutPage() {
       setFinalizing(true);
       setError("");
     });
-    purchaseCourse(courseId, ref)
+    confirmCoursePurchase(courseId, ref)
       .then(({ res, payload }) => {
-        if (!res.ok) {
-          setError(payload?.error || "Payment could not be confirmed. Reference: " + ref);
+        if ((payload as { pending?: boolean }).pending) {
+          setPendingRef(ref);
           setFinalizing(false);
           return;
         }
+        if (!res.ok) {
+          setError(`${payload?.error || "Payment could not be confirmed."} If you were charged, contact support@kizfarm.com with reference ${ref}.`);
+          setFinalizing(false);
+          return;
+        }
+        toast.success("Payment successful", {
+          description: "Your course is unlocked. Enjoy learning!",
+          duration: 6000,
+        });
         router.push(`/learning/course?courseId=${courseId}&access=1&source=${source}&returnTo=${encodeURIComponent(returnTo)}`);
       })
       .catch((err) => {
         console.error("Subscription activation error after Flutterwave return:", err);
-        setError("Payment could not be confirmed. Reference: " + ref);
+        setError(`We couldn't confirm your payment because of a connection problem. Don't pay again: refresh this page to check again, or contact support@kizfarm.com with reference ${ref}.`);
         setFinalizing(false);
       });
     // Only ever run once per landing on the page with a ref in the URL.
@@ -135,7 +153,20 @@ export default function LearningCheckoutPage() {
 
           {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-          {finalizing ? (
+          {pendingRef ? (
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-5">
+              <p className="flex items-center gap-1.5 text-sm font-bold text-amber-900">
+                <span className="material-symbols-outlined text-base">schedule</span> Payment received, waiting for confirmation
+              </p>
+              <p className="text-xs leading-relaxed text-amber-900">
+                Your bank is still confirming the payment. <strong>Please don&apos;t pay again.</strong> The course unlocks automatically as soon as Flutterwave confirms it, and you&apos;ll get a notification. This usually takes a few minutes.
+              </p>
+              <p className="text-xs text-amber-800">Reference: {pendingRef}</p>
+              <Link href={`/learning/course?courseId=${courseId}&source=${source}&returnTo=${encodeURIComponent(returnTo)}`} className="inline-block text-sm font-bold text-green-800 hover:underline">
+                Go to the course page
+              </Link>
+            </div>
+          ) : finalizing ? (
             <div className="rounded-lg bg-green-50/50 border border-green-100 p-5 flex items-center gap-3">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
               <p className="text-sm font-semibold text-green-900">Confirming your payment...</p>
@@ -151,9 +182,9 @@ export default function LearningCheckoutPage() {
             </div>
           )}
 
-          <button disabled={paying || finalizing || !courseId} className="w-full rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900 disabled:opacity-60 transition-colors">
+          {!pendingRef && <button disabled={paying || finalizing || !courseId || !course} className="w-full rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900 disabled:opacity-60 transition-colors">
             {finalizing ? "Confirming..." : paying ? "Redirecting to Flutterwave..." : `Pay NGN ${(course?.finalPrice ?? course?.price ?? 0).toLocaleString()}`}
-          </button>
+          </button>}
         </form>
 
         <aside className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm h-fit">

@@ -129,7 +129,8 @@ Deno.serve(async (req) => {
         const expectedCourseAmount = pricedCourse
           ? pricedCourse.source === "buyer" ? Number(pricedCourse.final_price ?? pricedCourse.price) : Number(pricedCourse.price)
           : NaN;
-        const amountOk = Math.abs(paidAmount - expectedCourseAmount) <= 10;
+        // Same rule as purchase-course: never less than the price.
+        const amountOk = paidAmount + 0.5 >= expectedCourseAmount;
         if (pricedCourse && !amountOk) {
           console.error(`Webhook amount mismatch for course ${courseId}: expected NGN${expectedCourseAmount}, paid NGN${paidAmount}`);
         }

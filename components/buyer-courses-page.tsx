@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 import React, { useEffect, useMemo, useState } from "react";
 import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
@@ -41,6 +42,22 @@ function isValidWhatsapp(value: string) {
   return /^\+?\d[\d -]*\d$/.test(value) && digits >= 7 && digits <= 15;
 }
 
+// Database/network errors are meaningless to a farmer -- translate the
+// common ones and fall back to a plain retry message.
+function friendlyCourseError(error?: string) {
+  const text = (error || "").toLowerCase();
+  if (!text) return "Could not create the course. Please try again.";
+  if (text.includes("not authenticated") || text.includes("jwt")) return "Your session has expired. Log in again, then submit the course.";
+  if (text.includes("failed to fetch") || text.includes("network") || text.includes("timeout")) {
+    return "Could not reach KizFarm. Check your internet connection and try again.";
+  }
+  if (text.includes("creator_whatsapp")) return "Enter a valid WhatsApp number, e.g. +234 801 234 5678, or leave it empty.";
+  if (text.includes("row-level security") || text.includes("permission denied")) {
+    return "Your account isn't allowed to create courses. Contact KizFarm support.";
+  }
+  return `Could not create the course: ${error}`;
+}
+
 const emptyCourse = {
   title: "",
   description: "",
@@ -67,7 +84,15 @@ export default function BuyerCoursesPage() {
   const [bankForm, setBankForm] = useState({ bankName: "", accountHolderName: "", accountNumber: "" });
   const [bankSaving, setBankSaving] = useState(false);
   const [bankMessage, setBankMessage] = useState("");
+  const [savedBank, setSavedBank] = useState("");
   const hasBankDetails = !!(bankForm.bankName && bankForm.accountHolderName && bankForm.accountNumber);
+  const bankDirty = JSON.stringify(bankForm) !== savedBank;
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  // Cover and lesson images upload as soon as they're picked; submitting
+  // before they finish would save the course without them.
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const trackUpload = (uploading: boolean) => setUploadingCount((n) => Math.max(0, n + (uploading ? 1 : -1)));
 
   async function loadData() {
     setLoading(true);
@@ -82,11 +107,13 @@ export default function BuyerCoursesPage() {
       if (mineRes.payload?.ok) setMyCourses(mineRes.payload.courses ?? []);
       if (subsRes.payload?.ok) setSubscriptions(subsRes.payload.subscriptions ?? []);
       if (profile) {
-        setBankForm({
+        const bank = {
           bankName: (profile as any).bank_name || "",
           accountHolderName: (profile as any).account_holder_name || "",
           accountNumber: (profile as any).account_number || "",
-        });
+        };
+        setBankForm(bank);
+        setSavedBank(JSON.stringify(bank));
       }
     } finally {
       setLoading(false);
@@ -107,7 +134,10 @@ export default function BuyerCoursesPage() {
     setBankSaving(true);
     try {
       const { res, payload } = await saveCreatorBankDetails(bankForm);
+      if (res.ok) setSavedBank(JSON.stringify(bankForm));
       setBankMessage(res.ok ? "Bank details saved." : payload?.error || "Could not save bank details.");
+    } catch {
+      setBankMessage("Could not save bank details. Check your internet connection and try again.");
     } finally {
       setBankSaving(false);
     }
@@ -129,6 +159,7 @@ export default function BuyerCoursesPage() {
   async function startEdit(course: BuyerCourse) {
     setEditingCourse(course);
     setMessage("");
+    setFormError("");
     // course.content isn't in the list payload anymore (gated behind
     // getCourseContent's authorization check) -- fetched here instead,
     // authorized since this buyer is the course's own creator.
@@ -149,36 +180,82 @@ export default function BuyerCoursesPage() {
 
   async function submitCourse(e: React.FormEvent) {
     e.preventDefault();
-    setMessage("");
-
-    const whatsapp = form.whatsapp.trim();
-    if (whatsapp && !isValidWhatsapp(whatsapp)) {
-      setMessage("Enter a valid WhatsApp number, e.g. +234 801 234 5678, or leave it empty.");
+    if (submitting) return;
+    if (uploadingCount > 0) {
+      toast.info("Please wait for the image to finish uploading", { duration: 5000 });
       return;
     }
 
-    const body = {
-      title: form.title,
-      description: form.description,
-      price: Number(form.price),
-      content: form.content,
-      coverImage: form.coverImage,
-      whatsapp,
+    const failed = (reason: string) => {
+      setFormError(reason);
+      toast.error(editingCourse ? "Changes not saved" : "Course was not created", {
+        description: `${reason} Your form has been kept, so you don't need to fill it again.`,
+        duration: 12000,
+      });
     };
-    const { res, payload } = editingCourse
-      ? await updateBuyerCourse(editingCourse._id, body)
-      : await createBuyerCourse(body);
+    setMessage("");
+    setFormError("");
 
-    if (!res.ok) {
-      setMessage(payload?.error || "Could not submit course.");
+    const title = form.title.trim();
+    const description = form.description.trim();
+    const price = Number(form.price);
+    const whatsapp = form.whatsapp.trim();
+    const contentText = form.content.replace(/<[^>]*>/g, "").trim();
+    const hasMedia = /<(img|iframe|video)\b/i.test(form.content);
+    let problem = "";
+    if (!title) problem = "Add a course title.";
+    else if (!description) problem = "Add a short course description.";
+    else if (form.price === "" || !Number.isFinite(price) || price < 0) problem = "Enter a valid price (0 or more).";
+    else if (whatsapp && !isValidWhatsapp(whatsapp)) problem = "Enter a valid WhatsApp number, e.g. +234 801 234 5678, or leave it empty.";
+    else if ((!contentText && !hasMedia) || form.content === emptyCourse.content) {
+      problem = "Add your course content (lessons, images or videos) in the editor.";
+    }
+    if (problem) {
+      setFormError(problem);
+      toast.error("Please complete the form", { description: problem, duration: 8000 });
       return;
     }
 
-    setMessage(editingCourse ? "Course updated and sent back for review." : "Course submitted for admin review.");
-    setEditingCourse(null);
-    setForm(emptyCourse);
-    setActiveTab("mine");
-    await loadData();
+    setSubmitting(true);
+    try {
+      // Bank details typed in but never saved would otherwise be lost when
+      // the page reloads its data below -- save them along with the course.
+      if (hasBankDetails && bankDirty) {
+        await saveBankDetails();
+      }
+
+      const body = { title, description, price, content: form.content, coverImage: form.coverImage, whatsapp };
+      const { res, payload } = editingCourse
+        ? await updateBuyerCourse(editingCourse._id, body)
+        : await createBuyerCourse(body);
+
+      if (!res.ok) {
+        failed(friendlyCourseError(payload?.error));
+        return;
+      }
+
+      const created = !editingCourse;
+      toast.success(created ? "Course created successfully" : "Changes saved", {
+        description: `"${title}" has been sent to the KizFarm admin team for verification. It will be visible to buyers and farmers once approved, and you'll get a notification when it's reviewed.`,
+        duration: 10000,
+      });
+      setMessage(
+        created
+          ? `"${title}" was created and is waiting for admin verification. It goes live once an admin approves it.`
+          : `Your changes to "${title}" were saved and sent back for admin verification.`,
+      );
+      setEditingCourse(null);
+      setForm(emptyCourse);
+      setActiveTab("mine");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      // The course is saved at this point; a failed refresh must not be
+      // reported as "Course was not created".
+      void loadData().catch(() => undefined);
+    } catch (err) {
+      failed(friendlyCourseError(err instanceof Error ? err.message : undefined));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const statusClass = (status?: ReviewStatus) => {
@@ -196,9 +273,13 @@ export default function BuyerCoursesPage() {
             <h1 className="text-xl font-bold text-green-900">Courses</h1>
             <p className="text-xs text-slate-500">Community-created training, reviewed by KizFarm</p>
           </div>
-          <button onClick={() => setActiveTab("create")} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
-            Create Course
-          </button>
+          {/* Only opens the form -- hidden on the form itself, where people
+              clicked it expecting it to submit and "nothing happened". */}
+          {activeTab !== "create" && (
+            <button onClick={() => { setFormError(""); setActiveTab("create"); }} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+              Create Course
+            </button>
+          )}
         </div>
       </header>
 
@@ -227,7 +308,13 @@ export default function BuyerCoursesPage() {
           </div>
         </section>
 
-        {message && <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">{message}</div>}
+        {message && (
+          <div role="status" className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            <span className="material-symbols-outlined text-[20px] text-green-700">verified</span>
+            <p className="flex-1 font-semibold">{message}</p>
+            <button type="button" onClick={() => setMessage("")} className="text-green-700 hover:text-green-900" aria-label="Dismiss">✕</button>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 rounded-lg bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap gap-2">
@@ -408,15 +495,30 @@ export default function BuyerCoursesPage() {
                 Subscribers can message you on WhatsApp for guidance during the first 30 days after they buy the course. It is never shown publicly.
               </p>
             </div>
-            <CourseCoverInput value={form.coverImage} onChange={(coverImage) => setForm({ ...form, coverImage })} />
-            <LearningRichEditor value={form.content} onChange={(content) => setForm({ ...form, content })} />
-            <div className="flex flex-wrap gap-3">
-              <button className="rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900">{editingCourse ? "Submit Changes" : "Submit for Review"}</button>
+            <CourseCoverInput value={form.coverImage} onChange={(coverImage) => setForm((f) => ({ ...f, coverImage }))} onUploadingChange={trackUpload} />
+            <LearningRichEditor value={form.content} onChange={(content) => setForm((f) => ({ ...f, content }))} onUploadingChange={trackUpload} />
+            {formError && (
+              <p role="alert" className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {formError}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={submitting || uploadingCount > 0}
+                className="inline-flex items-center gap-2 rounded-lg bg-green-800 px-5 py-3 font-bold text-white hover:bg-green-900 disabled:cursor-wait disabled:opacity-70"
+              >
+                {submitting && <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {submitting
+                  ? editingCourse ? "Saving..." : "Creating course..."
+                  : uploadingCount > 0 ? "Uploading image..." : editingCourse ? "Save Changes" : "Create Course"}
+              </button>
               {editingCourse && (
-                <button type="button" onClick={() => { setEditingCourse(null); setForm(emptyCourse); setActiveTab("mine"); }} className="rounded-lg border border-gray-200 px-5 py-3 font-bold text-slate-600 hover:bg-slate-50">
+                <button type="button" disabled={submitting} onClick={() => { setEditingCourse(null); setForm(emptyCourse); setFormError(""); setActiveTab("mine"); }} className="rounded-lg border border-gray-200 px-5 py-3 font-bold text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
               )}
+              <p className="text-xs text-slate-500">An admin reviews every course before it goes live.</p>
             </div>
           </form>
           </div>

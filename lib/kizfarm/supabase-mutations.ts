@@ -588,8 +588,8 @@ export async function uploadCourseCover(file: File): Promise<string> {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
-  if (!file.type.startsWith("image/")) throw new Error("Cover must be an image.");
-  if (file.size > 5 * 1024 * 1024) throw new Error("Cover image must be under 5 MB.");
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file (JPG or PNG).");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Image must be under 5 MB.");
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from("course-covers").upload(path, file, { contentType: file.type });
@@ -667,6 +667,8 @@ export async function updateBuyerCourse(id: string, input: { title: string; desc
       rejection_reason: null,
       reviewed_by: null,
       reviewed_at: null,
+      // Resubmissions surface again at the top of the admin's notifications.
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select(COURSE_SELECT)
@@ -723,7 +725,24 @@ export async function purchaseCourse(courseId: string, paymentReference: string)
     const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
     return { res: { ok: false } as Response, payload: { error: message } };
   }
+  if (data?.pending) {
+    return { res: { ok: false } as Response, payload: { pending: true, error: data.error as string } };
+  }
   return { res: { ok: true } as Response, payload: { ok: true, subscription: data.subscription } };
+}
+
+// Flutterwave reports bank-transfer/USSD payments as "pending" for a short
+// while after the buyer is sent back. Keep checking for ~40s; if it's still
+// pending after that, the flutterwave-webhook activates the course (and
+// notifies the buyer) once it settles, so the caller must not offer to pay
+// again.
+export async function confirmCoursePurchase(courseId: string, paymentReference: string, attempts = 8) {
+  let result = await purchaseCourse(courseId, paymentReference);
+  for (let i = 1; i < attempts && (result.payload as { pending?: boolean }).pending; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    result = await purchaseCourse(courseId, paymentReference);
+  }
+  return result;
 }
 
 // ===================== CHAT =====================

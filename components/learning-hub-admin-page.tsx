@@ -54,6 +54,13 @@ interface CoursePurchase {
 
 export default function LearningHubAdminPage() {
   const [activeTab, setActiveTab] = useState<"courses" | "buyerCourses" | "purchases" | "tutors">("courses");
+  // Deep link from admin notifications: /learning/admin?tab=buyerCourses
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "courses" || tab === "buyerCourses" || tab === "purchases" || tab === "tutors") {
+      void Promise.resolve().then(() => setActiveTab(tab));
+    }
+  }, []);
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [buyerCourses, setBuyerCourses] = useState<Course[]>([]);

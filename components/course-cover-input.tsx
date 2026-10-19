@@ -8,9 +8,11 @@ import { uploadCourseCover } from "@/lib/kizfarm/supabase-mutations";
 export default function CourseCoverInput({
   value,
   onChange,
+  onUploadingChange,
 }: {
   value: string | null | undefined;
   onChange: (url: string | null) => void;
+  onUploadingChange?: (uploading: boolean) => void;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -21,12 +23,14 @@ export default function CourseCoverInput({
     if (!file) return;
     setError("");
     setUploading(true);
+    onUploadingChange?.(true);
     try {
       onChange(await uploadCourseCover(file));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not upload the image.");
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
     }
   }
 
