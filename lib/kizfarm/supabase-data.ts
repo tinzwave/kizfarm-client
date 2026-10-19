@@ -962,7 +962,44 @@ function toCourse(c: any) {
     isPublished: c.is_published,
     createdAt: c.created_at,
     tutor: c.tutors ? toTutor(c.tutors) : undefined,
-    creator: c.profiles ? { _id: c.profiles.id, name: c.profiles.name, email: c.profiles.email } : undefined,
+    creator: c.profiles
+      ? { _id: c.profiles.id, name: c.profiles.name, email: c.profiles.email }
+      : c.course_creator_profile
+        ? { _id: c.course_creator_profile.id, name: c.course_creator_profile.name }
+        : undefined,
+    creatorProfile: toCreatorProfile(c.course_creator_profile),
+  };
+}
+
+// Public card for a community course's creator, from the
+// course_creator_profile computed field (0044) -- readable by any buyer,
+// unlike the creator's profiles row.
+export interface CreatorProfile {
+  id: string;
+  name: string;
+  photo?: string;
+  bio?: string;
+  role?: string;
+  verifiedFarmer: boolean;
+  farmName?: string;
+  location?: string;
+  coursesPublished: number;
+  memberSince?: string;
+}
+
+function toCreatorProfile(p: any): CreatorProfile | undefined {
+  if (!p) return undefined;
+  return {
+    id: p.id,
+    name: p.name || "KizFarm member",
+    photo: p.photo || undefined,
+    bio: p.bio || undefined,
+    role: p.role || undefined,
+    verifiedFarmer: !!p.verifiedFarmer,
+    farmName: p.farmName || undefined,
+    location: p.location || undefined,
+    coursesPublished: Number(p.coursesPublished) || 0,
+    memberSince: p.memberSince || undefined,
   };
 }
 
@@ -972,7 +1009,7 @@ function toCourse(c: any) {
 // bare "*" here would make every one of these queries fail outright.
 // Content is only ever readable through getCourseContent()'s gated RPC.
 const COURSE_SELECT =
-  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, has_creator_whatsapp, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email)";
+  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, has_creator_whatsapp, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email), course_creator_profile";
 
 export async function getCourseContent(courseId: string) {
   const supabase = createClient();

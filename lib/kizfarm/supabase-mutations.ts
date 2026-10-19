@@ -1089,6 +1089,23 @@ export async function submitReview(productId: string, input: { rating: number; c
   return { res: { ok: true } as Response, payload: { ok: true } };
 }
 
+// Public instructor details shown on the creator's courses (via the
+// course_creator_profile computed field, 0044).
+export async function saveCreatorProfile(input: { photo: string | null; bio: string }) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ profile_image: input.photo, bio: input.bio.trim() || null })
+    .eq("id", user.id);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true } };
+}
+
 export async function saveCreatorBankDetails(input: {
   bankName: string;
   accountHolderName: string;

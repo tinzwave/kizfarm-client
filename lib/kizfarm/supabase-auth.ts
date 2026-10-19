@@ -10,6 +10,7 @@ export type KizfarmProfile = {
   role: "user" | "admin" | "farmer";
   status: string;
   profile_image: string | null;
+  bio?: string | null;
   address: string | null;
   city: string | null;
   state: string | null;

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { sanitizeCourseHtml } from "@/lib/kizfarm/sanitize-course-html";
+import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
+import CourseCreatorCard, { CreatorAvatar } from "./course-creator-card";
 import { getCourseAccess, getCourseById, getCourseContent, getCourseCreatorContact, getCourseReviews } from "@/lib/kizfarm/supabase-data";
 import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
 
@@ -26,6 +28,7 @@ interface Course {
   source?: "admin" | "buyer";
   tutor?: Tutor;
   creator?: { _id: string; name: string };
+  creatorProfile?: CreatorProfile;
   hasWhatsappGuidance?: boolean;
 }
 
@@ -216,6 +219,17 @@ export default function CourseDetailPage() {
                 <p className="text-xs font-bold uppercase tracking-widest text-green-200">Course Detail</p>
                 <h1 className="mt-5 max-w-3xl text-4xl font-bold">{course.title}</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-green-50">{course.description}</p>
+                {course.creatorProfile && (
+                  <div className="mt-5 flex items-center gap-3">
+                    <CreatorAvatar creator={course.creatorProfile} size={40} />
+                    <div className="text-sm">
+                      <p className="font-bold text-white">By {course.creatorProfile.name}</p>
+                      {(course.creatorProfile.farmName || course.creatorProfile.location) && (
+                        <p className="text-green-100">{[course.creatorProfile.farmName, course.creatorProfile.location].filter(Boolean).join(" · ")}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {reviews.length > 0 && (
                   <div className="mt-4 flex items-center gap-2">
                     <Stars rating={reviewsAvg} />
@@ -368,6 +382,8 @@ export default function CourseDetailPage() {
                 )}
               </div>
             )}
+
+            {!course.tutor && course.creatorProfile && <CourseCreatorCard creator={course.creatorProfile} />}
 
             {course.tutor && (
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">

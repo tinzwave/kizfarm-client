@@ -4,6 +4,8 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { getCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile, redirectPathForRole } from "@/lib/kizfarm/supabase-auth";
+import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
+import { CreatorAvatar } from "./course-creator-card";
 
 interface Tutor {
   _id: string;
@@ -22,6 +24,7 @@ interface Course {
   content?: string;
   coverImage?: string;
   tutor?: Tutor;
+  creatorProfile?: CreatorProfile;
 }
 
 interface Subscription {
@@ -146,6 +149,12 @@ export default function LearningHubPage() {
                     <div className="flex items-center gap-3">
                       <img src={course.tutor.imageUrl} alt={course.tutor.name} className="h-10 w-10 rounded-full object-cover" />
                       <span className="text-sm font-semibold">{course.tutor.name}</span>
+                    </div>
+                  )}
+                  {!course.tutor && course.creatorProfile && (
+                    <div className="flex items-center gap-3">
+                      <CreatorAvatar creator={course.creatorProfile} size={40} />
+                      <span className="text-sm font-semibold">By {course.creatorProfile.name}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between">

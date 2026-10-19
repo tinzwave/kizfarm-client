@@ -6,9 +6,11 @@ import { toast } from "sonner";
 import React, { useEffect, useMemo, useState } from "react";
 import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
-import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails } from "@/lib/kizfarm/supabase-mutations";
+import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails, saveCreatorProfile, uploadCourseCover } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 import CourseCoverInput from "./course-cover-input";
+import { CreatorAvatar } from "./course-creator-card";
+import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
 
 type ReviewStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -24,6 +26,7 @@ interface BuyerCourse {
   status?: ReviewStatus;
   rejectionReason?: string;
   createdAt?: string;
+  creatorProfile?: CreatorProfile;
 }
 
 interface Subscription {
@@ -84,6 +87,12 @@ export default function BuyerCoursesPage() {
   const [bankForm, setBankForm] = useState({ bankName: "", accountHolderName: "", accountNumber: "" });
   const [bankSaving, setBankSaving] = useState(false);
   const [bankMessage, setBankMessage] = useState("");
+  const [creator, setCreator] = useState({ name: "", photo: null as string | null, bio: "" });
+  const [savedCreator, setSavedCreator] = useState("");
+  const creatorDirty = JSON.stringify({ photo: creator.photo, bio: creator.bio }) !== savedCreator;
+  const [creatorSaving, setCreatorSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [creatorMessage, setCreatorMessage] = useState("");
   const [savedBank, setSavedBank] = useState("");
   const hasBankDetails = !!(bankForm.bankName && bankForm.accountHolderName && bankForm.accountNumber);
   const bankDirty = JSON.stringify(bankForm) !== savedBank;
@@ -114,6 +123,10 @@ export default function BuyerCoursesPage() {
         };
         setBankForm(bank);
         setSavedBank(JSON.stringify(bank));
+        const photo = profile.profile_image || null;
+        const bio = profile.bio || "";
+        setCreator({ name: profile.name || "", photo, bio });
+        setSavedCreator(JSON.stringify({ photo, bio }));
       }
     } finally {
       setLoading(false);
@@ -123,6 +136,41 @@ export default function BuyerCoursesPage() {
   useEffect(() => {
     void Promise.resolve().then(() => loadData());
   }, []);
+
+  async function pickCreatorPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setCreatorMessage("");
+    setPhotoUploading(true);
+    try {
+      const photo = await uploadCourseCover(file);
+      setCreator((c) => ({ ...c, photo }));
+    } catch (err) {
+      setCreatorMessage(err instanceof Error ? err.message : "Could not upload the photo.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  async function saveCreator(quiet = false) {
+    setCreatorMessage("");
+    setCreatorSaving(true);
+    try {
+      const { res, payload } = await saveCreatorProfile({ photo: creator.photo, bio: creator.bio });
+      if (res.ok) {
+        setSavedCreator(JSON.stringify({ photo: creator.photo, bio: creator.bio.trim() }));
+        setCreator((c) => ({ ...c, bio: c.bio.trim() }));
+        if (!quiet) toast.success("Instructor profile saved", { description: "Buyers will see it on all your courses." });
+      } else {
+        setCreatorMessage(payload?.error || "Could not save your profile.");
+      }
+    } catch {
+      setCreatorMessage("Could not save your profile. Check your internet connection and try again.");
+    } finally {
+      setCreatorSaving(false);
+    }
+  }
 
   async function saveBankDetails() {
     setBankMessage("");
@@ -181,7 +229,7 @@ export default function BuyerCoursesPage() {
   async function submitCourse(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    if (uploadingCount > 0) {
+    if (uploadingCount > 0 || photoUploading) {
       toast.info("Please wait for the image to finish uploading", { duration: 5000 });
       return;
     }
@@ -222,6 +270,9 @@ export default function BuyerCoursesPage() {
       // the page reloads its data below -- save them along with the course.
       if (hasBankDetails && bankDirty) {
         await saveBankDetails();
+      }
+      if (creatorDirty) {
+        await saveCreator(true);
       }
 
       const body = { title, description, price, content: form.content, coverImage: form.coverImage, whatsapp };
@@ -352,6 +403,15 @@ export default function BuyerCoursesPage() {
                   </div>
                   <div className="space-y-4 p-5">
                     <p className="line-clamp-3 text-sm leading-6 text-slate-600">{course.description}</p>
+                    {course.creatorProfile && (
+                      <div className="flex items-center gap-3">
+                        <CreatorAvatar creator={course.creatorProfile} size={36} />
+                        <div className="min-w-0 text-sm">
+                          <p className="truncate font-semibold text-slate-800">By {course.creatorProfile.name}</p>
+                          {course.creatorProfile.verifiedFarmer && <p className="text-xs font-semibold text-green-700">Verified farmer</p>}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-green-800">NGN {(course.finalPrice ?? course.price).toLocaleString()}</span>
                       <Link href={`/learning/course?courseId=${course._id}${subscribedIds.has(course._id) ? "&access=1" : ""}&source=buyer&returnTo=${encodeURIComponent(returnTo)}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
@@ -430,6 +490,56 @@ export default function BuyerCoursesPage() {
 
         {activeTab === "create" && (
           <div className="space-y-5">
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold">Your Instructor Profile</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Shown on every course you publish, so buyers know who is teaching them. Your email, phone and bank details are never shown.
+              </p>
+              <div className="mt-4 flex flex-col gap-5 md:flex-row">
+                <div className="flex shrink-0 flex-col items-center gap-2">
+                  <div className="relative">
+                    <CreatorAvatar creator={{ name: creator.name || "You", photo: creator.photo || undefined }} size={96} />
+                    {photoUploading && (
+                      <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                        <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      </span>
+                    )}
+                  </div>
+                  <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-gray-50">
+                    {creator.photo ? "Change photo" : "Add photo"}
+                    <input type="file" accept="image/*" className="hidden" onChange={pickCreatorPhoto} disabled={photoUploading} />
+                  </label>
+                  {creator.photo && (
+                    <button type="button" onClick={() => setCreator((c) => ({ ...c, photo: null }))} className="text-xs font-semibold text-red-600 hover:underline">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-slate-800">{creator.name || "Your name"}</p>
+                  <textarea
+                    value={creator.bio}
+                    onChange={(e) => setCreator((c) => ({ ...c, bio: e.target.value.slice(0, 600) }))}
+                    rows={4}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm"
+                    placeholder="About you: your farming experience, what you grow or raise, and why you can help others. E.g. 'I have raised catfish in Enugu for 6 years and supply restaurants weekly.'"
+                  />
+                  <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+                    <span>{creator.bio.length}/600</span>
+                    {creatorMessage && <span className="text-red-600">{creatorMessage}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => saveCreator()}
+                    disabled={creatorSaving || photoUploading || !creatorDirty}
+                    className="mt-2 rounded-lg border border-green-800 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50 disabled:opacity-50"
+                  >
+                    {creatorSaving ? "Saving..." : creatorDirty ? "Save Profile" : "Profile Saved"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold">Payout Bank Details</h2>
               <p className="mt-1 text-sm text-slate-500">
