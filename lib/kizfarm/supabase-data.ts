@@ -972,7 +972,7 @@ function toCourse(c: any) {
 }
 
 // Public card for a community course's creator, from the
-// course_creator_profile computed field (0044) -- readable by any buyer,
+// get_course_creator_profiles RPC (0045) -- readable by any buyer,
 // unlike the creator's profiles row.
 export interface CreatorProfile {
   id: string;
@@ -985,6 +985,20 @@ export interface CreatorProfile {
   location?: string;
   coursesPublished: number;
   memberSince?: string;
+}
+
+// Fills in course_creator_profile on raw course rows (before toCourse) for
+// community courses, via the get_course_creator_profiles RPC (0045). Best
+// effort: if it fails the courses still render, just without the card.
+async function withCreatorProfiles<T extends { id: string; source?: string } | null | undefined>(
+  supabase: ReturnType<typeof createClient>,
+  rows: T[],
+): Promise<T[]> {
+  const ids = [...new Set(rows.filter((r) => r && r.source === "buyer").map((r) => r!.id))];
+  if (ids.length === 0) return rows;
+  const { data, error } = await supabase.rpc("get_course_creator_profiles", { p_course_ids: ids });
+  if (error || !data) return rows;
+  return rows.map((r) => (r && (data as Record<string, unknown>)[r.id] ? { ...r, course_creator_profile: (data as Record<string, unknown>)[r.id] } : r));
 }
 
 function toCreatorProfile(p: any): CreatorProfile | undefined {
@@ -1009,7 +1023,7 @@ function toCreatorProfile(p: any): CreatorProfile | undefined {
 // bare "*" here would make every one of these queries fail outright.
 // Content is only ever readable through getCourseContent()'s gated RPC.
 const COURSE_SELECT =
-  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, has_creator_whatsapp, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email), course_creator_profile";
+  "id, title, description, price, commission, final_price, tutor_id, creator_id, source, audience, status, rejection_reason, reviewed_by, reviewed_at, is_published, cover_image, has_creator_whatsapp, created_at, updated_at, tutors(*), profiles!creator_id(id, name, email)";
 
 export async function getCourseContent(courseId: string) {
   const supabase = createClient();
@@ -1043,7 +1057,8 @@ export async function getCourses({ audience, source }: { audience?: string; sour
   else if (audience === "farmer") query = query.or("source.eq.admin,and(source.eq.buyer,status.eq.approved)");
   const { data, error } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, courses: (data || []).map(toCourse) } };
+  const rows = await withCreatorProfiles(supabase, (data || []) as any[]);
+  return { res: { ok: true } as Response, payload: { ok: true, courses: rows.map(toCourse) } };
 }
 
 export async function getCourseById(id: string, opts: { source?: string } = {}) {
@@ -1052,7 +1067,8 @@ export async function getCourseById(id: string, opts: { source?: string } = {}) 
   if (opts.source === "buyer") query = query.eq("source", "buyer").eq("status", "approved");
   const { data, error } = await query.maybeSingle();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: "Course not found" } };
-  return { res: { ok: true } as Response, payload: { ok: true, course: toCourse(data) } };
+  const [row] = await withCreatorProfiles(supabase, [data as any]);
+  return { res: { ok: true } as Response, payload: { ok: true, course: toCourse(row) } };
 }
 
 export async function getBuyerBrowseCourses() {
@@ -1071,7 +1087,8 @@ export async function getBuyerBrowseCourses() {
     .neq("creator_id", user.id)
     .order("created_at", { ascending: false });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, courses: (data || []).map(toCourse) } };
+  const rows = await withCreatorProfiles(supabase, (data || []) as any[]);
+  return { res: { ok: true } as Response, payload: { ok: true, courses: rows.map(toCourse) } };
 }
 
 export async function getMyCreatedCourses() {
@@ -1107,9 +1124,10 @@ export async function getMySubscriptions(opts: { source?: string } = {}) {
 
   const { data, error } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  const subscriptions = (data || []).map((s: any) => ({
+  const courseRows = await withCreatorProfiles(supabase, (data || []).map((s: any) => s.courses));
+  const subscriptions = (data || []).map((s: any, i: number) => ({
     _id: s.id,
-    course: toCourse(s.courses),
+    course: toCourse(courseRows[i]),
     amount: s.amount,
     paidAt: s.paid_at,
   }));
@@ -1136,9 +1154,10 @@ export async function getCourseAccess(courseId: string, opts: { source?: string 
     .eq("status", "active")
     .maybeSingle();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: "Course is not subscribed" } };
+  const [courseRow] = await withCreatorProfiles(supabase, [data.courses as any]);
   return {
     res: { ok: true } as Response,
-    payload: { ok: true, course: toCourse(data.courses), subscription: { _id: data.id, amount: data.amount, paidAt: data.paid_at } },
+    payload: { ok: true, course: toCourse(courseRow), subscription: { _id: data.id, amount: data.amount, paidAt: data.paid_at } },
   };
 }
 
@@ -1161,7 +1180,10 @@ export async function getAdminCoursePurchases() {
   const { data, error } = await supabase
     .from("subscriptions")
     .select(
-      "*, courses(*, tutors(*), profiles!creator_id(id, name, email, bank_name, account_holder_name, account_number)), profiles!user_id(id, name, email)",
+      // Explicit course columns: courses(*) asks for content and
+      // creator_whatsapp too, which have no SELECT grant (0033/0043), so
+      // the whole query failed with "permission denied for table courses".
+      "*, courses(id, title, description, price, commission, final_price, source, status, is_published, cover_image, created_at, tutors(*), profiles!creator_id(id, name, email, bank_name, account_holder_name, account_number)), profiles!user_id(id, name, email)",
     )
     .eq("source", "buyer")
     .eq("status", "active")
