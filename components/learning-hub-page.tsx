@@ -119,11 +119,14 @@ export default function LearningHubPage() {
             farmers, which made it flash on screen until the profile loaded. */}
         <div className="flex flex-col gap-3 rounded-xl border border-green-100 bg-green-50 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-bold text-green-900">Know something worth teaching?</p>
-            <p className="text-sm text-green-800">Create your own course and sell it to farmers and buyers. An admin reviews it before it goes live.</p>
+            <p className="text-sm font-bold text-green-900">Your courses, all in one place</p>
+            <p className="text-sm text-green-800">
+              Continue the courses you bought, see who subscribed to your courses and when your payouts are released, or create a new course to sell. An admin reviews every new course before it goes live.
+            </p>
           </div>
-          <Link href="/learning/my-courses" className="whitespace-nowrap rounded-lg bg-green-800 px-4 py-2 text-center text-sm font-bold text-white hover:bg-green-900">
-            Create a Course
+          <Link href="/learning/my-courses" className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+            <span className="material-symbols-outlined text-[18px]">school</span>
+            Open My Course Hub
           </Link>
         </div>
 

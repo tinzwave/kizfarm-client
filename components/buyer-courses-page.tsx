@@ -360,8 +360,8 @@ export default function BuyerCoursesPage() {
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/90 shadow-sm backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div>
-            <h1 className="text-xl font-bold text-green-900">Courses</h1>
-            <p className="text-xs text-slate-500">Community-created training, reviewed by KizFarm</p>
+            <h1 className="text-xl font-bold text-green-900">My Course Hub</h1>
+            <p className="text-xs text-slate-500">Learn, teach, and track your subscribers and payouts</p>
           </div>
           {/* Only opens the form -- hidden on the form itself, where people
               clicked it expecting it to submit and "nothing happened". */}
