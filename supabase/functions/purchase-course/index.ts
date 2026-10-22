@@ -10,12 +10,7 @@
 import { callerClient, adminClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { verifyFlutterwaveTransaction } from "../_shared/flutterwave.ts";
-import {
-  notifyEmail,
-  sendCoursePurchaseBuyerEmail,
-  sendCourseSaleCreatorEmail,
-  sendAdminCoursePurchaseEmail,
-} from "../_shared/mailer.ts";
+import { activateCourseSubscription } from "../_shared/course-notifications.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -102,26 +97,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: subscription, error: subErr } = await admin.rpc("activate_subscription", {
-      p_user_id: user.id,
-      p_course_id: courseId,
-      p_payment_reference: paymentReference,
+    const { subscription, error: subErr } = await activateCourseSubscription(admin, {
+      userId: user.id,
+      courseId,
+      reference: paymentReference,
     });
     if (subErr) {
       return jsonResponse({ error: subErr.message }, { status: 500 });
     }
-
-    const buyerEmail = user.email;
-    if (buyerEmail) {
-      notifyEmail("Course purchase notification", sendCoursePurchaseBuyerEmail(course.title, subscription.amount, buyerEmail));
-    }
-    if (course.source === "buyer" && course.creator_id) {
-      const { data: creator } = await admin.from("profiles").select("email").eq("id", course.creator_id).single();
-      if (creator?.email) {
-        notifyEmail("Course sale notification", sendCourseSaleCreatorEmail(course.title, creator.email));
-      }
-    }
-    notifyEmail("Admin course purchase notification", sendAdminCoursePurchaseEmail(course.title, subscription.amount));
 
     return jsonResponse({ ok: true, subscription });
   } catch (err) {

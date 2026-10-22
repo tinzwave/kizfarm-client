@@ -24,10 +24,8 @@ import {
   sendBuyerPaymentSuccessfulEmail,
   sendFarmerNewPaidOrderEmail,
   sendAdminOrderPaidEmail,
-  sendCoursePurchaseBuyerEmail,
-  sendCourseSaleCreatorEmail,
-  sendAdminCoursePurchaseEmail,
 } from "../_shared/mailer.ts";
+import { activateCourseSubscription } from "../_shared/course-notifications.ts";
 
 const COURSE_REF_PREFIX = "KFM-CRS-";
 
@@ -136,28 +134,13 @@ Deno.serve(async (req) => {
         }
 
         if (courseId && userId && !alreadyActivated && amountOk) {
-          const { data: subscription, error: subErr } = await admin.rpc("activate_subscription", {
-            p_user_id: userId,
-            p_course_id: courseId,
-            p_payment_reference: reference,
+          const { error: subErr } = await activateCourseSubscription(admin, {
+            userId,
+            courseId,
+            reference,
           });
           if (subErr) {
             console.error("Webhook activate_subscription error:", subErr.message);
-          } else {
-            const [{ data: buyer }, { data: course }] = await Promise.all([
-              admin.from("profiles").select("email").eq("id", userId).single(),
-              admin.from("courses").select("title, source, creator_id").eq("id", courseId).single(),
-            ]);
-            if (buyer?.email) {
-              notifyEmail("Course purchase notification", sendCoursePurchaseBuyerEmail(course?.title ?? "", subscription.amount, buyer.email));
-            }
-            if (course?.source === "buyer" && course.creator_id) {
-              const { data: creator } = await admin.from("profiles").select("email").eq("id", course.creator_id).single();
-              if (creator?.email) {
-                notifyEmail("Course sale notification", sendCourseSaleCreatorEmail(course.title, creator.email));
-              }
-            }
-            notifyEmail("Admin course purchase notification", sendAdminCoursePurchaseEmail(course?.title ?? "", subscription.amount));
           }
         }
       }

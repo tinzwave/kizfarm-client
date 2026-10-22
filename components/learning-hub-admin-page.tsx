@@ -6,6 +6,8 @@ import { getTutors, getCourses, getAdminBuyerCourses, getAdminCoursePurchases, g
 import { createTutor, createAdminCourse, adminReviewBuyerCourse, releaseCoursePayout } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 import CourseCoverInput from "./course-cover-input";
+import { AccessBadge, PayoutBadge } from "./course-access-meter";
+import { courseAccessState, formatCourseDate } from "@/lib/kizfarm/course-access";
 
 interface Tutor {
   _id: string;
@@ -43,13 +45,29 @@ interface CoursePurchase {
     name?: string;
     email?: string;
   };
+  source?: "admin" | "buyer";
   amount: number;
   creatorAmount?: number;
   commission?: number;
   paymentReference?: string;
   paidAt?: string;
-  payoutStatus?: "pending" | "released";
+  expiresAt?: string;
+  payoutStatus?: "pending" | "released" | "not_applicable";
   releasedAt?: string;
+}
+
+type PurchaseFilter = "all" | "awaiting" | "released" | "active" | "expired";
+
+const PURCHASE_FILTERS: { id: PurchaseFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "awaiting", label: "Awaiting payout" },
+  { id: "released", label: "Payout released" },
+  { id: "active", label: "Active access" },
+  { id: "expired", label: "Expired" },
+];
+
+function naira(amount?: number | null) {
+  return `NGN ${Number(amount || 0).toLocaleString()}`;
 }
 
 export default function LearningHubAdminPage() {
@@ -77,6 +95,8 @@ export default function LearningHubAdminPage() {
   const [reviewWhatsapp, setReviewWhatsapp] = useState<Record<string, string | null>>({});
   const [reviewSubmitting, setReviewSubmitting] = useState<"approved" | "rejected" | "">("");
   const [releasingPayoutId, setReleasingPayoutId] = useState("");
+  const [purchaseFilter, setPurchaseFilter] = useState<PurchaseFilter>("all");
+  const [purchaseSearch, setPurchaseSearch] = useState("");
   const [reviewForm, setReviewForm] = useState({ commission: "", rejectionReason: "" });
 
   const [tutorForm, setTutorForm] = useState({
@@ -121,9 +141,10 @@ export default function LearningHubAdminPage() {
 
   const stats = useMemo(
     () => [
-      { label: "Total Courses", value: courses.length, icon: "school" },
+      { label: "Total Courses", value: courses.length + buyerCourses.filter((c) => c.status === "approved").length, icon: "school" },
       { label: "Buyer Reviews", value: buyerCourses.filter((c) => c.status === "pending").length, icon: "rate_review" },
-      { label: "Pending Payouts", value: purchases.filter((p) => p.payoutStatus !== "released").length, icon: "payments" },
+      { label: "Active Subscriptions", value: purchases.filter((p) => !courseAccessState(p.expiresAt).expired).length, icon: "group" },
+      { label: "Pending Payouts", value: purchases.filter((p) => p.payoutStatus === "pending").length, icon: "payments" },
     ],
     [buyerCourses, courses, purchases],
   );
@@ -211,7 +232,7 @@ export default function LearningHubAdminPage() {
   }
 
   async function releasePayout(purchase: CoursePurchase) {
-    if (purchase.payoutStatus === "released" || releasingPayoutId) return;
+    if (purchase.payoutStatus !== "pending" || releasingPayoutId) return;
     setMessage("");
     setReleasingPayoutId(purchase._id);
     try {
@@ -227,12 +248,53 @@ export default function LearningHubAdminPage() {
             : item,
         ),
       );
-      setMessage("Course creator payout released.");
+      setMessage("Payout released. The course creator has been notified by email.");
       await loadData();
     } finally {
       setReleasingPayoutId("");
     }
   }
+
+  const purchaseSummary = useMemo(() => {
+    const rows = new Map<string, {
+      courseId: string; title: string; community: boolean; creatorName?: string;
+      total: number; active: number; revenue: number; pendingAmount: number; pendingCount: number; releasedCount: number;
+    }>();
+    for (const p of purchases) {
+      const id = p.course?._id ?? p._id;
+      const row = rows.get(id) ?? {
+        courseId: id,
+        title: p.course?.title ?? "Course",
+        community: p.source === "buyer",
+        creatorName: p.course?.creator?.name,
+        total: 0, active: 0, revenue: 0, pendingAmount: 0, pendingCount: 0, releasedCount: 0,
+      };
+      row.total += 1;
+      if (!courseAccessState(p.expiresAt).expired) row.active += 1;
+      row.revenue += Number(p.amount || 0);
+      if (p.payoutStatus === "pending") {
+        row.pendingCount += 1;
+        row.pendingAmount += Number(p.creatorAmount ?? p.course?.price ?? 0);
+      }
+      if (p.payoutStatus === "released") row.releasedCount += 1;
+      rows.set(id, row);
+    }
+    return [...rows.values()].sort((a, b) => b.pendingAmount - a.pendingAmount || b.total - a.total);
+  }, [purchases]);
+
+  const visiblePurchases = useMemo(() => {
+    const q = purchaseSearch.trim().toLowerCase();
+    return purchases.filter((p) => {
+      const expired = courseAccessState(p.expiresAt).expired;
+      if (purchaseFilter === "awaiting" && p.payoutStatus !== "pending") return false;
+      if (purchaseFilter === "released" && p.payoutStatus !== "released") return false;
+      if (purchaseFilter === "active" && expired) return false;
+      if (purchaseFilter === "expired" && !expired) return false;
+      if (!q) return true;
+      return [p.course?.title, p.buyer?.name, p.buyer?.email, p.course?.creator?.name, p.course?.creator?.email, p.paymentReference]
+        .some((v) => (v ?? "").toLowerCase().includes(q));
+    });
+  }, [purchases, purchaseFilter, purchaseSearch]);
 
   const statusClass = (status?: Course["status"]) => {
     if (status === "approved") return "bg-green-50 text-green-800";
@@ -255,7 +317,7 @@ export default function LearningHubAdminPage() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {stats.map((item) => (
             <div key={item.label} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <span className="material-symbols-outlined text-green-800">{item.icon}</span>
@@ -267,14 +329,14 @@ export default function LearningHubAdminPage() {
 
         {message && <div className="rounded-lg border border-green-100 bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">{message}</div>}
 
-        <div className="flex gap-2 rounded-xl bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2 rounded-xl bg-white p-2 shadow-sm">
           {(["courses", "buyerCourses", "purchases", "tutors"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`rounded-lg px-4 py-2 text-sm font-bold capitalize ${activeTab === tab ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}
             >
-              {tab === "buyerCourses" ? "Buyer Courses" : tab}
+              {tab === "buyerCourses" ? "Buyer Courses" : tab === "purchases" ? "Subscriptions & Payouts" : tab}
             </button>
           ))}
         </div>
@@ -402,53 +464,124 @@ export default function LearningHubAdminPage() {
             )}
           </section>
         ) : activeTab === "purchases" ? (
-          <section className="space-y-3">
+          <section className="space-y-5">
             {purchases.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500">No course purchases yet.</div>
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500">No course subscriptions yet.</div>
             ) : (
-              purchases.map((purchase) => (
-                <article key={purchase._id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                    <div>
-                      <h3 className="font-bold">{purchase.course?.title ?? "Course purchase"}</h3>
-                      <p className="mt-1 text-sm text-slate-500">Buyer: {purchase.buyer?.name || purchase.buyer?.email || "Student"} · Ref: {purchase.paymentReference || "N/A"}</p>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
-                        <span>Paid: NGN {purchase.amount.toLocaleString()}</span>
-                        <span>Creator payout: NGN {(purchase.creatorAmount ?? purchase.course?.price ?? 0).toLocaleString()}</span>
-                        <span>Commission: NGN {(purchase.commission ?? 0).toLocaleString()}</span>
-                      </div>
-                      {purchase.payoutStatus !== "released" && (
-                        purchase.course?.creator?.bankName && purchase.course?.creator?.accountNumber ? (
-                          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            Pay to: <span className="font-bold">{purchase.course.creator.accountHolderName}</span> · {purchase.course.creator.bankName} · {purchase.course.creator.accountNumber}
-                          </div>
-                        ) : (
-                          <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                            Creator hasn&apos;t added bank details yet -- can&apos;t be paid out until they do.
-                          </div>
-                        )
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${purchase.payoutStatus === "released" ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-700"}`}>{purchase.payoutStatus ?? "pending"}</span>
-                      {purchase.payoutStatus === "released" ? (
-                        <span className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm font-bold text-green-800">
-                          Funds released{purchase.releasedAt ? ` · ${new Date(purchase.releasedAt).toLocaleDateString()}` : ""}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => releasePayout(purchase)}
-                          disabled={releasingPayoutId === purchase._id}
-                          className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {releasingPayoutId === purchase._id ? "Releasing..." : "Release Payout"}
-                        </button>
-                      )}
-                    </div>
+              <>
+                <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="border-b border-gray-100 px-5 py-4">
+                    <h2 className="font-bold">Subscriptions by course</h2>
+                    <p className="text-sm text-slate-500">Every course people have subscribed to, with payout progress for community courses.</p>
                   </div>
-                </article>
-              ))
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                          <th className="px-5 py-3 font-semibold">Course</th>
+                          <th className="px-5 py-3 font-semibold">Subscribers</th>
+                          <th className="px-5 py-3 font-semibold">Revenue</th>
+                          <th className="px-5 py-3 font-semibold">Awaiting payout</th>
+                          <th className="px-5 py-3 font-semibold">Payouts released</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {purchaseSummary.map((row) => (
+                          <tr key={row.courseId}>
+                            <td className="px-5 py-3">
+                              <p className="font-semibold">{row.title}</p>
+                              <p className="text-xs text-slate-500">{row.community ? `Community · ${row.creatorName || "Unknown creator"}` : "KIZ FARM course"}</p>
+                            </td>
+                            <td className="px-5 py-3">{row.active} active · {row.total} total</td>
+                            <td className="px-5 py-3">{naira(row.revenue)}</td>
+                            <td className="px-5 py-3">{row.community ? <span className="font-semibold text-amber-700">{naira(row.pendingAmount)} ({row.pendingCount})</span> : "-"}</td>
+                            <td className="px-5 py-3">{row.community ? `${row.releasedCount} of ${row.total}` : "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-xl bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {PURCHASE_FILTERS.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setPurchaseFilter(f.id)}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-bold ${purchaseFilter === f.id ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    value={purchaseSearch}
+                    onChange={(e) => setPurchaseSearch(e.target.value)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm md:w-72"
+                    placeholder="Search course, subscriber, creator, ref"
+                  />
+                </div>
+
+                {visiblePurchases.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500">No subscriptions match this filter.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {visiblePurchases.map((purchase) => {
+                      const community = purchase.source === "buyer";
+                      return (
+                        <article key={purchase._id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                          <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="font-bold">{purchase.course?.title ?? "Course subscription"}</h3>
+                                <AccessBadge expiresAt={purchase.expiresAt} />
+                              </div>
+                              <p className="mt-1 text-sm text-slate-500">
+                                Subscriber: {[purchase.buyer?.name, purchase.buyer?.email].filter(Boolean).join(" · ") || "Student"}
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                {community ? `Creator: ${[purchase.course?.creator?.name, purchase.course?.creator?.email].filter(Boolean).join(" · ") || "Unknown"}` : "KIZ FARM course"}
+                              </p>
+                              <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-4">
+                                <span>Paid: <strong>{naira(purchase.amount)}</strong></span>
+                                {community && <span>Creator payout: <strong>{naira(purchase.creatorAmount ?? purchase.course?.price)}</strong></span>}
+                                {community && <span>Commission: <strong>{naira(purchase.commission)}</strong></span>}
+                                <span>Subscribed: {formatCourseDate(purchase.paidAt)} · Ends {formatCourseDate(purchase.expiresAt)}</span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-400">Ref: {purchase.paymentReference || "N/A"}</p>
+                              {purchase.payoutStatus === "pending" && (
+                                purchase.course?.creator?.bankName && purchase.course?.creator?.accountNumber ? (
+                                  <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                    Pay to: <span className="font-bold">{purchase.course.creator.accountHolderName}</span> · {purchase.course.creator.bankName} · {purchase.course.creator.accountNumber}
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                                    Creator hasn&apos;t added bank details yet -- can&apos;t be paid out until they do.
+                                  </div>
+                                )
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                              <PayoutBadge status={purchase.payoutStatus} releasedAt={purchase.releasedAt} />
+                              {purchase.payoutStatus === "pending" && (
+                                <button
+                                  type="button"
+                                  onClick={() => releasePayout(purchase)}
+                                  disabled={releasingPayoutId === purchase._id}
+                                  className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {releasingPayoutId === purchase._id ? "Releasing..." : "Release Payout"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </section>
         ) : (

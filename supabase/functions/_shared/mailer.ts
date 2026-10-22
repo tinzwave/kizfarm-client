@@ -258,35 +258,250 @@ export function sendAdminOrderPaidEmail(order: any) {
   });
 }
 
-export function sendCoursePurchaseBuyerEmail(courseTitle: string, amount: number, buyerEmail: string) {
+// ---------------------------------------------------------------------------
+// Courses
+// ---------------------------------------------------------------------------
+
+export function courseDate(value: string | Date): string {
+  return new Date(value).toLocaleDateString("en-NG", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Lagos",
+  });
+}
+
+// Buyers browse courses at /buyer/courses, farmers at /learning/my-courses;
+// links land them back on the list they actually use.
+export function courseListPath(role: string | null | undefined, tab?: string): string {
+  const base = role === "farmer" ? "/learning/my-courses" : "/buyer/courses";
+  return tab ? `${base}?tab=${tab}` : base;
+}
+
+export function coursePath(course: { id: string; source?: string | null }, role: string | null | undefined): string {
+  const source = course.source === "buyer" ? "buyer" : "admin";
+  return `/learning/course?courseId=${encodeURIComponent(course.id)}&access=1&source=${source}&returnTo=${encodeURIComponent(courseListPath(role))}`;
+}
+
+function detailRows(rows: [string, string][]): string {
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;margin:16px 0;border-collapse:collapse;font-size:14px">
+    ${rows
+      .map(
+        ([label, value]) =>
+          `<tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b">${escapeHtml(label)}</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:bold">${escapeHtml(value)}</td></tr>`,
+      )
+      .join("")}
+  </table>`;
+}
+
+type CourseRef = { id: string; title: string; source?: string | null };
+type SubscriptionRef = {
+  amount: number;
+  creator_amount?: number | null;
+  commission?: number | null;
+  payment_reference?: string | null;
+  expires_at: string;
+};
+
+export function sendCoursePurchaseBuyerEmail(params: {
+  to: string;
+  name?: string | null;
+  role?: string | null;
+  course: CourseRef;
+  subscription: SubscriptionRef;
+  amountPaid: number;
+  renewed: boolean;
+}) {
+  const { course, subscription } = params;
   return sendEmail({
-    to: buyerEmail,
-    subject: `KIZ FARM: you now have access to ${courseTitle}`,
+    to: params.to,
+    subject: params.renewed
+      ? `KIZ FARM: your access to ${course.title} has been renewed`
+      : `KIZ FARM: you now have access to ${course.title}`,
     html: layout(
-      "Course purchase successful",
-      `<p>You now have access to <strong>${escapeHtml(courseTitle)}</strong>.</p><p>Amount paid: <strong>${money(amount)}</strong></p>`,
+      params.renewed ? "Course access renewed" : "Course purchase successful",
+      `
+        <p>Hi ${escapeHtml(params.name || "there")},</p>
+        <p>${params.renewed ? "Your access to" : "You now have full access to"} <strong>${escapeHtml(course.title)}</strong>.</p>
+        ${detailRows([
+          ["Amount paid", money(params.amountPaid)],
+          ["Access until", courseDate(subscription.expires_at)],
+          ["Payment reference", subscription.payment_reference || "-"],
+        ])}
+        <p>Your access lasts 30 days. You'll find the course under <strong>My Subscriptions</strong>, with the days you have left, and we'll remind you before it ends.</p>
+        ${actionButton(coursePath(course, params.role), "Start learning")}
+      `,
     ),
   });
 }
 
-export function sendCourseSaleCreatorEmail(courseTitle: string, creatorEmail: string) {
+export function sendCourseSaleCreatorEmail(params: {
+  to: string;
+  name?: string | null;
+  role?: string | null;
+  course: CourseRef;
+  subscriberName: string;
+  earning: number;
+  activeSubscribers: number;
+  renewed: boolean;
+}) {
   return sendEmail({
-    to: creatorEmail,
-    subject: `KIZ FARM: new sale of your course ${courseTitle}`,
+    to: params.to,
+    subject: `KIZ FARM: ${params.renewed ? "a subscriber renewed" : "new subscriber for"} ${params.course.title}`,
     html: layout(
-      "New course sale",
-      `<p>Your course <strong>${escapeHtml(courseTitle)}</strong> was purchased.</p><p>Your payout is pending admin release.</p>`,
+      params.renewed ? "Course subscription renewed" : "New course subscriber",
+      `
+        <p>Hi ${escapeHtml(params.name || "there")},</p>
+        <p><strong>${escapeHtml(params.subscriberName)}</strong> ${params.renewed ? "renewed their subscription to" : "subscribed to"} your course <strong>${escapeHtml(params.course.title)}</strong>.</p>
+        ${detailRows([
+          ["Your earning from this sale", money(params.earning)],
+          ["Payout status", "Pending admin release"],
+          ["Active subscribers", String(params.activeSubscribers)],
+        ])}
+        <p>We'll email you as soon as an admin releases this payout to your bank account. You can follow every subscriber and payout under <strong>My Created Courses</strong>.</p>
+        ${actionButton(courseListPath(params.role, "teaching"), "View subscribers and payouts")}
+      `,
     ),
   });
 }
 
-export function sendAdminCoursePurchaseEmail(courseTitle: string, amount: number) {
+export function sendAdminCoursePurchaseEmail(params: {
+  course: CourseRef;
+  buyer: { name?: string | null; email?: string | null };
+  creatorName?: string | null;
+  subscription: SubscriptionRef;
+  amountPaid: number;
+  renewed: boolean;
+}) {
+  const { course, subscription } = params;
+  const community = course.source === "buyer";
   return sendEmail({
     to: adminEmails(),
-    subject: `KIZ FARM: new course purchase (${courseTitle})`,
+    subject: `KIZ FARM: ${params.renewed ? "course renewed" : "new course subscription"} (${course.title})`,
     html: layout(
-      "New course purchase",
-      `<p><strong>${escapeHtml(courseTitle)}</strong> was purchased for ${money(amount)}.</p>`,
+      params.renewed ? "Course subscription renewed" : "New course subscription",
+      `
+        <p><strong>${escapeHtml(course.title)}</strong> ${params.renewed ? "was renewed" : "was purchased"}.</p>
+        ${detailRows([
+          ["Subscriber", [params.buyer.name, params.buyer.email].filter(Boolean).join(" · ") || "-"],
+          ["Course type", community ? `Community course by ${params.creatorName || "a creator"}` : "KIZ FARM course"],
+          ["Amount paid", money(params.amountPaid)],
+          ...(community
+            ? ([
+                ["Creator payout (pending)", money(subscription.creator_amount)],
+                ["KIZ FARM commission", money(subscription.commission)],
+              ] as [string, string][])
+            : []),
+          ["Access until", courseDate(subscription.expires_at)],
+          ["Payment reference", subscription.payment_reference || "-"],
+        ])}
+        ${community ? "<p>The creator's payout is waiting for you to release it.</p>" : ""}
+        ${actionButton("/learning/admin?tab=purchases", community ? "Review and release payout" : "View subscriptions")}
+      `,
+    ),
+  });
+}
+
+export function sendCoursePayoutReleasedCreatorEmail(params: {
+  to: string;
+  name?: string | null;
+  role?: string | null;
+  courseTitle: string;
+  amount: number;
+  subscriberName: string;
+  bank?: { bankName?: string | null; accountNumber?: string | null };
+}) {
+  const account = params.bank?.bankName && params.bank?.accountNumber
+    ? `${params.bank.bankName} · ending ${params.bank.accountNumber.slice(-4)}`
+    : "Your bank details on file";
+  return sendEmail({
+    to: params.to,
+    subject: `KIZ FARM: payout of ${money(params.amount)} released for ${params.courseTitle}`,
+    html: layout(
+      "Course payout released",
+      `
+        <p>Hi ${escapeHtml(params.name || "there")},</p>
+        <p>Good news: an admin has released your payout for <strong>${escapeHtml(params.courseTitle)}</strong>.</p>
+        ${detailRows([
+          ["Amount", money(params.amount)],
+          ["Subscriber", params.subscriberName],
+          ["Paid to", account],
+          ["Released on", courseDate(new Date())],
+        ])}
+        <p>If the money hasn't reached your account within 24 hours, reply to this email and we'll look into it.</p>
+        ${actionButton(courseListPath(params.role, "teaching"), "View your payouts")}
+      `,
+    ),
+  });
+}
+
+export function sendAdminCoursePayoutReleasedEmail(params: {
+  courseTitle: string;
+  amount: number;
+  creator: { name?: string | null; email?: string | null };
+  subscriberName: string;
+  releasedBy?: string | null;
+}) {
+  return sendEmail({
+    to: adminEmails(),
+    subject: `KIZ FARM: course payout released (${params.courseTitle})`,
+    html: layout(
+      "Course payout released",
+      `
+        ${detailRows([
+          ["Course", params.courseTitle],
+          ["Creator", [params.creator.name, params.creator.email].filter(Boolean).join(" · ") || "-"],
+          ["Subscriber", params.subscriberName],
+          ["Amount", money(params.amount)],
+          ["Released by", params.releasedBy || "-"],
+        ])}
+        ${actionButton("/learning/admin?tab=purchases", "View payouts")}
+      `,
+    ),
+  });
+}
+
+export function sendCourseExpiringSoonEmail(params: {
+  to: string;
+  name?: string | null;
+  role?: string | null;
+  course: CourseRef;
+  expiresAt: string;
+}) {
+  const days = Math.max(1, Math.ceil((new Date(params.expiresAt).getTime() - Date.now()) / 86_400_000));
+  return sendEmail({
+    to: params.to,
+    subject: `KIZ FARM: ${days} day${days === 1 ? "" : "s"} left on ${params.course.title}`,
+    html: layout(
+      "Your course access ends soon",
+      `
+        <p>Hi ${escapeHtml(params.name || "there")},</p>
+        <p>Your access to <strong>${escapeHtml(params.course.title)}</strong> ends on <strong>${escapeHtml(courseDate(params.expiresAt))}</strong> (${days} day${days === 1 ? "" : "s"} left).</p>
+        <p>Renew now to keep learning. The new 30 days are added on top of the days you have left, so you lose nothing by renewing early.</p>
+        ${actionButton(coursePath(params.course, params.role), "Open course and renew")}
+      `,
+    ),
+  });
+}
+
+export function sendCourseExpiredEmail(params: {
+  to: string;
+  name?: string | null;
+  role?: string | null;
+  course: CourseRef;
+  expiresAt: string;
+}) {
+  return sendEmail({
+    to: params.to,
+    subject: `KIZ FARM: your access to ${params.course.title} has ended`,
+    html: layout(
+      "Course access ended",
+      `
+        <p>Hi ${escapeHtml(params.name || "there")},</p>
+        <p>Your 30-day access to <strong>${escapeHtml(params.course.title)}</strong> ended on ${escapeHtml(courseDate(params.expiresAt))}.</p>
+        <p>You can renew any time from the course page to unlock the lessons for another 30 days.</p>
+        ${actionButton(coursePath(params.course, params.role), "Renew access")}
+      `,
     ),
   });
 }

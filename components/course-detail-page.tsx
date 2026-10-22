@@ -8,6 +8,8 @@ import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
 import CourseCreatorCard, { CreatorAvatar } from "./course-creator-card";
 import { getCourseAccess, getCourseById, getCourseContent, getCourseCreatorContact, getCourseReviews } from "@/lib/kizfarm/supabase-data";
 import { submitCourseReview } from "@/lib/kizfarm/supabase-mutations";
+import { courseAccessState, formatCourseDate, RENEWAL_WINDOW_DAYS } from "@/lib/kizfarm/course-access";
+import { AccessMeter } from "./course-access-meter";
 
 interface Tutor {
   name: string;
@@ -73,7 +75,6 @@ function Stars({ rating, size = "text-[18px]" }: { rating: number; size?: string
 export default function CourseDetailPage() {
   const params = useSearchParams();
   const courseId = params.get("courseId");
-  const wantsAccess = params.get("access") === "1";
   const source = params.get("source") === "buyer" ? "buyer" : "admin";
   const returnTo = params.get("returnTo") || "/learning";
   const [course, setCourse] = useState<Course | null>(null);
@@ -81,6 +82,9 @@ export default function CourseDetailPage() {
   // it must only flip true once getCourseAccess has actually confirmed an
   // active subscription server-side.
   const [hasAccess, setHasAccess] = useState(false);
+  // The viewer's subscription, active or expired -- drives the countdown
+  // and the renew button.
+  const [subscription, setSubscription] = useState<{ paidAt: string; expiresAt: string } | null>(null);
   const [showCoach, setShowCoach] = useState(false);
   const [creatorContact, setCreatorContact] = useState<CreatorContact | null>(null);
   const [error, setError] = useState("");
@@ -98,6 +102,7 @@ export default function CourseDetailPage() {
       if (!courseId) return;
       setError("");
       setHasAccess(false);
+      setSubscription(null);
       setCreatorContact(null);
 
       // Base metadata (title, price, description, cover) is always safe to
@@ -110,10 +115,13 @@ export default function CourseDetailPage() {
       }
       setCourse((base.payload.course as Course) ?? null);
 
-      if (!wantsAccess) return;
-
+      // Always checked (not only when the link says access=1), so a buyer
+      // who opens a course they own from anywhere sees it as theirs rather
+      // than being offered to pay again.
       const access = await getCourseAccess(courseId, { source });
       if (!access.res.ok) return; // not subscribed -- hasAccess stays false
+      setSubscription({ paidAt: access.payload.subscription!.paidAt, expiresAt: access.payload.subscription!.expiresAt });
+      if (access.payload.expired) return; // expired -- renew offered instead of content
 
       const content = await getCourseContent(courseId);
       if (!content.res.ok) return;
@@ -133,7 +141,7 @@ export default function CourseDetailPage() {
       }
     }
     loadCourse();
-  }, [courseId, source, wantsAccess]);
+  }, [courseId, source]);
 
   useEffect(() => {
     async function loadReviews() {
@@ -187,6 +195,8 @@ export default function CourseDetailPage() {
   }
 
   const payablePrice = course.finalPrice ?? course.price;
+  const accessState = subscription ? courseAccessState(subscription.expiresAt) : null;
+  const checkoutHref = `/learning/checkout?courseId=${course._id}&source=${source}&returnTo=${encodeURIComponent(returnTo)}`;
   const canContactCoach = hasAccess && source === "admin" && !!course.tutor;
 
   return (
@@ -246,9 +256,15 @@ export default function CourseDetailPage() {
                 <div>
                   <h2 className="text-xl font-bold">About this course</h2>
                   <p className="mt-3 leading-7 text-slate-600">{course.description}</p>
-                  <div className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-green-900">
-                    Subscribe to unlock the formatted lesson content, embedded videos, and images.
-                  </div>
+                  {accessState?.expired ? (
+                    <div className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+                      Your 30-day access ended on {formatCourseDate(subscription!.expiresAt)}. Renew to unlock the lessons again for another 30 days.
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-lg bg-green-50 p-4 text-sm text-green-900">
+                      Subscribe to unlock the formatted lesson content, embedded videos, and images for 30 days.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -327,23 +343,43 @@ export default function CourseDetailPage() {
 
           <aside className="space-y-4 lg:col-span-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-500">Course Price</p>
-              <p className="mt-2 text-3xl font-bold text-green-800">NGN {payablePrice.toLocaleString()}</p>
-              {hasAccess ? (
-                canContactCoach ? (
-                <button onClick={() => setShowCoach(true)} className="mt-5 w-full rounded-lg bg-green-800 px-4 py-3 font-bold text-white hover:bg-green-900">Contact Coach</button>
-                ) : (
-                  <div className="mt-5 rounded-lg bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">Course unlocked</div>
-                )
+              {subscription && accessState ? (
+                <>
+                  <p className="text-sm font-semibold text-slate-500">Your subscription</p>
+                  <div className="mt-3">
+                    <AccessMeter paidAt={subscription.paidAt} expiresAt={subscription.expiresAt} />
+                  </div>
+                  {accessState.canRenew && (
+                    <>
+                      <Link href={checkoutHref} className={`mt-5 block w-full rounded-lg px-4 py-3 text-center font-bold text-white ${accessState.expired ? "bg-amber-600 hover:bg-amber-700" : "bg-green-800 hover:bg-green-900"}`}>
+                        Renew for NGN {payablePrice.toLocaleString()}
+                      </Link>
+                      {!accessState.expired && (
+                        <p className="mt-2 text-xs text-slate-500">The new 30 days are added after your current access ends.</p>
+                      )}
+                    </>
+                  )}
+                  {!accessState.canRenew && (
+                    <p className="mt-3 text-xs text-slate-500">You can renew in the last {RENEWAL_WINDOW_DAYS} days of your access.</p>
+                  )}
+                  {canContactCoach && (
+                    <button onClick={() => setShowCoach(true)} className="mt-5 w-full rounded-lg bg-green-800 px-4 py-3 font-bold text-white hover:bg-green-900">Contact Coach</button>
+                  )}
+                </>
+              ) : hasAccess ? (
+                <div className="rounded-lg bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">You have full access to this course</div>
               ) : (
                 <>
+                <p className="text-sm font-semibold text-slate-500">Course Price</p>
+                <p className="mt-2 text-3xl font-bold text-green-800">NGN {payablePrice.toLocaleString()}</p>
+                <p className="mt-1 text-xs text-slate-500">30 days of full access</p>
                 {course.hasWhatsappGuidance && (
                   <div className="mt-4 flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-900">
                     <span className="material-symbols-outlined text-[18px]">chat</span>
                     <span>Includes 30 days of WhatsApp guidance from {course.creator?.name || "the course creator"}.</span>
                   </div>
                 )}
-                <Link href={`/learning/checkout?courseId=${course._id}&source=${source}&returnTo=${encodeURIComponent(returnTo)}`} className="mt-5 block w-full rounded-lg bg-green-800 px-4 py-3 text-center font-bold text-white hover:bg-green-900">
+                <Link href={checkoutHref} className="mt-5 block w-full rounded-lg bg-green-800 px-4 py-3 text-center font-bold text-white hover:bg-green-900">
                   Subscribe
                 </Link>
                 </>
@@ -356,7 +392,7 @@ export default function CourseDetailPage() {
                 {creatorContact.expired ? (
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     Your 30-day WhatsApp guidance period with {course.creator?.name || "the course creator"} ended on{" "}
-                    {new Date(creatorContact.accessUntil!).toLocaleDateString()}. You still have full access to the course.
+                    {new Date(creatorContact.accessUntil!).toLocaleDateString()}.
                   </p>
                 ) : (
                   <>
@@ -375,7 +411,7 @@ export default function CourseDetailPage() {
                     </a>
                     {creatorContact.accessUntil && (
                       <p className="mt-3 text-xs text-slate-500">
-                        Available until {new Date(creatorContact.accessUntil).toLocaleDateString()} (30 days from your purchase).
+                        Available until {new Date(creatorContact.accessUntil).toLocaleDateString()} (for as long as your course access lasts).
                       </p>
                     )}
                   </>

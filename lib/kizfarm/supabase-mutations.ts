@@ -689,11 +689,18 @@ export async function adminReviewBuyerCourse(courseId: string, approved: boolean
   return { res: { ok: true } as Response, payload: { ok: true, course: data } };
 }
 
+// Through the release-course-payout Edge Function rather than the RPC
+// directly, so the creator is emailed once the payout is released.
 export async function releaseCoursePayout(subscriptionId: string) {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("release_course_payout", { p_subscription_id: subscriptionId });
-  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, purchase: data } };
+  const { data, error } = await supabase.functions.invoke("release-course-payout", {
+    body: { subscriptionId },
+  });
+  if (error) {
+    const message = (await error.context?.json?.().catch(() => null))?.error || error.message;
+    return { res: { ok: false } as Response, payload: { error: message } };
+  }
+  return { res: { ok: true } as Response, payload: { ok: true, purchase: data.subscription } };
 }
 
 // Calls the create-flutterwave-course-payment Edge Function, which creates

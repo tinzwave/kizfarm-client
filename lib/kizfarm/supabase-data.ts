@@ -1130,10 +1130,15 @@ export async function getMySubscriptions(opts: { source?: string } = {}) {
     course: toCourse(courseRows[i]),
     amount: s.amount,
     paidAt: s.paid_at,
+    expiresAt: s.expires_at as string,
   }));
   return { res: { ok: true } as Response, payload: { ok: true, subscriptions } };
 }
 
+// Resolves with ok: true for any subscription the user holds, including an
+// expired one (expired: true), so the course page can offer a renewal
+// instead of treating a past subscriber like a stranger. Content is still
+// gated server-side by get_course_content.
 export async function getCourseAccess(courseId: string, opts: { source?: string } = {}) {
   const supabase = createClient();
   const {
@@ -1155,10 +1160,51 @@ export async function getCourseAccess(courseId: string, opts: { source?: string 
     .maybeSingle();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: "Course is not subscribed" } };
   const [courseRow] = await withCreatorProfiles(supabase, [data.courses as any]);
+  const expired = new Date(data.expires_at).getTime() <= Date.now();
   return {
     res: { ok: true } as Response,
-    payload: { ok: true, course: toCourse(courseRow), subscription: { _id: data.id, amount: data.amount, paidAt: data.paid_at } },
+    payload: {
+      ok: true,
+      expired,
+      course: toCourse(courseRow),
+      subscription: { _id: data.id, amount: data.amount, paidAt: data.paid_at, expiresAt: data.expires_at as string },
+    },
   };
+}
+
+export interface CourseSale {
+  id: string;
+  courseId: string;
+  subscriberName: string;
+  paidAt: string;
+  expiresAt: string;
+  creatorAmount: number;
+  payoutStatus: "pending" | "released" | "not_applicable";
+  releasedAt?: string | null;
+}
+
+// Subscribers to the signed-in creator's courses and their payout state,
+// via get_my_course_sales (0046) -- creators can't read other users'
+// subscriptions through RLS. releasedByCourse is the all-time total
+// released per course, from the payout ledger.
+export async function getMyCourseSales() {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_my_course_sales");
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  const d = (data || {}) as { sales?: any[]; releasedByCourse?: Record<string, number> };
+  const sales: CourseSale[] = (d.sales || []).map((s) => ({
+    id: s.id,
+    courseId: s.courseId,
+    subscriberName: s.subscriberName,
+    paidAt: s.paidAt,
+    expiresAt: s.expiresAt,
+    creatorAmount: Number(s.creatorAmount) || 0,
+    payoutStatus: s.payoutStatus,
+    releasedAt: s.releasedAt,
+  }));
+  const releasedByCourse: Record<string, number> = {};
+  for (const [courseId, total] of Object.entries(d.releasedByCourse || {})) releasedByCourse[courseId] = Number(total) || 0;
+  return { res: { ok: true } as Response, payload: { ok: true, sales, releasedByCourse } };
 }
 
 export async function getAdminBuyerCourses() {
@@ -1185,9 +1231,8 @@ export async function getAdminCoursePurchases() {
       // the whole query failed with "permission denied for table courses".
       "*, courses(id, title, description, price, commission, final_price, source, status, is_published, cover_image, created_at, tutors(*), profiles!creator_id(id, name, email, bank_name, account_holder_name, account_number)), profiles!user_id(id, name, email)",
     )
-    .eq("source", "buyer")
     .eq("status", "active")
-    .order("created_at", { ascending: false });
+    .order("paid_at", { ascending: false });
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   const purchases = (data || []).map((p: any) => ({
     _id: p.id,
@@ -1205,11 +1250,13 @@ export async function getAdminCoursePurchases() {
         : undefined,
     },
     buyer: p.profiles ? { name: p.profiles.name, email: p.profiles.email } : undefined,
+    source: p.source as "admin" | "buyer",
     amount: p.amount,
     creatorAmount: p.creator_amount,
     commission: p.commission,
     paymentReference: p.payment_reference,
     paidAt: p.paid_at,
+    expiresAt: p.expires_at as string,
     payoutStatus: p.payout_status,
     releasedAt: p.released_at,
   }));

@@ -10,6 +10,10 @@
 import { callerClient } from "../_shared/supabase-admin.ts";
 import { handleCorsPreflight, jsonResponse } from "../_shared/cors.ts";
 import { createFlutterwaveCheckout } from "../_shared/flutterwave.ts";
+import { courseDate } from "../_shared/mailer.ts";
+
+// Keep in step with course_renewal_window_days() (0046).
+const RENEWAL_WINDOW_DAYS = 3;
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -47,19 +51,27 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "You cannot subscribe to a course you created" }, { status: 400 });
     }
 
-    // Subscriptions never expire (one row per user+course), so a second
-    // checkout would only charge the buyer twice for access they already
-    // have -- e.g. reopening the course from a browse list that doesn't
-    // know they own it.
+    // Access lasts 30 days. Renewing opens in the last 3 days (the new 30
+    // days are added on top) and stays open after expiry; before that, a
+    // second checkout would only charge the buyer for access they already
+    // have.
     const { data: existing } = await caller
       .from("subscriptions")
-      .select("id")
+      .select("expires_at")
       .eq("user_id", user.id)
       .eq("course_id", courseId)
       .eq("status", "active")
       .maybeSingle();
-    if (existing) {
-      return jsonResponse({ error: "You already have access to this course." }, { status: 409 });
+    const renewalOpensAt = existing
+      ? new Date(existing.expires_at).getTime() - RENEWAL_WINDOW_DAYS * 86_400_000
+      : 0;
+    if (existing && Date.now() < renewalOpensAt) {
+      return jsonResponse(
+        {
+          error: `You already have access to this course until ${courseDate(existing.expires_at)}. You can renew from ${courseDate(new Date(renewalOpensAt))}.`,
+        },
+        { status: 409 },
+      );
     }
 
     const payableAmount = course.source === "buyer" ? Number(course.final_price ?? course.price) : Number(course.price);

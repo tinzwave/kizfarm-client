@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import React, { useEffect, useMemo, useState } from "react";
-import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
+import { getBuyerBrowseCourses, getMyCreatedCourses, getMySubscriptions, getMyCourseSales, getCourseContent, getCourseCreatorContact } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
 import { createBuyerCourse, updateBuyerCourse, saveCreatorBankDetails, saveCreatorProfile, uploadCourseCover } from "@/lib/kizfarm/supabase-mutations";
 import LearningRichEditor from "./learning-rich-editor";
 import CourseCoverInput from "./course-cover-input";
 import { CreatorAvatar } from "./course-creator-card";
-import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
+import { AccessBadge, AccessMeter, PayoutBadge } from "./course-access-meter";
+import { courseAccessState, formatCourseDate } from "@/lib/kizfarm/course-access";
+import type { CourseSale, CreatorProfile } from "@/lib/kizfarm/supabase-data";
 
 type ReviewStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -33,6 +35,20 @@ interface Subscription {
   _id: string;
   course: BuyerCourse;
   paidAt: string;
+  expiresAt: string;
+}
+
+type Tab = "browse" | "subscribed" | "teaching" | "create";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "browse", label: "All Courses" },
+  { id: "subscribed", label: "My Subscriptions" },
+  { id: "teaching", label: "My Created Courses" },
+  { id: "create", label: "Create Course" },
+];
+
+function naira(amount: number) {
+  return `NGN ${amount.toLocaleString()}`;
 }
 
 function onlyDigits(value: string) {
@@ -74,10 +90,18 @@ export default function BuyerCoursesPage() {
   // Farmers reach this page at /learning/my-courses and buyers at
   // /buyer/courses; course links come back to whichever one they used.
   const returnTo = usePathname() || "/buyer/courses";
-  const [activeTab, setActiveTab] = useState<"browse" | "mine" | "create">("browse");
+  const [activeTab, setActiveTab] = useState<Tab>("browse");
+  // Deep links from emails/notifications: ?tab=subscribed|teaching
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (TABS.some((t) => t.id === tab)) void Promise.resolve().then(() => setActiveTab(tab as Tab));
+  }, []);
   const [courses, setCourses] = useState<BuyerCourse[]>([]);
   const [myCourses, setMyCourses] = useState<BuyerCourse[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [sales, setSales] = useState<CourseSale[]>([]);
+  const [releasedByCourse, setReleasedByCourse] = useState<Record<string, number>>({});
+  const [openSalesCourseId, setOpenSalesCourseId] = useState("");
   const [editingCourse, setEditingCourse] = useState<BuyerCourse | null>(null);
   const [form, setForm] = useState(emptyCourse);
   const [search, setSearch] = useState("");
@@ -106,15 +130,20 @@ export default function BuyerCoursesPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [coursesRes, mineRes, subsRes, profile] = await Promise.all([
+      const [coursesRes, mineRes, subsRes, salesRes, profile] = await Promise.all([
         getBuyerBrowseCourses(),
         getMyCreatedCourses(),
         getMySubscriptions({ source: "buyer" }),
+        getMyCourseSales(),
         getCurrentProfile(),
       ]);
       if (coursesRes.payload?.ok) setCourses(coursesRes.payload.courses ?? []);
       if (mineRes.payload?.ok) setMyCourses(mineRes.payload.courses ?? []);
       if (subsRes.payload?.ok) setSubscriptions(subsRes.payload.subscriptions ?? []);
+      if (salesRes.payload?.ok) {
+        setSales(salesRes.payload.sales ?? []);
+        setReleasedByCourse(salesRes.payload.releasedByCourse ?? {});
+      }
       if (profile) {
         const bank = {
           bankName: (profile as any).bank_name || "",
@@ -191,18 +220,28 @@ export default function BuyerCoursesPage() {
     }
   }
 
-  const subscribedIds = useMemo(
-    () => new Set(subscriptions.map((sub) => sub.course?._id).filter(Boolean)),
+  const subscriptionByCourse = useMemo(
+    () => new Map(subscriptions.filter((sub) => sub.course?._id).map((sub) => [sub.course._id, sub])),
     [subscriptions],
   );
 
+  // Bought courses stay in the list (marked as subscribed) -- hiding them
+  // made a purchase look like the course had disappeared.
   const visibleCourses = courses.filter((course) => {
     const q = search.toLowerCase();
-    return !subscribedIds.has(course._id) && (
-      course.title.toLowerCase().includes(q) ||
-      course.description.toLowerCase().includes(q)
-    );
+    return course.title.toLowerCase().includes(q) || course.description.toLowerCase().includes(q);
   });
+
+  const activeSubscriptionCount = subscriptions.filter((sub) => !courseAccessState(sub.expiresAt).expired).length;
+
+  const salesByCourse = useMemo(() => {
+    const map = new Map<string, CourseSale[]>();
+    for (const sale of sales) map.set(sale.courseId, [...(map.get(sale.courseId) ?? []), sale]);
+    return map;
+  }, [sales]);
+
+  const courseHref = (courseId: string) =>
+    `/learning/course?courseId=${courseId}&access=1&source=buyer&returnTo=${encodeURIComponent(returnTo)}`;
 
   async function startEdit(course: BuyerCourse) {
     setEditingCourse(course);
@@ -297,7 +336,7 @@ export default function BuyerCoursesPage() {
       );
       setEditingCourse(null);
       setForm(emptyCourse);
-      setActiveTab("mine");
+      setActiveTab("teaching");
       window.scrollTo({ top: 0, behavior: "smooth" });
       // The course is saved at this point; a failed refresh must not be
       // reported as "Course was not created".
@@ -348,12 +387,12 @@ export default function BuyerCoursesPage() {
                 <p className="text-xs text-green-100">Published</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{loading ? "-" : myCourses.length}</p>
-                <p className="text-xs text-green-100">Created</p>
+                <p className="text-2xl font-bold">{loading ? "-" : activeSubscriptionCount}</p>
+                <p className="text-xs text-green-100">Subscribed</p>
               </div>
               <div>
-                <p className="text-2xl font-bold">{loading ? "-" : subscriptions.length}</p>
-                <p className="text-xs text-green-100">Bought</p>
+                <p className="text-2xl font-bold">{loading ? "-" : myCourses.length}</p>
+                <p className="text-xs text-green-100">Created</p>
               </div>
             </div>
           </div>
@@ -369,16 +408,19 @@ export default function BuyerCoursesPage() {
 
         <div className="flex flex-col gap-3 rounded-lg bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap gap-2">
-            {(["browse", "mine", "create"] as const).map((tab) => (
+            {TABS.map((tab) => (
               <button
-                key={tab}
+                key={tab.id}
                 onClick={() => {
-                  if (tab !== "create") setEditingCourse(null);
-                  setActiveTab(tab);
+                  if (tab.id !== "create") setEditingCourse(null);
+                  setActiveTab(tab.id);
                 }}
-                className={`rounded-lg px-4 py-2 text-sm font-bold capitalize ${activeTab === tab ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold ${activeTab === tab.id ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}
               >
-                {tab === "mine" ? "My Courses" : tab}
+                {tab.label}
+                {tab.id === "subscribed" && subscriptions.length > 0 && (
+                  <span className={`rounded-full px-1.5 text-xs ${activeTab === tab.id ? "bg-white/20" : "bg-green-100 text-green-800"}`}>{subscriptions.length}</span>
+                )}
               </button>
             ))}
           </div>
@@ -412,12 +454,24 @@ export default function BuyerCoursesPage() {
                         </div>
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-green-800">NGN {(course.finalPrice ?? course.price).toLocaleString()}</span>
-                      <Link href={`/learning/course?courseId=${course._id}${subscribedIds.has(course._id) ? "&access=1" : ""}&source=buyer&returnTo=${encodeURIComponent(returnTo)}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
-                        {subscribedIds.has(course._id) ? "Open" : "Details"}
-                      </Link>
-                    </div>
+                    {(() => {
+                      const sub = subscriptionByCourse.get(course._id);
+                      const access = sub ? courseAccessState(sub.expiresAt) : null;
+                      return (
+                        <>
+                          {sub && <AccessBadge expiresAt={sub.expiresAt} />}
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-green-800">{naira(course.finalPrice ?? course.price)}</span>
+                            <Link
+                              href={sub ? courseHref(course._id) : `/learning/course?courseId=${course._id}&source=buyer&returnTo=${encodeURIComponent(returnTo)}`}
+                              className={`rounded-lg px-4 py-2 text-sm font-bold ${access?.expired ? "bg-amber-600 text-white hover:bg-amber-700" : "bg-green-800 text-white hover:bg-green-900"}`}
+                            >
+                              {!sub ? "Details" : access?.expired ? "Renew" : "Open course"}
+                            </Link>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </article>
               ))
@@ -425,66 +479,179 @@ export default function BuyerCoursesPage() {
           </section>
         )}
 
-        {activeTab === "mine" && (
-          <section className="space-y-6">
-            <div>
-              <h2 className="mb-3 font-bold text-slate-900">Bought Courses</h2>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {subscriptions.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 lg:col-span-2">No bought courses yet.</div>
-                ) : (
-                  subscriptions.map((sub) => (
-                    <article key={sub._id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                      <p className="text-xs font-bold uppercase tracking-widest text-green-800">Unlocked Course</p>
-                      <h3 className="mt-2 text-lg font-bold">{sub.course.title}</h3>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{sub.course.description}</p>
-                      <div className="mt-5 flex items-center justify-between">
-                        <span className="font-bold text-green-800">NGN {(sub.course.finalPrice ?? sub.course.price).toLocaleString()}</span>
-                        <Link href={`/learning/course?courseId=${sub.course._id}&access=1&source=buyer&returnTo=${encodeURIComponent(returnTo)}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
-                          Continue
-                        </Link>
-                      </div>
-                    </article>
-                  ))
-                )}
+        {activeTab === "subscribed" && (
+          <section className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            {subscriptions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 lg:col-span-2">
+                <p>You haven&apos;t subscribed to any course yet.</p>
+                <button onClick={() => setActiveTab("browse")} className="mt-3 text-sm font-bold text-green-800 hover:underline">Browse courses</button>
               </div>
-            </div>
+            ) : (
+              subscriptions.map((sub) => {
+                const access = courseAccessState(sub.expiresAt);
+                return (
+                  <article key={sub._id} className="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm sm:flex-row">
+                    <div
+                      className={`h-28 shrink-0 bg-cover bg-center sm:h-auto sm:w-40 ${sub.course.coverImage ? "" : "bg-gradient-to-br from-green-900 to-cyan-800"}`}
+                      style={sub.course.coverImage ? { backgroundImage: `url(${sub.course.coverImage})` } : undefined}
+                    />
+                    <div className="flex flex-1 flex-col gap-4 p-5">
+                      <div>
+                        <AccessBadge expiresAt={sub.expiresAt} />
+                        <h3 className="mt-2 text-lg font-bold">{sub.course.title}</h3>
+                        {sub.course.creatorProfile && <p className="text-sm text-slate-500">By {sub.course.creatorProfile.name}</p>}
+                      </div>
+                      <AccessMeter paidAt={sub.paidAt} expiresAt={sub.expiresAt} />
+                      <div className="mt-auto flex flex-wrap items-center justify-end gap-2">
+                        {access.canRenew && (
+                          <Link
+                            href={`/learning/checkout?courseId=${sub.course._id}&source=buyer&returnTo=${encodeURIComponent(returnTo)}`}
+                            className={`rounded-lg px-4 py-2 text-sm font-bold ${access.expired ? "bg-amber-600 text-white hover:bg-amber-700" : "border border-amber-300 text-amber-800 hover:bg-amber-50"}`}
+                          >
+                            Renew · {naira(sub.course.finalPrice ?? sub.course.price)}
+                          </Link>
+                        )}
+                        {!access.expired && (
+                          <Link href={courseHref(sub.course._id)} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
+                            Continue learning
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </section>
+        )}
 
-            <div>
-              <h2 className="mb-3 font-bold text-slate-900">Created Courses</h2>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {myCourses.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 lg:col-span-2">You have not created any courses yet.</div>
-                ) : (
-                  myCourses.map((course) => (
-                    <article key={course._id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        {activeTab === "teaching" && (
+          <section className="space-y-5">
+            {myCourses.length > 0 && (() => {
+              const pending = sales.filter((s) => s.payoutStatus === "pending").reduce((sum, s) => sum + s.creatorAmount, 0);
+              const released = Object.values(releasedByCourse).reduce((sum, n) => sum + n, 0);
+              const activeSubscribers = sales.filter((s) => !courseAccessState(s.expiresAt).expired).length;
+              return (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {[
+                    { label: "Active subscribers", value: String(activeSubscribers), icon: "group" },
+                    { label: "Total subscriptions", value: String(sales.length), icon: "receipt_long" },
+                    { label: "Awaiting release", value: naira(pending), icon: "schedule" },
+                    { label: "Released to you", value: naira(released), icon: "payments" },
+                  ].map((stat) => (
+                    <div key={stat.label} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                      <span className="material-symbols-outlined text-green-800">{stat.icon}</span>
+                      <p className="mt-2 text-xs font-semibold text-slate-500">{stat.label}</p>
+                      <p className="text-xl font-bold">{loading ? "-" : stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {myCourses.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500">
+                <p>You have not created any courses yet.</p>
+                <button onClick={() => setActiveTab("create")} className="mt-3 text-sm font-bold text-green-800 hover:underline">Create your first course</button>
+              </div>
+            ) : (
+              myCourses.map((course) => {
+                const courseSales = salesByCourse.get(course._id) ?? [];
+                const active = courseSales.filter((s) => !courseAccessState(s.expiresAt).expired).length;
+                const pending = courseSales.filter((s) => s.payoutStatus === "pending").reduce((sum, s) => sum + s.creatorAmount, 0);
+                const released = releasedByCourse[course._id] ?? 0;
+                const open = openSalesCourseId === course._id;
+                return (
+                  <article key={course._id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div className="p-5">
                       <div className="flex items-start justify-between gap-4">
                         {course.coverImage && (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img src={course.coverImage} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
                         )}
                         <div className="flex-1">
                           <h3 className="text-lg font-bold">{course.title}</h3>
-                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{course.description}</p>
+                          <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{course.description}</p>
                         </div>
                         <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${statusClass(course.status)}`}>{course.status ?? "draft"}</span>
                       </div>
                       {course.rejectionReason && (
                         <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{course.rejectionReason}</div>
                       )}
-                      <div className="mt-5 flex items-center justify-between">
-                        <div className="text-sm">
-                          <span className="font-bold text-green-800">NGN {course.price.toLocaleString()}</span>
-                          {course.finalPrice && course.finalPrice !== course.price && <span className="ml-2 text-slate-500">Published: NGN {course.finalPrice.toLocaleString()}</span>}
+                      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-slate-500">Subscribers</p>
+                          <p className="font-bold">{active} active · {courseSales.length} total</p>
                         </div>
-                        <button onClick={() => startEdit(course)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50">
-                          {course.status === "rejected" ? "Edit & Resubmit" : "Edit"}
-                        </button>
+                        <div>
+                          <p className="text-xs text-slate-500">Your price</p>
+                          <p className="font-bold">{naira(course.price)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Awaiting release</p>
+                          <p className="font-bold text-amber-700">{naira(pending)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Released to you</p>
+                          <p className="font-bold text-green-800">{naira(released)}</p>
+                        </div>
                       </div>
-                    </article>
-                  ))
-                )}
-              </div>
-            </div>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-sm text-slate-500">
+                          {course.finalPrice && course.finalPrice !== course.price ? `Buyers pay ${naira(course.finalPrice)}` : null}
+                        </div>
+                        <div className="flex gap-2">
+                          {courseSales.length > 0 && (
+                            <button
+                              onClick={() => setOpenSalesCourseId(open ? "" : course._id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                              aria-expanded={open}
+                            >
+                              {open ? "Hide subscribers" : `View subscribers (${courseSales.length})`}
+                              <span className="material-symbols-outlined text-[18px]">{open ? "expand_less" : "expand_more"}</span>
+                            </button>
+                          )}
+                          <button onClick={() => startEdit(course)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-green-800 hover:bg-green-50">
+                            {course.status === "rejected" ? "Edit & Resubmit" : "Edit"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {open && (
+                      <div className="overflow-x-auto border-t border-gray-100">
+                        <table className="w-full min-w-[640px] text-left text-sm">
+                          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                            <tr>
+                              <th className="px-5 py-3 font-semibold">Subscriber</th>
+                              <th className="px-5 py-3 font-semibold">Subscribed</th>
+                              <th className="px-5 py-3 font-semibold">Access</th>
+                              <th className="px-5 py-3 font-semibold">Your earning</th>
+                              <th className="px-5 py-3 font-semibold">Payout</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {courseSales.map((sale) => {
+                              const access = courseAccessState(sale.expiresAt);
+                              return (
+                                <tr key={sale.id}>
+                                  <td className="px-5 py-3 font-semibold">{sale.subscriberName}</td>
+                                  <td className="px-5 py-3 text-slate-600">{formatCourseDate(sale.paidAt)}</td>
+                                  <td className={`px-5 py-3 ${access.expired ? "text-red-700" : "text-slate-600"}`}>
+                                    {access.expired ? `Expired ${formatCourseDate(sale.expiresAt)}` : `${access.daysLeft} days left`}
+                                  </td>
+                                  <td className="px-5 py-3">{naira(sale.creatorAmount)}</td>
+                                  <td className="px-5 py-3"><PayoutBadge status={sale.payoutStatus} releasedAt={sale.releasedAt} /></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </article>
+                );
+              })
+            )}
           </section>
         )}
 
@@ -624,7 +791,7 @@ export default function BuyerCoursesPage() {
                   : uploadingCount > 0 ? "Uploading image..." : editingCourse ? "Save Changes" : "Create Course"}
               </button>
               {editingCourse && (
-                <button type="button" disabled={submitting} onClick={() => { setEditingCourse(null); setForm(emptyCourse); setFormError(""); setActiveTab("mine"); }} className="rounded-lg border border-gray-200 px-5 py-3 font-bold text-slate-600 hover:bg-slate-50">
+                <button type="button" disabled={submitting} onClick={() => { setEditingCourse(null); setForm(emptyCourse); setFormError(""); setActiveTab("teaching"); }} className="rounded-lg border border-gray-200 px-5 py-3 font-bold text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
               )}

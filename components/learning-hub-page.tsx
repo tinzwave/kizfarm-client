@@ -6,6 +6,8 @@ import { getCourses, getMySubscriptions } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile, redirectPathForRole } from "@/lib/kizfarm/supabase-auth";
 import type { CreatorProfile } from "@/lib/kizfarm/supabase-data";
 import { CreatorAvatar } from "./course-creator-card";
+import { AccessBadge, AccessMeter } from "./course-access-meter";
+import { courseAccessState } from "@/lib/kizfarm/course-access";
 
 interface Tutor {
   _id: string;
@@ -21,6 +23,8 @@ interface Course {
   title: string;
   description: string;
   price: number;
+  finalPrice?: number;
+  source?: "admin" | "buyer";
   content?: string;
   coverImage?: string;
   tutor?: Tutor;
@@ -31,6 +35,7 @@ interface Subscription {
   _id: string;
   course: Course;
   paidAt: string;
+  expiresAt: string;
 }
 
 export default function LearningHubPage() {
@@ -63,18 +68,22 @@ export default function LearningHubPage() {
     void Promise.resolve().then(() => loadData());
   }, []);
 
-  const subscribedIds = useMemo(
-    () => new Set(subscriptions.map((sub) => sub.course?._id)),
+  const subscriptionByCourse = useMemo(
+    () => new Map(subscriptions.filter((sub) => sub.course?._id).map((sub) => [sub.course._id, sub])),
     [subscriptions],
   );
+  // Bought courses stay in the list (marked as subscribed) -- hiding them
+  // made a purchase look like the course had disappeared.
   const visibleCourses = courses.filter((course) => {
     const q = search.toLowerCase();
-    return !subscribedIds.has(course._id) && (
+    return (
       course.title.toLowerCase().includes(q) ||
       course.description.toLowerCase().includes(q) ||
       (course.tutor?.name ?? "").toLowerCase().includes(q)
     );
   });
+  const courseHref = (course: Course, subscribed: boolean) =>
+    `/learning/course?courseId=${course._id}${subscribed ? "&access=1" : ""}&source=${course.source === "buyer" ? "buyer" : "admin"}`;
 
   return (
     <div className="min-h-screen bg-[#f7faf7] pb-20 text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -99,7 +108,9 @@ export default function LearningHubPage() {
             <div className="rounded-lg bg-white/10 p-5">
               <p className="text-sm text-green-100">Available courses</p>
               <p className="text-4xl font-bold">{loading ? "-" : courses.length}</p>
-              <p className="mt-4 text-sm text-green-100">My courses: {subscriptions.length}</p>
+              <p className="mt-4 text-sm text-green-100">
+                My subscriptions: {subscriptions.filter((sub) => !courseAccessState(sub.expiresAt).expired).length} active
+              </p>
             </div>
           </div>
         </section>
@@ -119,7 +130,7 @@ export default function LearningHubPage() {
         <div className="flex flex-col gap-3 rounded-xl bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
           <div className="flex gap-2">
             <button onClick={() => setActiveTab("browse")} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "browse" ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}>Browse Courses</button>
-            <button onClick={() => setActiveTab("mine")} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "mine" ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}>My Courses</button>
+            <button onClick={() => setActiveTab("mine")} className={`rounded-lg px-4 py-2 text-sm font-bold ${activeTab === "mine" ? "bg-green-800 text-white" : "text-slate-600 hover:bg-slate-50"}`}>My Subscriptions</button>
           </div>
           <input value={search} onChange={(e) => setSearch(e.target.value)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm md:w-80" placeholder="Search courses or tutors" />
         </div>
@@ -128,7 +139,7 @@ export default function LearningHubPage() {
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {visibleCourses.length === 0 ? (
               <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-slate-500 md:col-span-2 lg:col-span-3">
-                No new courses to browse.
+                No courses match your search.
               </div>
             ) : visibleCourses.map((course) => (
               <article key={course._id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -157,12 +168,24 @@ export default function LearningHubPage() {
                       <span className="text-sm font-semibold">By {course.creatorProfile.name}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-green-800">NGN {course.price.toLocaleString()}</span>
-                    <Link href={`/learning/course?courseId=${course._id}`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">
-                      {subscribedIds.has(course._id) ? "Open" : "Details"}
-                    </Link>
-                  </div>
+                  {(() => {
+                    const sub = subscriptionByCourse.get(course._id);
+                    const expired = sub ? courseAccessState(sub.expiresAt).expired : false;
+                    return (
+                      <>
+                        {sub && <AccessBadge expiresAt={sub.expiresAt} />}
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-green-800">NGN {(course.finalPrice ?? course.price).toLocaleString()}</span>
+                          <Link
+                            href={courseHref(course, !!sub)}
+                            className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${expired ? "bg-amber-600 hover:bg-amber-700" : "bg-green-800 hover:bg-green-900"}`}
+                          >
+                            {!sub ? "Details" : expired ? "Renew" : "Open course"}
+                          </Link>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </article>
             ))}
@@ -174,17 +197,34 @@ export default function LearningHubPage() {
                 No courses unlocked yet.
               </div>
             ) : (
-              subscriptions.map((sub) => (
-                <article key={sub._id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                  <p className="text-xs font-bold uppercase tracking-widest text-green-800">Unlocked Course</p>
-                  <h3 className="mt-2 text-xl font-bold">{sub.course.title}</h3>
-                  <p className="mt-2 line-clamp-2 text-sm text-slate-600">{sub.course.description}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Coach: {sub.course.tutor?.name ?? "Assigned tutor"}</span>
-                    <Link href={`/learning/course?courseId=${sub.course._id}&access=1`} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">Continue</Link>
-                  </div>
-                </article>
-              ))
+              subscriptions.map((sub) => {
+                const access = courseAccessState(sub.expiresAt);
+                return (
+                  <article key={sub._id} className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div>
+                      <AccessBadge expiresAt={sub.expiresAt} />
+                      <h3 className="mt-2 text-xl font-bold">{sub.course.title}</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {sub.course.tutor ? `Coach: ${sub.course.tutor.name}` : sub.course.creatorProfile ? `By ${sub.course.creatorProfile.name}` : null}
+                      </p>
+                    </div>
+                    <AccessMeter paidAt={sub.paidAt} expiresAt={sub.expiresAt} />
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {access.canRenew && (
+                        <Link
+                          href={`/learning/checkout?courseId=${sub.course._id}&source=${sub.course.source === "buyer" ? "buyer" : "admin"}`}
+                          className={`rounded-lg px-4 py-2 text-sm font-bold ${access.expired ? "bg-amber-600 text-white hover:bg-amber-700" : "border border-amber-300 text-amber-800 hover:bg-amber-50"}`}
+                        >
+                          Renew
+                        </Link>
+                      )}
+                      {!access.expired && (
+                        <Link href={courseHref(sub.course, true)} className="rounded-lg bg-green-800 px-4 py-2 text-sm font-bold text-white hover:bg-green-900">Continue learning</Link>
+                      )}
+                    </div>
+                  </article>
+                );
+              })
             )}
           </section>
         )}
