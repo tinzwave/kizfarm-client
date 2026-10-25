@@ -25,6 +25,9 @@ interface Course {
   price: number;
   finalPrice?: number;
   commission?: number;
+  coverImage?: string;
+  source?: "admin" | "buyer";
+  isPublished?: boolean;
   tutor?: Tutor;
   status?: "pending" | "approved" | "rejected";
   rejectionReason?: string;
@@ -296,6 +299,26 @@ export default function LearningHubAdminPage() {
     });
   }, [purchases, purchaseFilter, purchaseSearch]);
 
+  // Every course buyers can see: KIZ FARM's own plus approved community
+  // courses. Listing only the admin ones made a bought community course
+  // look like it had vanished from the admin side.
+  const publishedCourses = useMemo(
+    () => [...courses, ...buyerCourses.filter((c) => c.status === "approved" && c.isPublished !== false)],
+    [courses, buyerCourses],
+  );
+  const subscriberCounts = useMemo(() => {
+    const counts = new Map<string, { active: number; total: number }>();
+    for (const p of purchases) {
+      const id = p.course?._id;
+      if (!id) continue;
+      const row = counts.get(id) ?? { active: 0, total: 0 };
+      row.total += 1;
+      if (!courseAccessState(p.expiresAt).expired) row.active += 1;
+      counts.set(id, row);
+    }
+    return counts;
+  }, [purchases]);
+
   const statusClass = (status?: Course["status"]) => {
     if (status === "approved") return "bg-green-50 text-green-800";
     if (status === "rejected") return "bg-red-50 text-red-700";
@@ -390,7 +413,13 @@ export default function LearningHubAdminPage() {
                 return (
                   <article key={course._id} className={`rounded-xl border border-gray-200 bg-white p-5 shadow-sm ${isReviewing ? "lg:col-span-2" : ""}`}>
                     <div className="flex items-start justify-between gap-4">
-                      <div>
+                      {course.coverImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={course.coverImage} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded-md bg-slate-100 text-xs text-slate-400">No cover</div>
+                      )}
+                      <div className="flex-1">
                         <h3 className="text-lg font-bold">{course.title}</h3>
                         <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{course.description}</p>
                       </div>
@@ -603,17 +632,38 @@ export default function LearningHubAdminPage() {
             </form>
 
             <aside className="space-y-3">
-              <h2 className="font-bold">Published Courses</h2>
-              {courses.map((course) => (
-                <div key={course._id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <h3 className="font-bold">{course.title}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-slate-500">{course.description}</p>
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="font-bold text-green-800">NGN {course.price.toLocaleString()}</span>
-                    <span>{course.tutor?.name ?? "No tutor"}</span>
+              <h2 className="font-bold">Published Courses ({publishedCourses.length})</h2>
+              {publishedCourses.map((course) => {
+                const community = course.source === "buyer";
+                const subs = subscriberCounts.get(course._id);
+                return (
+                  <div key={course._id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    {course.coverImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={course.coverImage} alt="" className="h-32 w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="flex h-32 w-full items-center justify-center bg-gradient-to-br from-green-900 to-lime-700">
+                        <span className="material-symbols-outlined text-4xl text-white/50">school</span>
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${community ? "bg-cyan-50 text-cyan-800" : "bg-green-50 text-green-800"}`}>
+                        {community ? "Community course" : "KIZ FARM course"}
+                      </span>
+                      <h3 className="mt-2 font-bold">{course.title}</h3>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-500">{course.description}</p>
+                      <div className="mt-3 flex items-center justify-between gap-2 text-sm">
+                        <span className="font-bold text-green-800">NGN {(community ? course.finalPrice ?? course.price : course.price).toLocaleString()}</span>
+                        <span className="truncate text-slate-600">{community ? `By ${course.creator?.name ?? "creator"}` : course.tutor?.name ?? "No tutor"}</span>
+                      </div>
+                      <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-slate-500">
+                        <span className="material-symbols-outlined text-[16px]">group</span>
+                        {subs ? `${subs.active} active · ${subs.total} total subscriber${subs.total === 1 ? "" : "s"}` : "No subscribers yet"}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </aside>
           </div>
         )}
