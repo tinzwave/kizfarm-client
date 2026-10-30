@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getAdminFarmers, getAdminFarmerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
+import Link from "next/link";
+import { getAdminFarmers, getAdminFarmerStatusCounts, getAdminFarmerSuspensionEligibility } from "@/lib/kizfarm/supabase-data";
+import { statusMeta } from "@/lib/kizfarm/farmer-application";
 import { suspendAdminFarmer, unsuspendAdminFarmer, deactivateAdminFarmer } from "@/lib/kizfarm/supabase-mutations";
 import DeleteAccountButton from "@/components/delete-account-button";
 
@@ -10,8 +12,11 @@ interface Farmer {
   fullName: string;
   farmName: string;
   phone: string;
-  status: "approved" | "pending" | "rejected";
+  status: "draft" | "approved" | "pending" | "rejected";
+  location?: string;
   createdAt: string;
+  submittedAt?: string;
+  missingCount: number;
   userId?: {
     _id?: string;
     email: string;
@@ -28,7 +33,10 @@ export default function AllFarmersListPage() {
   const PAGE_SIZE = 20;
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
-  const [statusFilter, setStatusFilter] = useState("approved");
+  // "All" by default: a filtered default once made pending and incomplete
+  // applicants look like they had vanished from the list.
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   // Suspension modal
   const [showSuspendModal, setShowSuspendModal] = useState(false);
@@ -39,7 +47,13 @@ export default function AllFarmersListPage() {
   const [canSuspend, setCanSuspend] = useState(false);
   const [checkingEligibility, setCheckingEligibility] = useState(false);
 
+  const fetchCounts = async () => {
+    const { res, payload } = await getAdminFarmerStatusCounts();
+    if (res.ok) setCounts(payload.counts || {});
+  };
+
   const fetchFarmers = async () => {
+    void fetchCounts();
     try {
       setLoading(true);
       const { res, payload } = await getAdminFarmers({ status: statusFilter, search: searchQ || undefined, offset: 0, limit: PAGE_SIZE });
@@ -72,8 +86,33 @@ export default function AllFarmersListPage() {
   };
 
   useEffect(() => {
-    void Promise.resolve().then(() => fetchFarmers());
-  }, [statusFilter]);
+    // Debounced so typing in the search box doesn't fire a request per key.
+    const t = setTimeout(() => fetchFarmers(), searchQ ? 350 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, searchQ]);
+
+  const exportCsv = () => {
+    const header = ["Name", "Farm", "Email", "Phone", "State", "Application status", "Account", "Started", "Submitted"];
+    const rows = filteredFarmers.map((f) => [
+      f.fullName,
+      f.farmName,
+      f.userId?.email || "",
+      f.phone || f.userId?.phone || "",
+      f.location || "",
+      statusMeta(f.status).adminLabel,
+      isSuspended(f) ? f.userId?.status || "" : "active",
+      f.createdAt ? new Date(f.createdAt).toISOString() : "",
+      f.submittedAt ? new Date(f.submittedAt).toISOString() : "",
+    ]);
+    const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `kizfarm-farmers-${statusFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const openSuspendModal = async (farmer: Farmer) => {
     setSelectedFarmer(farmer);
@@ -156,45 +195,6 @@ export default function AllFarmersListPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-emerald-100/50 text-emerald-700";
-      case "pending":
-        return "bg-amber-100/50 text-amber-700";
-      case "rejected":
-        return "bg-rose-100/50 text-rose-700";
-      default:
-        return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "bg-emerald-600";
-      case "pending":
-        return "bg-amber-600";
-      case "rejected":
-        return "bg-rose-600";
-      default:
-        return "bg-gray-400";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "approved":
-        return "Verified";
-      case "pending":
-        return "Pending";
-      case "rejected":
-        return "Rejected";
-      default:
-        return status;
-    }
-  };
-
   const isSuspended = (farmer: Farmer) =>
     farmer.userId?.status === "suspended" || farmer.userId?.status === "deactivated";
 
@@ -235,7 +235,21 @@ export default function AllFarmersListPage() {
               </h2>
             </div>
             <div className="flex gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 font-label-md shadow-sm hover:bg-slate-50 transition-all">
+              <Link
+                href="/admin/verify-farmers"
+                className="flex items-center gap-2 px-4 py-2 bg-[#1B6D24] rounded-lg text-white font-label-md shadow-sm hover:brightness-110 transition-all"
+              >
+                <span className="material-symbols-outlined text-[20px]">verified</span>
+                Review applications
+                {(counts.pending || 0) > 0 && (
+                  <span className="rounded-full bg-amber-400 px-1.5 text-xs font-bold text-amber-950">{counts.pending}</span>
+                )}
+              </Link>
+              <button
+                onClick={exportCsv}
+                disabled={filteredFarmers.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-700 font-label-md shadow-sm hover:bg-slate-50 transition-all disabled:opacity-50"
+              >
                 <span
                   className="material-symbols-outlined text-[20px]"
                   data-icon="file_download"
@@ -247,66 +261,29 @@ export default function AllFarmersListPage() {
             </div>
           </div>
 
-          {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-lg">
-            <div className="bg-white p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-              <div className="flex justify-between items-start">
-                <div className="p-2 bg-emerald-50 rounded-lg">
-                  <span
-                    className="material-symbols-outlined text-emerald-700"
-                    data-icon="groups"
-                  >
-                    groups
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-slate-500 font-label-sm uppercase tracking-wider">
-                  Total Farmers
-                </p>
-                <p className="text-h2 font-h2 text-slate-900">{total}</p>
-              </div>
-            </div>
-            <div className="bg-white p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-              <div className="flex justify-between items-start">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <span
-                    className="material-symbols-outlined text-blue-700"
-                    data-icon="verified"
-                  >
-                    verified
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-slate-500 font-label-sm uppercase tracking-wider">
-                  Showing
-                </p>
-                <p className="text-h2 font-h2 text-slate-900">
-                  {filteredFarmers.length}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white p-lg rounded-xl border border-outline-variant shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
-              <div className="flex justify-between items-start">
-                <div className="p-2 bg-rose-50 rounded-lg">
-                  <span
-                    className="material-symbols-outlined text-rose-700"
-                    data-icon="block"
-                  >
-                    block
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4">
-                <p className="text-slate-500 font-label-sm uppercase tracking-wider">
-                  Suspended
-                </p>
-                <p className="text-h2 font-h2 text-slate-900">
-                  {filteredFarmers.filter((f) => isSuspended(f)).length}
-                </p>
-              </div>
-            </div>
+          {/* Stats Overview -- each card filters the list */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-lg">
+            {[
+              { key: "all", label: "All", icon: "groups", tone: "bg-slate-50 text-slate-700" },
+              { key: "approved", label: "Verified", icon: "verified", tone: "bg-emerald-50 text-emerald-700" },
+              { key: "pending", label: "Pending review", icon: "hourglass_top", tone: "bg-amber-50 text-amber-700" },
+              { key: "draft", label: "Incomplete", icon: "edit_note", tone: "bg-slate-100 text-slate-700" },
+              { key: "rejected", label: "Rejected", icon: "block", tone: "bg-rose-50 text-rose-700" },
+            ].map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setStatusFilter(c.key)}
+                className={`bg-white p-4 rounded-xl border text-left shadow-sm transition-all hover:shadow-md ${
+                  statusFilter === c.key ? "border-[#1B6D24] ring-2 ring-[#1B6D24]/15" : "border-outline-variant"
+                }`}
+              >
+                <span className={`inline-flex p-1.5 rounded-lg ${c.tone}`}>
+                  <span className="material-symbols-outlined text-[20px]">{c.icon}</span>
+                </span>
+                <p className="mt-3 text-slate-500 text-xs font-semibold uppercase tracking-wider">{c.label}</p>
+                <p className="text-2xl font-bold text-slate-900">{counts[c.key] ?? "–"}</p>
+              </button>
+            ))}
           </div>
 
           {/* Filters Section */}
@@ -321,7 +298,6 @@ export default function AllFarmersListPage() {
                   placeholder="Search farmers..."
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && fetchFarmers()}
                 />
               </div>
               <div className="h-6 w-px bg-slate-200" />
@@ -336,7 +312,8 @@ export default function AllFarmersListPage() {
                 >
                   <option value="all">All Status</option>
                   <option value="approved">Verified</option>
-                  <option value="pending">Pending</option>
+                  <option value="pending">Pending review</option>
+                  <option value="draft">Incomplete (not submitted)</option>
                   <option value="rejected">Rejected</option>
                 </select>
               </div>
@@ -365,7 +342,9 @@ export default function AllFarmersListPage() {
                   <span className="material-symbols-outlined text-4xl mb-3">
                     agriculture
                   </span>
-                  <p className="text-sm font-medium">No farmers found</p>
+                  <p className="text-sm font-medium">
+                    {searchQ ? `No farmers match “${searchQ}”` : statusFilter === "all" ? "No farmers yet" : `No ${statusMeta(statusFilter).adminLabel.toLowerCase()} farmers`}
+                  </p>
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse">
@@ -403,9 +382,9 @@ export default function AllFarmersListPage() {
                               {farmer.fullName?.charAt(0)?.toUpperCase() || "?"}
                             </div>
                             <div>
-                              <p className="font-label-md text-slate-900">
+                              <Link href={`/admin/verify-farmers/${farmer._id}`} className="font-label-md text-slate-900 hover:text-[#1B6D24] hover:underline">
                                 {farmer.fullName}
-                              </p>
+                              </Link>
                               <p className="text-xs text-slate-500">
                                 {farmer.userId?.email || "—"}
                               </p>
@@ -422,13 +401,18 @@ export default function AllFarmersListPage() {
                         </td>
                         <td className="px-lg py-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusBadge(farmer.status)}`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${statusMeta(farmer.status).badge}`}
                           >
                             <span
-                              className={`w-1.5 h-1.5 rounded-full ${getStatusDot(farmer.status)}`}
+                              className={`w-1.5 h-1.5 rounded-full ${statusMeta(farmer.status).dot}`}
                             />
-                            {getStatusLabel(farmer.status)}
+                            {statusMeta(farmer.status).adminLabel}
                           </span>
+                          {farmer.status === "draft" && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              {farmer.missingCount > 0 ? `${farmer.missingCount} item${farmer.missingCount === 1 ? "" : "s"} missing` : "Complete, not submitted"}
+                            </p>
+                          )}
                         </td>
                         <td className="px-lg py-4">
                           {isSuspended(farmer) ? (
@@ -444,7 +428,13 @@ export default function AllFarmersListPage() {
                           )}
                         </td>
                         <td className="px-lg py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-wrap items-center justify-end gap-2 min-w-[220px]">
+                            <Link
+                              href={`/admin/verify-farmers/${farmer._id}`}
+                              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors"
+                            >
+                              {farmer.status === "pending" ? "Review" : "Application"}
+                            </Link>
                             {isSuspended(farmer) ? (
                               <button
                                 onClick={() => handleUnsuspend(farmer)}

@@ -396,6 +396,90 @@ export async function submitFarmerVerification(input: {
   }
 }
 
+export const KYC_MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+export function kycFileProblem(file: File) {
+  if (!file.type.startsWith("image/")) return "Please choose an image file (JPG or PNG).";
+  if (file.size > KYC_MAX_FILE_BYTES) return "This image is larger than 10MB. Please choose a smaller one.";
+  return null;
+}
+
+// Saves whatever the applicant has filled in so far without submitting it
+// -- uploads survive leaving the page, and admins can see an incomplete
+// application's progress. Only allowed while the application is a draft
+// or was rejected (save_farmer_application_progress enforces this).
+export async function saveFarmerApplicationProgress(input: {
+  farmName?: string;
+  phone?: string;
+  location?: string;
+  farmType?: string;
+  farmAddress?: string;
+  farmerImageFile?: File | null;
+  validIdImageFile?: File | null;
+  // All 5 slots: a new File, the existing raw storage path (never a signed
+  // display URL), or null for an empty slot. Omit when no slot changed.
+  farmImageSlots?: (File | string | null)[];
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { res: { ok: false } as Response, payload: { error: "Your session has expired. Please log in again." } };
+
+  const files = [input.farmerImageFile, input.validIdImageFile, ...(input.farmImageSlots || [])].filter(
+    (f): f is File => f instanceof File,
+  );
+  const problem = files.map(kycFileProblem).find(Boolean);
+  if (problem) return { res: { ok: false } as Response, payload: { error: problem } };
+
+  try {
+    const [farmerImageUrl, validIdImageUrl, farmImageUrls] = await Promise.all([
+      input.farmerImageFile ? uploadKycFile(supabase, user.id, input.farmerImageFile) : Promise.resolve(undefined),
+      input.validIdImageFile ? uploadKycFile(supabase, user.id, input.validIdImageFile) : Promise.resolve(undefined),
+      input.farmImageSlots
+        ? Promise.all(
+            input.farmImageSlots.map((slot) =>
+              slot instanceof File ? uploadKycFile(supabase, user.id, slot) : Promise.resolve(slot || null),
+            ),
+          )
+        : Promise.resolve(undefined),
+    ]);
+
+    const { data, error } = await supabase.rpc("save_farmer_application_progress", {
+      p_farm_name: input.farmName ?? null,
+      p_phone: input.phone ?? null,
+      p_location: input.location ?? null,
+      p_farm_type: input.farmType ?? null,
+      p_farm_address: input.farmAddress ?? null,
+      p_farmer_image_url: farmerImageUrl || null,
+      p_valid_id_image_url: validIdImageUrl || null,
+      p_farm_image_urls: farmImageUrls || null,
+    });
+    if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+    return { res: { ok: true } as Response, payload: { ok: true, farmer: data } };
+  } catch (err) {
+    return { res: { ok: false } as Response, payload: { error: err instanceof Error ? err.message : "Upload failed. Check your connection and try again." } };
+  }
+}
+
+// Sends what's already saved for review. The RPC refuses (with a list of
+// what's missing) if the application isn't complete.
+export async function submitFarmerApplication() {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("submit_farmer_verification", {});
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, farmer: data } };
+}
+
+// Admin -> applicant feedback, or the applicant's reply. Admin messages
+// notify the applicant (in-app + push) and are written to the activity log.
+export async function postFarmerApplicationMessage(farmerId: string, body: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("post_farmer_application_message", { p_farmer_id: farmerId, p_body: body });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, message: data } };
+}
+
 export async function adminReviewFarmer(farmerId: string, approved: boolean, rejectionReason?: string) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("admin_review_farmer", {

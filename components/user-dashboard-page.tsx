@@ -3,7 +3,8 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useCart } from "@/lib/kizfarm/cart-context";
-import { getBuyerDashboard, getFarmerStatus } from "@/lib/kizfarm/supabase-data";
+import { getBuyerDashboard } from "@/lib/kizfarm/supabase-data";
+import { useFarmerStatus } from "@/hooks/use-farmer-status";
 import BuyerActionItems from "@/components/buyer-action-items";
 import { orderStatusLabel } from "@/lib/kizfarm/order-status";
 
@@ -48,11 +49,6 @@ interface BuyerDashboard {
   };
 }
 
-interface FarmerStatus {
-  _id: string;
-  status?: string;
-}
-
 const money = (value = 0) => `NGN ${Number(value).toLocaleString()}`;
 
 export default function UserDashboardPage() {
@@ -60,20 +56,7 @@ export default function UserDashboardPage() {
   const [data, setData] = useState<BuyerDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [farmer, setFarmer] = useState<FarmerStatus | null>(null);
-  const [farmerStatusLoaded, setFarmerStatusLoaded] = useState(false);
-
-  useEffect(() => {
-    async function loadFarmerStatus() {
-      try {
-        const { res, payload } = await getFarmerStatus();
-        if (res.ok) setFarmer(payload?.farmer ?? null);
-      } finally {
-        setFarmerStatusLoaded(true);
-      }
-    }
-    loadFarmerStatus();
-  }, []);
+  const { farmer, loaded: farmerStatusLoaded } = useFarmerStatus();
 
   useEffect(() => {
     async function loadDashboard() {
@@ -125,22 +108,16 @@ export default function UserDashboardPage() {
               Become a Farmer
             </Link>
           )}
-          {hasFarmerApplication && farmer?.status === "pending" && (
+          {hasFarmerApplication && !isApprovedFarmer && (
             <Link href="/farmer/verify" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all">
-              <span className="material-symbols-outlined text-lg">hourglass_top</span>
-              Awaiting Admin Approval
-            </Link>
-          )}
-          {hasFarmerApplication && (farmer?.status === "draft" || farmer?.status === "rejected") && (
-            <Link href="/farmer/verify" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all">
-              <span className="material-symbols-outlined text-lg">verified</span>
-              Farmer Verification
+              <span className="material-symbols-outlined text-lg">{farmer?.status === "pending" ? "hourglass_top" : "edit_note"}</span>
+              {farmer?.status === "pending" ? "Application under review" : "Farmer application"}
             </Link>
           )}
           {isApprovedFarmer && (
-            <Link href="/farmer/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-[#1B6D24] bg-green-50 border border-green-200 hover:bg-green-100 transition-all">
-              <span className="material-symbols-outlined text-lg">check_circle</span>
-              Approved
+            <Link href="/farmer/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white bg-[#1B6D24] hover:bg-green-800 transition-all">
+              <span className="material-symbols-outlined text-lg">storefront</span>
+              Farmer Dashboard
             </Link>
           )}
           <Link href="/buyer/cart" className="relative rounded-full p-2 hover:bg-gray-50">
@@ -185,44 +162,62 @@ export default function UserDashboardPage() {
         {hasFarmerApplication && farmer?.status === "pending" && (
           <div className="mb-6 bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold mb-1 text-amber-950">Awaiting admin approval</h2>
-              <p className="text-amber-800 text-sm">Your farmer application has been submitted. Our admin team will review it and get back to you.</p>
+              <h2 className="text-xl font-bold mb-1 text-amber-950">Your farmer application is under review</h2>
+              <p className="text-amber-800 text-sm">
+                Submitted{farmer.submittedAt ? ` on ${new Date(farmer.submittedAt).toLocaleDateString()}` : ""}. An admin is checking your details — you&apos;ll get a notification with the decision.
+              </p>
             </div>
             <Link href="/farmer/verify" className="px-6 py-3 bg-amber-600 text-white hover:bg-amber-700 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 active:scale-95">
-              View Application
+              View application
               <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
             </Link>
           </div>
         )}
 
-        {hasFarmerApplication && (farmer?.status === "draft" || farmer?.status === "rejected") && (
+        {hasFarmerApplication && farmer?.status === "draft" && (
           <div className="mb-6 bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold mb-1 text-amber-950">
-                {farmer?.status === "rejected" ? "Farmer application needs changes" : "Farmer application in progress"}
-              </h2>
+              <h2 className="text-xl font-bold mb-1 text-amber-950">Your farmer application is not complete</h2>
               <p className="text-amber-800 text-sm">
-                {farmer?.status === "rejected"
-                  ? "Your application was rejected -- review the reason and resubmit."
-                  : "Continue verification so your farmer portal can be activated."}
+                {farmer.missingCount > 0
+                  ? `It hasn't been sent for review yet — ${farmer.missingCount} item${farmer.missingCount === 1 ? " is" : "s are"} still missing. Finish it so an admin can verify your farm.`
+                  : "Everything is filled in, but it hasn't been submitted yet. Open it and press “Submit for review”."}
               </p>
             </div>
             <Link href="/farmer/verify" className="px-6 py-3 bg-amber-600 text-white hover:bg-amber-700 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 active:scale-95">
-              Continue Verification
+              {farmer.missingCount > 0 ? "Finish application" : "Submit application"}
+              <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
+            </Link>
+          </div>
+        )}
+
+        {hasFarmerApplication && farmer?.status === "rejected" && (
+          <div className="mb-6 bg-rose-50 border border-rose-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h2 className="text-xl font-bold mb-1 text-rose-950">Your farmer application needs changes</h2>
+              <p className="text-rose-800 text-sm">
+                {farmer.rejectionReason ? `Admin's note: ${farmer.rejectionReason}` : "An admin asked for changes."} Update your application and resubmit it.
+              </p>
+            </div>
+            <Link href="/farmer/verify" className="px-6 py-3 bg-rose-600 text-white hover:bg-rose-700 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 active:scale-95">
+              Fix and resubmit
               <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
             </Link>
           </div>
         )}
 
         {isApprovedFarmer && (
-          <div className="mb-6 bg-gradient-to-r from-emerald-600 to-green-700 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4 shadow-lg border border-emerald-500/20">
+          <div className="mb-6 bg-gradient-to-r from-emerald-600 to-green-700 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-lg border border-emerald-500/20">
             <div>
-              <h2 className="text-xl font-bold mb-1">Farmer Portal Connected</h2>
-              <p className="text-white/80 text-sm">You are logged in as a verified farmer. Manage your crops, listings, and payouts here.</p>
+              <h2 className="text-xl font-bold mb-1 flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                You&apos;re a verified farmer
+              </h2>
+              <p className="text-white/85 text-sm">List products, receive orders and manage payouts from your Farmer Dashboard. You can keep buying here as usual.</p>
             </div>
             <Link href="/farmer/dashboard" className="px-6 py-3 bg-white text-[#1B6D24] hover:bg-slate-100 transition-all font-bold text-sm rounded-xl flex items-center gap-2 shrink-0 shadow-sm active:scale-95">
-              <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
-              Approved -- Go to Farmer Dashboard
+              Go to Farmer Dashboard
+              <span className="material-symbols-outlined text-sm font-bold">arrow_forward</span>
             </Link>
           </div>
         )}

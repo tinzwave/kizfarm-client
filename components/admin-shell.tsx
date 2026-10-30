@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
-import { getAdminRecentActivity } from "@/lib/kizfarm/supabase-data";
+import { getAdminFarmerStatusCounts, getAdminRecentActivity } from "@/lib/kizfarm/supabase-data";
 
 export default function AdminShell({
   children,
@@ -13,6 +13,7 @@ export default function AdminShell({
 }) {
   const router = useRouter();
   const [recentCount, setRecentCount] = useState(0);
+  const [pendingFarmers, setPendingFarmers] = useState(0);
 
   useEffect(() => {
     void Promise.resolve().then(async () => {
@@ -28,6 +29,16 @@ export default function AdminShell({
       }
     });
   }, []);
+
+  // Refreshed on every admin page change so the badge drops as soon as an
+  // application is decided.
+  const pathname = usePathname();
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      const { res, payload } = await getAdminFarmerStatusCounts();
+      if (res.ok) setPendingFarmers(payload.counts?.pending || 0);
+    });
+  }, [pathname]);
 
   const handleLogout = async () => {
     await signOut();
@@ -149,9 +160,17 @@ export default function AdminShell({
             <span className="material-symbols-outlined" data-icon="verified">
               verified
             </span>
-            <span className="font-inter text-sm antialiased">
-              Verify Farmers
+            <span className="font-inter text-sm antialiased flex-1">
+              Farmer Applications
             </span>
+            {pendingFarmers > 0 && (
+              <span
+                title={`${pendingFarmers} waiting for review`}
+                className="min-w-[20px] h-5 px-1.5 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center"
+              >
+                {pendingFarmers > 99 ? "99+" : pendingFarmers}
+              </span>
+            )}
           </Link>
 
           {/* Product Management */}
@@ -237,6 +256,17 @@ export default function AdminShell({
               agriculture
             </span>
             <span className="font-inter text-sm antialiased">Farmers</span>
+          </Link>
+
+          {/* Audit trail */}
+          <Link
+            href="/admin/activity"
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors duration-200 scale-100 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined" data-icon="history">
+              history
+            </span>
+            <span className="font-inter text-sm antialiased">Activity Log</span>
           </Link>
         </nav>
       </aside>

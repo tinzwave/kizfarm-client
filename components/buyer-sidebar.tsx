@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/kizfarm/cart-context";
 import { UnreadBadge, useUnreadNotificationCount } from "@/hooks/use-notifications";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
+import { useFarmerStatus } from "@/hooks/use-farmer-status";
 
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/buyer/dashboard", icon: "home" },
@@ -81,6 +82,8 @@ export default function BuyerSidebar() {
         })}
       </nav>
 
+      <FarmerEntry />
+
       <button
         onClick={handleSignOut}
         className="flex h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-zinc-900"
@@ -89,5 +92,56 @@ export default function BuyerSidebar() {
         Sign Out
       </button>
     </aside>
+  );
+}
+
+// Where the buyer is on the road to selling: one always-visible entry so
+// "how do I become a farmer / where's my application / where's my farm"
+// never needs explaining.
+function FarmerEntry() {
+  const { farmer, loaded } = useFarmerStatus();
+  if (!loaded) return <div className="mb-2 h-[58px]" />;
+
+  if (farmer?.status === "approved") {
+    return (
+      <Link
+        href="/farmer/dashboard"
+        className="mb-2 flex items-center gap-3 rounded-xl bg-[#1B6D24] px-3 py-3 text-sm font-semibold text-white shadow-sm hover:brightness-110"
+      >
+        <span className="material-symbols-outlined text-[22px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+          verified
+        </span>
+        <span className="flex-1 leading-tight">
+          Farmer Dashboard
+          <span className="block text-[11px] font-medium text-white/80">You&apos;re a verified farmer</span>
+        </span>
+        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+      </Link>
+    );
+  }
+
+  const entry = !farmer
+    ? { title: "Become a Farmer", sub: "Sell your farm products", icon: "agriculture", tone: "border-green-200 bg-green-50 text-[#1B6D24]", href: "/farmer/become" }
+    : farmer.status === "pending"
+      ? { title: "Farmer application", sub: "Under review by admin", icon: "hourglass_top", tone: "border-amber-200 bg-amber-50 text-amber-900", href: "/farmer/verify" }
+      : farmer.status === "rejected"
+        ? { title: "Farmer application", sub: "Needs changes — tap to fix", icon: "error", tone: "border-rose-200 bg-rose-50 text-rose-800", href: "/farmer/verify" }
+        : {
+            title: "Finish farmer application",
+            sub: farmer.missingCount > 0 ? `${farmer.missingCount} item${farmer.missingCount === 1 ? "" : "s"} left` : "Ready to submit",
+            icon: "edit_note",
+            tone: "border-amber-200 bg-amber-50 text-amber-900",
+            href: "/farmer/verify",
+          };
+
+  return (
+    <Link href={entry.href} className={`mb-2 flex items-center gap-3 rounded-xl border px-3 py-3 text-sm font-semibold hover:brightness-95 ${entry.tone}`}>
+      <span className="material-symbols-outlined text-[22px]">{entry.icon}</span>
+      <span className="flex-1 leading-tight">
+        {entry.title}
+        <span className="block text-[11px] font-medium opacity-80">{entry.sub}</span>
+      </span>
+      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+    </Link>
   );
 }

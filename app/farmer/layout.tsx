@@ -116,16 +116,20 @@ export default function FarmerLayout({
     );
   }
 
+  // The onboarding pages (become/verify) have their own header and no
+  // sidebar, so they don't need the space reserved for its mobile top bar.
+  const showSidebar = pathname !== "/farmer/become" && pathname !== "/farmer/verify";
+
   return (
     <div className="min-h-screen bg-background text-on-background font-body-md overflow-x-hidden">
-      {pathname !== "/farmer/become" && pathname !== "/farmer/verify" ? (
+      {showSidebar ? (
         <FarmerSidebar
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
         />
       ) : null}
       <div
-        className={`${pathname !== "/farmer/become" && pathname !== "/farmer/verify" ? contentPaddingClass : ""} ${isChatDetail ? "" : "pt-16 md:pt-0"}`}
+        className={`${showSidebar ? contentPaddingClass : ""} ${isChatDetail || !showSidebar ? "" : "pt-16 md:pt-0"}`}
       >
         <main className="min-h-screen w-full">{children}</main>
       </div>

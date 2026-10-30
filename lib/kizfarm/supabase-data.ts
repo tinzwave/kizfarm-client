@@ -5,6 +5,7 @@
 // New pages built from scratch should prefer plain Postgres field names
 // instead of extending this shim.
 import { createClient } from "./supabase-client";
+import { missingSteps } from "./farmer-application";
 
 // The `farmers` table is RLS-restricted to its owner + admin (it holds
 // BVN/bank details), so PostgREST's automatic embed (`products.farmer_id ->
@@ -119,8 +120,59 @@ export async function getFarmerStatus() {
   if (!farmerRes.data) return { res: { ok: true } as Response, payload: { ok: true, farmer: null, profileStatus } };
   return {
     res: { ok: true } as Response,
-    payload: { ok: true, farmer: { _id: farmerRes.data.id, status: farmerRes.data.status }, profileStatus },
+    payload: {
+      ok: true,
+      farmer: {
+        _id: farmerRes.data.id,
+        status: farmerRes.data.status,
+        rejectionReason: farmerRes.data.rejection_reason,
+        submittedAt: farmerRes.data.submitted_at,
+        missingCount: missingSteps(farmerApplicationFields(farmerRes.data)).length,
+      },
+      profileStatus,
+    },
   };
+}
+
+// Snake-case farmers row -> the shape lib/kizfarm/farmer-application.ts
+// checks. Works on raw storage paths as well as signed URLs, since only
+// presence matters.
+function farmerApplicationFields(f: any) {
+  return {
+    farmName: f.farm_name,
+    phone: f.phone,
+    location: f.location,
+    farmType: f.farm_type,
+    farmAddress: f.farm_address,
+    farmerImageUrl: f.farmer_image_url,
+    selfieUrl: f.selfie_url,
+    validIdImageUrl: f.valid_id_image_url,
+    govIdUrl: f.gov_id_url,
+    farmImageUrls: f.farm_image_urls || [],
+  };
+}
+
+function toApplicationMessage(m: any) {
+  return {
+    _id: m.id,
+    authorRole: m.author_role as "admin" | "farmer",
+    authorName: m.author_name,
+    body: m.body,
+    createdAt: m.created_at,
+  };
+}
+
+export type FarmerApplicationMessage = ReturnType<typeof toApplicationMessage>;
+
+export async function getFarmerApplicationMessages(farmerId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("farmer_application_messages")
+    .select("*")
+    .eq("farmer_id", farmerId)
+    .order("created_at", { ascending: true });
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, messages: (data || []).map(toApplicationMessage) } };
 }
 
 // farmer-kyc is a private bucket -- the *_url fields on the farmers row
@@ -186,6 +238,14 @@ export async function getMyFarmerProfile() {
     {
       _id: data.id,
       status: data.status,
+      fullName: data.full_name,
+      farmName: data.farm_name,
+      phone: data.phone,
+      location: data.location,
+      farmType: data.farm_type,
+      submittedAt: data.submitted_at,
+      reviewedAt: data.reviewed_at,
+      createdAt: data.created_at,
       bvn: data.bvn,
       bvnUrl: data.bvn_url,
       nin: data.nin,
@@ -911,27 +971,115 @@ function toAdminFarmerVerification(f: any) {
     farmImageUrls: f.farm_image_urls || [],
     rejectionReason: f.rejection_reason,
     createdAt: f.created_at,
-    userId: f.profiles ? { name: f.profiles.name, email: f.profiles.email, phone: f.profiles.phone } : null,
+    updatedAt: f.updated_at,
+    submittedAt: f.submitted_at,
+    reviewedAt: f.reviewed_at,
+    reviewedByName: f.reviewed_by_name,
+    missing: missingSteps(farmerApplicationFields(f)),
+    userId: f.profiles
+      ? { _id: f.user_id, name: f.profiles.name, email: f.profiles.email, phone: f.profiles.phone, status: f.profiles.status }
+      : null,
   };
 }
 
-export async function getAdminFarmerVerifications() {
+// The review queue, one status at a time. Pending is ordered oldest
+// submission first (first come, first served); the rest newest first.
+export async function getAdminFarmerVerifications({
+  status = "pending",
+  search,
+}: { status?: string; search?: string } = {}) {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("farmers")
-    .select("*, profiles!user_id(name, email, phone)")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .select("*, profiles!user_id(name, email, phone, status)")
+    .eq("status", status)
+    .limit(200);
+  query =
+    status === "pending"
+      ? query.order("submitted_at", { ascending: true, nullsFirst: false })
+      : status === "approved" || status === "rejected"
+        ? query.order("reviewed_at", { ascending: false, nullsFirst: false })
+        : query.order("created_at", { ascending: false });
+  const term = search?.trim().replace(/[,()%]/g, " ");
+  if (term) query = query.or(`full_name.ilike.%${term}%,farm_name.ilike.%${term}%,phone.ilike.%${term}%`);
+  const { data, error } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
   const list = await resolveFarmerKycUrls(supabase, (data || []).map(toAdminFarmerVerification));
   return { res: { ok: true } as Response, payload: { ok: true, list } };
+}
+
+export async function getAdminFarmerStatusCounts() {
+  const supabase = createClient();
+  const statuses = ["draft", "pending", "approved", "rejected"] as const;
+  const results = await Promise.all(
+    statuses.map((st) => supabase.from("farmers").select("id", { count: "exact", head: true }).eq("status", st)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { res: { ok: false } as Response, payload: { error: failed.error.message } };
+  const counts = Object.fromEntries(statuses.map((st, i) => [st, results[i].count || 0])) as Record<(typeof statuses)[number], number>;
+  return {
+    res: { ok: true } as Response,
+    payload: { ok: true, counts: { ...counts, all: statuses.reduce((sum, st) => sum + counts[st], 0) } },
+  };
+}
+
+function toActivityEntry(a: any) {
+  return {
+    _id: a.id,
+    actorId: a.actor_id,
+    actorName: a.actor_name,
+    actorEmail: a.actor_email,
+    action: a.action as string,
+    targetType: a.target_type as string,
+    targetId: a.target_id,
+    targetLabel: a.target_label,
+    details: (a.details || {}) as Record<string, any>,
+    createdAt: a.created_at,
+  };
+}
+
+export type AdminActivityEntry = ReturnType<typeof toActivityEntry>;
+
+export async function getAdminActivityLog({
+  action,
+  search,
+  offset = 0,
+  limit = 50,
+}: { action?: string; search?: string; offset?: number; limit?: number } = {}) {
+  const supabase = createClient();
+  let query = supabase
+    .from("admin_activity_log")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (action && action !== "all") query = query.like("action", `${action}%`);
+  const term = search?.trim().replace(/[,()%]/g, " ");
+  if (term) query = query.or(`actor_name.ilike.%${term}%,actor_email.ilike.%${term}%,target_label.ilike.%${term}%`);
+  const { data, error, count } = await query;
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, entries: (data || []).map(toActivityEntry), total: count || 0 } };
+}
+
+// Everything logged against one application: the farmers row and the
+// applicant's account (suspensions, deletion) are separate target ids.
+export async function getAdminFarmerActivity(farmerId: string, userId?: string) {
+  const supabase = createClient();
+  const ids = [farmerId, userId].filter(Boolean) as string[];
+  const { data, error } = await supabase
+    .from("admin_activity_log")
+    .select("*")
+    .in("target_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
+  return { res: { ok: true } as Response, payload: { ok: true, entries: (data || []).map(toActivityEntry) } };
 }
 
 export async function getAdminFarmerVerificationById(id: string) {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("farmers")
-    .select("*, profiles!user_id(name, email, phone)")
+    .select("*, profiles!user_id(name, email, phone, status)")
     .eq("id", id)
     .single();
   if (error || !data) return { res: { ok: false } as Response, payload: { error: error?.message || "Farmer not found" } };
@@ -1627,8 +1775,12 @@ function toAdminFarmerListItem(f: any) {
     fullName: f.full_name,
     farmName: f.farm_name,
     phone: f.phone,
+    location: f.location,
     status: f.status,
     createdAt: f.created_at,
+    submittedAt: f.submitted_at,
+    reviewedAt: f.reviewed_at,
+    missingCount: missingSteps(farmerApplicationFields(f)).length,
     userId: f.profiles ? { _id: f.user_id, email: f.profiles.email, phone: f.profiles.phone, status: f.profiles.status } : undefined,
   };
 }
@@ -1646,7 +1798,8 @@ export async function getAdminFarmers({
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (status && status !== "all") query = query.eq("status", status);
-  if (search) query = query.or(`full_name.ilike.%${search}%,farm_name.ilike.%${search}%,phone.ilike.%${search}%`);
+  const term = search?.trim().replace(/[,()%]/g, " ");
+  if (term) query = query.or(`full_name.ilike.%${term}%,farm_name.ilike.%${term}%,phone.ilike.%${term}%`);
 
   const { data, error, count } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
@@ -1867,7 +2020,7 @@ export async function getAdminReviews({ limit = 100 }: { limit?: number } = {}) 
 export async function getAdminRecentActivity() {
   const supabase = createClient();
 
-  const [ordersRes, farmersRes, buyersRes, coursesRes] = await Promise.all([
+  const [ordersRes, farmersRes, buyersRes, coursesRes, repliesRes] = await Promise.all([
     supabase
       .from("orders")
       .select("id, status, updated_at, total")
@@ -1875,10 +2028,10 @@ export async function getAdminRecentActivity() {
       .limit(15),
     supabase
       .from("farmers")
-      .select("id, farm_name, created_at, profiles!user_id(name)")
+      .select("id, farm_name, created_at, submitted_at, profiles!user_id(name)")
       .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(10),
+      .order("submitted_at", { ascending: false, nullsFirst: false })
+      .limit(50),
     supabase
       .from("profiles")
       .select("id, name, created_at")
@@ -1894,6 +2047,13 @@ export async function getAdminRecentActivity() {
       .eq("status", "pending")
       .order("updated_at", { ascending: false })
       .limit(50),
+    // Applicants answering an admin's message about their application.
+    supabase
+      .from("farmer_application_messages")
+      .select("id, farmer_id, body, created_at, author_name, farmers(farm_name)")
+      .eq("author_role", "farmer")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
   if (ordersRes.error) return { res: { ok: false } as Response, payload: { error: ordersRes.error.message } };
   if (farmersRes.error) return { res: { ok: false } as Response, payload: { error: farmersRes.error.message } };
@@ -1912,10 +2072,12 @@ export async function getAdminRecentActivity() {
   const farmerEvents = (farmersRes.data || []).map((f: any) => ({
     id: `farmer-${f.id}`,
     type: "farmer" as const,
-    message: `New farmer verification request: ${f.farm_name || f.profiles?.name || "Unnamed farm"}`,
+    message: `Farmer application waiting for review: ${f.farm_name || f.profiles?.name || "Unnamed farm"}`,
     amount: null,
-    createdAt: f.created_at,
+    createdAt: f.submitted_at || f.created_at,
     link: `/admin/verify-farmers/${f.id}`,
+    // Each one needs an admin decision, however old.
+    needsAction: true,
   }));
 
   const buyerEvents = (buyersRes.data || []).map((b) => ({
@@ -1940,7 +2102,18 @@ export async function getAdminRecentActivity() {
     };
   });
 
-  const items = [...courseEvents, ...orderEvents, ...farmerEvents, ...buyerEvents].sort(
+  // Not fatal: the feed is still useful without replies (e.g. before
+  // migration 0047 is applied).
+  const replyEvents = (repliesRes.data || []).map((m: any) => ({
+    id: `farmer-reply-${m.id}`,
+    type: "farmer" as const,
+    message: `${m.author_name || "An applicant"} replied about the application for ${m.farmers?.farm_name || "their farm"}: "${String(m.body).slice(0, 80)}"`,
+    amount: null,
+    createdAt: m.created_at,
+    link: `/admin/verify-farmers/${m.farmer_id}`,
+  }));
+
+  const items = [...courseEvents, ...orderEvents, ...farmerEvents, ...replyEvents, ...buyerEvents].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 

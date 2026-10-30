@@ -5,45 +5,9 @@ import { useRouter } from "next/navigation";
 import { getMyFarmerProfile } from "@/lib/kizfarm/supabase-data";
 import { registerAsFarmer } from "@/lib/kizfarm/supabase-mutations";
 import { getSession, getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
+import { FARM_TYPES, NIGERIAN_STATES } from "@/lib/kizfarm/farmer-application";
 
-const NIGERIAN_STATES = [
-  "Abia",
-  "Adamawa",
-  "Akwa Ibom",
-  "Anambra",
-  "Bauchi",
-  "Bayelsa",
-  "Benue",
-  "Borno",
-  "Cross River",
-  "Delta",
-  "Ebonyi",
-  "Edo",
-  "Ekiti",
-  "Enugu",
-  "Gombe",
-  "Imo",
-  "Jigawa",
-  "Kaduna",
-  "Kano",
-  "Katsina",
-  "Kebbi",
-  "Kogi",
-  "Kwara",
-  "Lagos",
-  "Nasarawa",
-  "Niger",
-  "Ogun",
-  "Ondo",
-  "Osun",
-  "Oyo",
-  "Plateau",
-  "Rivers",
-  "Sokoto",
-  "Taraba",
-  "Yobe",
-  "Zamfara",
-];
+
 
 export default function BecomeAFarmerPage() {
   const [loading, setLoading] = useState(true);
@@ -51,6 +15,7 @@ export default function BecomeAFarmerPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [formError, setFormError] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -80,43 +45,35 @@ export default function BecomeAFarmerPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitting(true);
     // Read the form synchronously -- e.currentTarget goes stale after an
     // await, so this must happen before any async work.
     const formData = new FormData(e.currentTarget);
-
-    const session = await getSession();
-    if (!session) {
-      // redirect to login
-      router.push("/login");
-      return;
-    }
-
     const farmName = String(formData.get("farm_name") || "").trim();
     const contact = phone.trim();
     const location = String(formData.get("location") || "");
     const farmType = String(formData.get("farm_type") || "");
 
+    setFormError("");
     if (!fullName.trim()) {
-      alert("Your registered full name could not be found. Please log in again.");
-      setSubmitting(false);
+      setFormError("We couldn't find the name on your account. Please log out and log in again.");
       return;
     }
-
     if (!farmName || !location || !farmType || !contact) {
-      alert("Please complete all required fields.");
-      setSubmitting(false);
+      setFormError("Please fill in every field.");
+      return;
+    }
+    if (!/^[0-9]{7,15}$/.test(contact)) {
+      setPhoneError("Phone number must be 7 to 15 digits, numbers only.");
       return;
     }
 
-    if (!/^\d+$/.test(contact)) {
-      setPhoneError("Phone number must contain numbers only.");
-      alert("Phone number must contain numbers only.");
-      setSubmitting(false);
-      return;
-    }
-
+    setSubmitting(true);
     try {
+      const session = await getSession();
+      if (!session) {
+        router.push("/login");
+        return;
+      }
       const { res, payload } = await registerAsFarmer({
         fullName: fullName.trim(),
         farmName,
@@ -124,18 +81,24 @@ export default function BecomeAFarmerPage() {
         location,
         farmType,
       });
-      if (!res.ok) throw new Error(payload?.error || "Registration failed");
-      // redirect to verification
+      // A second tab/double click already created it -- just carry on.
+      if (!res.ok && payload?.error !== "Already registered") {
+        throw new Error(payload?.error || "Could not start your application.");
+      }
       router.push("/farmer/verify");
     } catch (err) {
-      alert(String(err));
-    } finally {
+      setFormError(err instanceof Error ? err.message : String(err));
       setSubmitting(false);
     }
   };
 
   if (loading)
-    return <div className="pt-32 text-center">Checking registration...</div>;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 text-sm text-zinc-500">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-[#1B6D24]" />
+        Checking your account…
+      </div>
+    );
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
       {/* Header */}
@@ -148,10 +111,11 @@ export default function BecomeAFarmerPage() {
           />
         </div>
         <a
-          className="text-primary font-label-sm hover:underline decoration-2 underline-offset-4"
-          href="/login"
+          className="flex items-center gap-1 text-primary font-label-sm hover:underline decoration-2 underline-offset-4"
+          href="/buyer/dashboard"
         >
-          Sign In
+          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+          Back to dashboard
         </a>
       </header>
 
@@ -184,12 +148,16 @@ export default function BecomeAFarmerPage() {
           {/* Registration Form Canvas */}
           <div className="bg-white p-margin rounded-xl border border-zinc-200 shadow-sm">
             <div className="mb-lg">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#1B6D24]">
+                Step 1 of 2 · Farm basics
+              </p>
               <h2 className="text-on-surface font-headline-lg mb-xs">
-                Create Farmer Account
+                Become a farmer on KIZ FARM
               </h2>
               <p className="text-on-surface-variant font-body-md">
-                Join the KIZ FARM ecosystem and start managing your production
-                with precision.
+                Tell us about your farm. Next you&apos;ll add your farm address,
+                a photo, a valid ID and 5 farm photos, then an admin reviews
+                your application. You keep your buyer account the whole time.
               </p>
             </div>
             <form className="space-y-md" onSubmit={handleSubmit}>
@@ -266,6 +234,7 @@ export default function BecomeAFarmerPage() {
                           ? "Phone number must contain numbers only."
                           : "",
                       );
+                      setFormError("");
                     }}
                   />
                 </div>
@@ -328,9 +297,11 @@ export default function BecomeAFarmerPage() {
                       <option disabled value="">
                         Select type
                       </option>
-                      <option value="crops">Crops</option>
-                      <option value="livestock">Livestock</option>
-                      <option value="mixed">Mixed Farming</option>
+                      {FARM_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
                     </select>
                     <span
                       className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none"
@@ -344,28 +315,27 @@ export default function BecomeAFarmerPage() {
 
               {/* CTA Section */}
               <div className="pt-base flex flex-col gap-md">
+                {formError && (
+                  <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {formError}
+                  </p>
+                )}
                 <button
                   disabled={submitting}
-                  className="w-full h-12 bg-[#1B6D24] hover:bg-primary-container text-white font-headline-md rounded-lg shadow-sm active:scale-[0.98] transition-all duration-150"
+                  className="w-full h-12 bg-[#1B6D24] hover:bg-primary-container text-white font-headline-md rounded-lg shadow-sm active:scale-[0.98] transition-all duration-150 disabled:opacity-60"
                   type="submit"
                 >
-                  {submitting ? "Submitting…" : "Join KIZ FARM"}
+                  {submitting ? "Saving…" : "Continue to step 2"}
                 </button>
                 <p className="text-center text-on-surface-variant font-label-sm">
-                  By joining, you agree to our{" "}
+                  By continuing, you agree to our{" "}
                   <a
                     className="text-[#1B6D24] font-semibold hover:underline"
-                    href="#"
-                  >
-                    Terms of Service
-                  </a>{" "}
-                  and{" "}
-                  <a
-                    className="text-[#1B6D24] font-semibold hover:underline"
-                    href="#"
+                    href="/privacy"
                   >
                     Privacy Policy
                   </a>
+                  .
                 </p>
               </div>
             </form>
@@ -383,7 +353,7 @@ export default function BecomeAFarmerPage() {
               </div>
               <a
                 className="text-[#1B6D24] font-label-sm font-semibold flex items-center gap-xs"
-                href="#"
+                href="/contact"
               >
                 Contact Support
                 <span

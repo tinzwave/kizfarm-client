@@ -145,6 +145,35 @@ function NavLinks({
   );
 }
 
+// The farmer layout only renders the sidebar for approved farmers, so
+// it's always true here -- but saying it makes "am I a farmer yet?"
+// impossible to miss.
+function VerifiedBadge() {
+  return (
+    <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+      <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+        verified
+      </span>
+      Verified farmer
+    </div>
+  );
+}
+
+// Farmers keep their buyer account; this is the way back to it.
+function SwitchToBuying({ collapsed, onClick }: { collapsed: boolean; onClick?: () => void }) {
+  return (
+    <Link
+      href="/buyer/dashboard"
+      onClick={onClick}
+      title="Switch to buying"
+      className={`mb-1 flex items-center gap-3 rounded px-3 py-3 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 ${collapsed ? "justify-center" : ""}`}
+    >
+      <span className="material-symbols-outlined">shopping_bag</span>
+      {!collapsed && "Switch to buying"}
+    </Link>
+  );
+}
+
 export default function FarmerSidebar({
   collapsed = false,
   onToggleCollapsed,
@@ -191,8 +220,10 @@ export default function FarmerSidebar({
             </button>
           )}
         </div>
+        {!collapsed && <VerifiedBadge />}
         <NavLinks pathname={pathname} collapsed={collapsed} />
         <div className="px-3 pb-4">
+          <SwitchToBuying collapsed={collapsed} />
           <button
             onClick={handleSignOut}
             className={`flex items-center gap-3 px-3 py-3 rounded w-full text-zinc-600 hover:bg-red-50 hover:text-red-600 ${collapsed ? "justify-center" : ""}`}
@@ -241,8 +272,10 @@ export default function FarmerSidebar({
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
+            <VerifiedBadge />
             <NavLinks pathname={pathname} onClick={() => setOpen(false)} collapsed={false} />
             <div className="px-3 pb-4">
+              <SwitchToBuying collapsed={false} onClick={() => setOpen(false)} />
               <button
                 onClick={() => {
                   setOpen(false);

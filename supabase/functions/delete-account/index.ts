@@ -34,19 +34,43 @@ Deno.serve(async (req) => {
     const targetId: string = body?.userId || user.id;
 
     const admin = adminClient();
-    const { data: callerProfile } = await admin.from("profiles").select("role, status").eq("id", user.id).single();
+    const { data: callerProfile } = await admin.from("profiles").select("role, status, name, email").eq("id", user.id).single();
     const isAdmin = callerProfile?.role === "admin" && callerProfile?.status === "active";
     if (targetId !== user.id && !isAdmin) {
       return jsonResponse({ error: "Only an admin can delete another account." }, { status: 403 });
     }
 
-    const { data: target } = await admin.from("profiles").select("role").eq("id", targetId).maybeSingle();
+    const { data: target } = await admin.from("profiles").select("role, name, email").eq("id", targetId).maybeSingle();
     if (target?.role === "admin") {
       return jsonResponse({ error: "Admin accounts cannot be deleted here." }, { status: 400 });
     }
 
+    // Snapshot before the data goes -- the log entry has to stay readable
+    // after the profile it describes is erased.
+    const { data: targetFarmer } = await admin.from("farmers").select("id, farm_name, status").eq("user_id", targetId).maybeSingle();
+
     const { data: result, error } = await admin.rpc("delete_account_data", { p_user_id: targetId });
     if (error) return jsonResponse({ error: error.message }, { status: 400 });
+
+    // Written with the service role (admin_activity_log has no client
+    // insert policy). A logging failure must not undo a completed deletion.
+    const { error: logErr } = await admin.from("admin_activity_log").insert({
+      actor_id: user.id,
+      actor_name: callerProfile?.name ?? null,
+      actor_email: callerProfile?.email ?? user.email ?? null,
+      action: targetId === user.id ? "account_self_deleted" : "account_deleted",
+      target_type: target?.role === "farmer" || targetFarmer ? "farmer_account" : "user",
+      target_id: targetId,
+      target_label: target?.name || target?.email || null,
+      details: {
+        email: target?.email ?? null,
+        role: target?.role ?? null,
+        farm_name: targetFarmer?.farm_name ?? null,
+        farmer_status: targetFarmer?.status ?? null,
+        removed: result?.hard_delete ? "deleted" : "anonymised",
+      },
+    });
+    if (logErr) console.error("activity log insert failed", logErr);
 
     // Uploaded files: ID documents, course covers; product photos too when
     // the farm itself is gone.
