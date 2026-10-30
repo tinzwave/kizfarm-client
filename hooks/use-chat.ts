@@ -48,6 +48,9 @@ export function useChat({ chatId, currentUserId, buyer, farmer }: UseChatOptions
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  // Who has this conversation open right now (Realtime Presence) -- the
+  // only honest basis for showing someone as "online".
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const enrichSender = useCallback(
@@ -72,7 +75,10 @@ export function useChat({ chatId, currentUserId, buyer, farmer }: UseChatOptions
     if (!chatId) return;
 
     const channel = supabase
-      .channel(`chat:${chatId}`)
+      .channel(`chat:${chatId}`, currentUserId ? { config: { presence: { key: currentUserId } } } : undefined)
+      .on("presence", { event: "sync" }, () => {
+        setOnlineUsers(new Set(Object.keys(channel.presenceState())));
+      })
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${chatId}` },
@@ -117,7 +123,10 @@ export function useChat({ chatId, currentUserId, buyer, farmer }: UseChatOptions
           });
         }
       })
-      .subscribe((status) => setIsConnected(status === "SUBSCRIBED"));
+      .subscribe((status) => {
+        setIsConnected(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED" && currentUserId) void channel.track({ at: new Date().toISOString() });
+      });
 
     channelRef.current = channel;
 
@@ -125,6 +134,8 @@ export function useChat({ chatId, currentUserId, buyer, farmer }: UseChatOptions
       supabase.removeChannel(channel);
       channelRef.current = null;
       setIsConnected(false);
+      setOnlineUsers(new Set());
+      setTypingUsers(new Set());
     };
   }, [chatId, currentUserId, supabase, enrichSender, upsertMessage]);
 
@@ -197,6 +208,7 @@ export function useChat({ chatId, currentUserId, buyer, farmer }: UseChatOptions
     isSending,
     error,
     typingUsers,
+    onlineUsers,
     sendMessage,
     sendAttachment,
     emitTyping,

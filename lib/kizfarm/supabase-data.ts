@@ -1416,10 +1416,22 @@ export async function getAdminCoursePurchases() {
 function toChat(c: any) {
   return {
     _id: c.id,
-    buyerId: c.buyer ? { _id: c.buyer.id, name: c.buyer.name, email: c.buyer.email, phone: c.buyer.phone } : { _id: c.buyer_id },
-    farmerId: c.farmer ? { _id: c.farmer.id, name: c.farmer.name, email: c.farmer.email, phone: c.farmer.phone } : { _id: c.farmer_id },
+    buyerId: c.buyer
+      ? { _id: c.buyer.id, name: c.buyer.name, email: c.buyer.email, phone: c.buyer.phone, photo: c.buyer.profile_image }
+      : { _id: c.buyer_id },
+    farmerId: c.farmer
+      ? { _id: c.farmer.id, name: c.farmer.name, email: c.farmer.email, phone: c.farmer.phone, photo: c.farmer.profile_image }
+      : { _id: c.farmer_id },
     productId: c.products
-      ? { _id: c.products.id, name: c.products.name, price: c.products.price, images: c.products.images || [] }
+      ? {
+          _id: c.products.id,
+          name: c.products.name,
+          price: c.products.price,
+          unit: c.products.unit,
+          quantity: c.products.quantity,
+          isActive: c.products.is_active,
+          images: c.products.images || [],
+        }
       : { _id: c.product_id },
     lastMessage: c.last_message,
     lastMessageTime: c.last_message_time,
@@ -1445,7 +1457,8 @@ function toMessage(m: any) {
   };
 }
 
-const CHAT_SELECT = "*, buyer:profiles!buyer_id(id, name, email, phone), farmer:profiles!farmer_id(id, name, email, phone), products(id, name, price, images)";
+const CHAT_SELECT =
+  "*, buyer:profiles!buyer_id(id, name, email, phone, profile_image), farmer:profiles!farmer_id(id, name, email, phone, profile_image), products(id, name, price, unit, quantity, is_active, images)";
 
 export async function getConversations() {
   const supabase = createClient();
@@ -1480,16 +1493,68 @@ export async function getChatDetails(chatId: string) {
   return { res: { ok: true } as Response, payload: { ok: true, chat: toChat(data) } };
 }
 
-export async function getMessages(chatId: string, limit = 50, skip = 0) {
+// Newest page first; pass `before` (the oldest loaded message's
+// created_at) to page backwards -- a timestamp cursor, unlike an offset,
+// doesn't skip or repeat messages when new ones arrive in the meantime.
+export async function getMessages(chatId: string, limit = 50, skip = 0, before?: string) {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("messages")
     .select("*, sender:profiles!sender_id(id, name, email, role)")
     .eq("chat_id", chatId)
-    .order("created_at", { ascending: false })
-    .range(skip, skip + limit - 1);
+    .order("created_at", { ascending: false });
+  query = before ? query.lt("created_at", before).limit(limit) : query.range(skip, skip + limit - 1);
+  const { data, error } = await query;
   if (error) return { res: { ok: false } as Response, payload: { error: error.message } };
-  return { res: { ok: true } as Response, payload: { ok: true, messages: (data || []).map(toMessage).reverse() } };
+  return {
+    res: { ok: true } as Response,
+    payload: { ok: true, messages: (data || []).map(toMessage).reverse(), hasMore: (data || []).length === limit },
+  };
+}
+
+export type ChatPartyCard = {
+  id: string;
+  name: string;
+  photo: string | null;
+  role: "user" | "farmer" | "admin";
+  accountStatus: string;
+  memberSince: string;
+  verifiedFarmer: boolean;
+  farmName: string | null;
+  farmType: string | null;
+  location: string | null;
+  activeListings: number | null;
+  completedSales: number | null;
+  rating: number | null;
+  reviewCount: number | null;
+};
+
+export type ChatContext = {
+  chatId: string;
+  startedAt: string;
+  buyer: ChatPartyCard;
+  farmer: ChatPartyCard;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    unit: string | null;
+    quantity: number | null;
+    category: string | null;
+    image: string | null;
+    isActive: boolean;
+  } | null;
+  ordersTogether: number;
+};
+
+// Both participants' public profile cards plus the product the chat is
+// about -- see migration 0048. Only chat participants (and admins) can
+// call it.
+export async function getChatContext(chatId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_chat_context", { p_chat_id: chatId });
+  if (error || !data) return { res: { ok: false } as Response, payload: { error: error?.message || "Chat not found" } };
+  return { res: { ok: true } as Response, payload: { ok: true, context: data as ChatContext } };
 }
 
 // Chat attachments live in a private bucket (only the two participants can

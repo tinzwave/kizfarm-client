@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getConversations } from "@/lib/kizfarm/supabase-data";
 import { getCurrentProfile } from "@/lib/kizfarm/supabase-auth";
+import { createClient } from "@/lib/kizfarm/supabase-client";
+import { PartyAvatar, money } from "@/components/chat-party";
 
 type CurrentRole = "buyer" | "farmer";
 
@@ -12,13 +14,14 @@ interface ChatParty {
   name?: string;
   email?: string;
   phone?: string;
+  photo?: string | null;
 }
 
 interface ChatData {
   _id: string;
   buyerId: ChatParty;
   farmerId: ChatParty;
-  productId: { _id: string; name?: string };
+  productId: { _id: string; name?: string; price?: number; unit?: string; images?: string[] };
   lastMessage?: string;
   lastMessageTime?: string;
   updatedAt?: string;
@@ -46,27 +49,50 @@ export default function ChatListPage({ currentRole }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [profile, { res, payload }] = await Promise.all([getCurrentProfile(), getConversations()]);
-        if (profile?.id) setCurrentUserId(profile.id);
-        if (!res.ok) {
-          setError(payload?.error || "Failed to load conversations");
-          return;
-        }
-        setChats(payload.chats || []);
-      } catch (err) {
-        console.error("Error fetching conversations:", err);
-        setError("Failed to load conversations");
-      } finally {
-        setLoading(false);
+  // `quiet` reloads (from live updates) keep the list on screen.
+  const load = useCallback(async (quiet = false) => {
+    try {
+      if (!quiet) setLoading(true);
+      setError(null);
+      const [profile, { res, payload }] = await Promise.all([getCurrentProfile(), getConversations()]);
+      if (profile?.id) setCurrentUserId(profile.id);
+      if (!res.ok) {
+        if (!quiet) setError(payload?.error || "Failed to load conversations");
+        return;
       }
-    };
-    void load();
+      setChats(payload.chats || []);
+    } catch (err) {
+      console.error("Error fetching conversations:", err);
+      if (!quiet) setError("Failed to load conversations");
+    } finally {
+      if (!quiet) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => load());
+  }, [load]);
+
+  // New messages and new conversations show up without a refresh. RLS
+  // limits the change feed to chats this user is part of.
+  useEffect(() => {
+    if (!currentUserId) return;
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const reload = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(true), 400);
+    };
+    const channel = supabase
+      .channel(`chat-list:${currentUserId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "chats" }, reload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `receiver_id=eq.${currentUserId}` }, reload)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, load]);
 
   const otherParty = (chat: ChatData): ChatParty | undefined => {
     if (currentUserId) {
@@ -109,7 +135,7 @@ export default function ChatListPage({ currentRole }: Props) {
       : "Message a farmer from a product page to start a conversation";
 
   const search = (
-    <div className="relative w-full md:max-w-xs">
+    <div className="relative w-full md:w-72">
       <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
       <input
         className="w-full h-11 pl-11 pr-4 bg-white border border-outline-variant rounded-xl focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md"
@@ -153,12 +179,7 @@ export default function ChatListPage({ currentRole }: Props) {
               onClick={() => router.push(detailHref(chat._id))}
               className="group bg-white border border-gray-200 p-4 rounded-xl flex items-center gap-4 hover:shadow-[0_10px_30px_rgba(27,109,36,0.05)] transition-all text-left"
             >
-              <div className="relative shrink-0">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-gray-400">account_circle</span>
-                </div>
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
-              </div>
+              <PartyAvatar name={other?.name} photo={other?.photo} seed={other?._id} size={48} />
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline gap-2 mb-1">
                   <h3 className={`text-[15px] text-on-surface truncate ${chat.unreadCount ? "font-bold" : "font-semibold"}`}>
@@ -166,9 +187,18 @@ export default function ChatListPage({ currentRole }: Props) {
                   </h3>
                   <span className="text-[11px] text-gray-400 shrink-0">{formatTime(chat.lastMessageTime || chat.updatedAt)}</span>
                 </div>
+                {chat.productId?.name && (
+                  <p className="mb-0.5 flex items-center gap-1 truncate text-xs text-[#1B6D24]">
+                    <span className="material-symbols-outlined text-[14px]">sell</span>
+                    <span className="truncate">
+                      {chat.productId.name}
+                      {chat.productId.price != null ? ` · ${money(chat.productId.price)}${chat.productId.unit ? `/${chat.productId.unit}` : ""}` : ""}
+                    </span>
+                  </p>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <p className={`text-sm truncate ${chat.unreadCount ? "text-on-surface font-semibold" : "text-gray-500"}`}>
-                    {chat.lastMessage || `Conversation about ${chat.productId?.name || "this product"}`}
+                    {chat.lastMessage || "No messages yet"}
                   </p>
                   {!!chat.unreadCount && (
                     <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-primary text-white text-[11px] font-bold flex items-center justify-center">
@@ -177,6 +207,9 @@ export default function ChatListPage({ currentRole }: Props) {
                   )}
                 </div>
               </div>
+              {chat.productId?.images?.[0] && (
+                <img src={chat.productId.images[0]} alt="" className="hidden h-12 w-12 shrink-0 rounded-lg object-cover sm:block" />
+              )}
             </button>
           );
         })}

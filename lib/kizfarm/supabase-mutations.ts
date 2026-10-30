@@ -870,7 +870,8 @@ function toMessage(m: any) {
   };
 }
 
-const CHAT_SELECT = "*, buyer:profiles!buyer_id(id, name, email, phone), farmer:profiles!farmer_id(id, name, email, phone), products(id, name, price, images)";
+const CHAT_SELECT =
+  "*, buyer:profiles!buyer_id(id, name, email, phone, profile_image), farmer:profiles!farmer_id(id, name, email, phone, profile_image), products(id, name, price, unit, quantity, is_active, images)";
 
 // Buyer-only, matching the chats_insert RLS policy -- a farmer can reply
 // inside an existing chat but never originate one.
