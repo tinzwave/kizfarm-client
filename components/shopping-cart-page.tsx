@@ -7,7 +7,7 @@ import { useCart } from "@/lib/kizfarm/cart-context";
 export default function ShoppingCartPage() {
   const { items, totalPrice, updateQuantity, removeItem } = useCart();
 
-  const serviceCharge = items.length > 0 ? 1200 : 0;
+  const serviceCharge = items.length > 0 ? 200 : 0;
   const totalBeforeTransport = totalPrice + serviceCharge;
 
   return (

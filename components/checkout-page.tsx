@@ -53,7 +53,7 @@ export default function CheckoutPage() {
   }, []);
 
   // Calculate pricing
-  const serviceCharge = items.length > 0 ? 1200 : 0;
+  const serviceCharge = items.length > 0 ? 200 : 0;
   const totalBeforeTransport = totalPrice + serviceCharge;
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
