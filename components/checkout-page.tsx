@@ -27,6 +27,10 @@ export default function CheckoutPage() {
   const [placingOrder, setPlacingOrder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
+  // Order numbers of a successfully submitted order. Shown in a
+  // confirmation so the buyer only ever sees "submitted" once the order is
+  // really saved -- and has its KFM number to quote if anything goes wrong.
+  const [submittedRefs, setSubmittedRefs] = useState<string[] | null>(null);
 
   // Fetch saved addresses
   useEffect(() => {
@@ -84,8 +88,11 @@ export default function CheckoutPage() {
         return;
       }
 
+      const refs = ((payload?.orders || []) as { masterOrderId?: string | null }[])
+        .map((o) => o.masterOrderId)
+        .filter((r): r is string => !!r);
       clearCart();
-      router.push("/buyer/orders");
+      setSubmittedRefs(Array.from(new Set(refs)));
     } catch (err) {
       console.error("Transport fare request error:", err);
       setError("Failed to submit your order. Please try again.");
@@ -108,6 +115,31 @@ export default function CheckoutPage() {
           <span className="font-label-sm text-label-sm text-gray-500 uppercase tracking-widest">Secure Checkout</span>
         </div>
       </header>
+
+      {/* Submitted confirmation -- only shown once the order is really saved */}
+      {submittedRefs && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div role="dialog" aria-modal="true" className="bg-white max-w-md w-full rounded-2xl p-6 shadow-2xl border border-gray-100 text-center">
+            <span className="material-symbols-outlined text-6xl text-[#1B6D24] mb-3" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+            <h3 className="text-xl font-bold text-on-surface mb-2">Order submitted</h3>
+            {submittedRefs.length > 0 && (
+              <p className="text-sm text-on-surface-variant mb-2">
+                Order number{submittedRefs.length > 1 ? "s" : ""}:{" "}
+                <strong className="text-on-surface [overflow-wrap:anywhere]">{submittedRefs.join(", ")}</strong>
+              </p>
+            )}
+            <p className="text-sm text-on-surface-variant mb-6 leading-relaxed">
+              Our team will add the transport fare within 60 minutes, during working hours. We&apos;ll email you when it&apos;s ready, then you can pay from My Orders.
+            </p>
+            <button
+              onClick={() => router.push("/buyer/orders")}
+              className="w-full py-3 bg-[#1B6D24] text-white rounded-lg font-bold hover:bg-[#15521B] transition-colors"
+            >
+              View My Orders
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Address Validation Gate Overlay */}
       {!loadingAddresses && addresses.length === 0 && (
@@ -362,7 +394,7 @@ export default function CheckoutPage() {
                     Transport fare review required
                   </p>
                   <p className="mt-1 text-xs leading-relaxed">
-                    Submit this order and our team will review the goods and delivery address, then get back to you with the transport fare <strong>within 60 minutes, during working hours</strong>. We&apos;ll email you the moment it&apos;s added, and you&apos;ll see it here too — payment opens once the fare is in your order summary.
+                    <strong>Your order is not sent until you press the button below.</strong> After you submit it, our team will review the goods and delivery address, then get back to you with the transport fare <strong>within 60 minutes, during working hours</strong>. We&apos;ll email you the moment it&apos;s added, and you&apos;ll see it here too — payment opens once the fare is in your order summary.
                   </p>
                 </div>
                 <div className="p-md">
@@ -378,9 +410,18 @@ export default function CheckoutPage() {
                     <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
                     {placingOrder ? "Submitting..." : "Request Transport Fare Review"}
                   </button>
+                  {/* Repeated here, beside the button: the copy at the top of
+                      the page is off-screen on a phone, so a failed submit
+                      looked like it had gone through. */}
+                  {error && (
+                    <div role="alert" className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 flex items-start gap-2">
+                      <span className="material-symbols-outlined text-red-500 text-base">error</span>
+                      <span className="text-sm font-semibold">Your order was NOT submitted. {error}</span>
+                    </div>
+                  )}
                   <p className="text-center font-label-xs text-label-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
                     <span className="material-symbols-outlined text-xs">info</span>
-                    Our team will get back to you within 60 minutes with the transport fare — you&apos;ll pay once it&apos;s added.
+                    After you submit, our team will add the transport fare within 60 minutes — you&apos;ll pay once it&apos;s added.
                   </p>
                 </div>
               </div>
