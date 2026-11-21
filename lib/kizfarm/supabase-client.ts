@@ -49,11 +49,28 @@ export function sessionSignedInAt(session: SessionLike): number | null {
   return Number(claims.iat) || null;
 }
 
+// Pages where money is moving: checkout, the payment hand-off/return pages
+// (order payment starts and returns on track-order) and course checkout.
+// Logging someone out on one of these mid-payment would strand the payment
+// they just made, so the limit is stretched by a grace period there; it
+// applies again as soon as they move on.
+const PAYMENT_PATHS = ["/buyer/checkout", "/buyer/payment", "/buyer/track-order", "/learning/checkout"];
+const PAYMENT_GRACE_SECONDS = 30 * 60;
+
+export function isPaymentPage(pathname?: string): boolean {
+  const path = pathname ?? (typeof window !== "undefined" ? window.location.pathname : "");
+  return PAYMENT_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+}
+
 // Milliseconds left before this login must end (<= 0 means it already has).
-export function sessionMsRemaining(session: SessionLike): number {
+export function sessionMsRemaining(session: SessionLike, pathname?: string): number {
   const signedInAt = sessionSignedInAt(session);
-  if (!signedInAt) return 0;
-  return (signedInAt + SESSION_MAX_AGE_SECONDS) * 1000 - Date.now();
+  // A token we can't read is treated as still valid -- the server checks it
+  // on every request anyway, and a parsing problem must never lock everyone
+  // out of the app.
+  if (!signedInAt) return Number.POSITIVE_INFINITY;
+  const grace = isPaymentPage(pathname) ? PAYMENT_GRACE_SECONDS : 0;
+  return (signedInAt + SESSION_MAX_AGE_SECONDS + grace) * 1000 - Date.now();
 }
 
 // A verified getUser() that only goes to the Auth server once per access
@@ -73,7 +90,9 @@ export async function getVerifiedUser(supabase: ReturnType<typeof createClient>)
 
   if (sessionMsRemaining(session) <= 0) {
     verifiedUserCache = null;
-    await supabase.auth.signOut().catch(() => {});
+    // "local": end the login on this device only. The default ("global")
+    // would also log the person out of the mobile app and every other device.
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     return { data: { user: null }, error: null } as unknown as GetUserResult;
   }
 

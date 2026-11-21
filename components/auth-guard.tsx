@@ -36,7 +36,7 @@ export default function AuthGuard({ children, fallback }: AuthGuardProps) {
       if (!profile) {
         // Clear the dead local session so /login and "/" don't see a
         // truthy getSession() and try to bounce back in here.
-        await signOut();
+        await signOut("local");
         if (!cancelled) setAuthorized(false);
         router.replace(loginPathWithRedirect());
         return;

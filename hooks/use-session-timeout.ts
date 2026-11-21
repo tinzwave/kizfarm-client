@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient, sessionMsRemaining } from "@/lib/kizfarm/supabase-client";
 import { signOut } from "@/lib/kizfarm/supabase-auth";
 
@@ -10,6 +10,9 @@ import { signOut } from "@/lib/kizfarm/supabase-auth";
 // is re-armed whenever the session changes (sign-in, token refresh).
 export function useSessionTimeout(loginPath: string, enabled = true) {
   const router = useRouter();
+  // Re-armed on every page change: the limit is longer on payment pages
+  // (see sessionMsRemaining) and back to normal once the person leaves.
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!enabled) return;
@@ -19,7 +22,7 @@ export function useSessionTimeout(loginPath: string, enabled = true) {
 
     const expire = async () => {
       if (cancelled) return;
-      await signOut();
+      await signOut("local");
       if (cancelled) return;
       const here = window.location.pathname + window.location.search;
       const sep = loginPath.includes("?") ? "&" : "?";
@@ -29,13 +32,14 @@ export function useSessionTimeout(loginPath: string, enabled = true) {
     const arm = (session: { access_token: string } | null) => {
       if (timer) clearTimeout(timer);
       if (!session) return;
-      const ms = sessionMsRemaining(session);
+      const ms = sessionMsRemaining(session, pathname);
       if (ms <= 0) {
         // Deferred: signing out from inside an auth-state callback can
         // deadlock supabase-js's auth lock.
         timer = setTimeout(expire, 0);
         return;
       }
+      if (!Number.isFinite(ms)) return;
       // setTimeout can't wait longer than ~24.8 days; an hour is well within.
       timer = setTimeout(expire, ms + 500);
     };
@@ -60,5 +64,5 @@ export function useSessionTimeout(loginPath: string, enabled = true) {
       subscription.unsubscribe();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [enabled, loginPath, router]);
+  }, [enabled, loginPath, router, pathname]);
 }

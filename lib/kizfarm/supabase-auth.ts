@@ -52,7 +52,7 @@ export async function getSession() {
     data: { session },
   } = await supabase.auth.getSession();
   if (session && sessionMsRemaining(session) <= 0) {
-    await signOut();
+    await signOut("local");
     return null;
   }
   return session;
@@ -96,11 +96,14 @@ export function clearCurrentProfileCache() {
   profileCache = null;
 }
 
-export async function signOut() {
+// scope "local" ends the login on this device only (used when the 1-hour
+// limit runs out); the default keeps the existing "log out everywhere"
+// behaviour of the Log out button.
+export async function signOut(scope: "global" | "local" = "global") {
   profileCache = null;
   clearVerifiedUserCache();
   const supabase = createClient();
-  await supabase.auth.signOut().catch(() => {});
+  await supabase.auth.signOut({ scope }).catch(() => {});
 }
 
 // Pending-email passthrough for the signup -> OTP -> login flow (unrelated

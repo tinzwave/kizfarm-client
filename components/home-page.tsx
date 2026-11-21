@@ -96,7 +96,7 @@ export default function HomePage() {
           router.replace(redirectPathForRole(profile.role));
           return;
         }
-        await signOut();
+        await signOut("local");
         if (cancelled) return;
       }
       setLoggedIn(false);

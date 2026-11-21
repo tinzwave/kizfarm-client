@@ -42,7 +42,7 @@ export default function LoginPage() {
       if (profile) {
         router.replace(redirectParam() ?? redirectPathForRole(profile.role));
       } else {
-        await signOut();
+        await signOut("local");
       }
     });
     return () => {
