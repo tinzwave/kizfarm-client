@@ -18,6 +18,14 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired") === "1") {
+      // Set after mount (not as initial state) so the server-rendered HTML
+      // and the first client render match.
+      Promise.resolve().then(() => setError("Your session has expired. Please log in again."));
+    }
+  }, []);
+
   // redirect away if already authenticated
   useEffect(() => {
     let cancelled = false;
@@ -32,7 +40,7 @@ export default function LoginPage() {
       const profile = await getCurrentProfile();
       if (cancelled) return;
       if (profile) {
-        router.push(redirectParam() ?? "/");
+        router.replace(redirectParam() ?? redirectPathForRole(profile.role));
       } else {
         await signOut();
       }

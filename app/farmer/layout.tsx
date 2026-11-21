@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import FarmerSidebar from "@/components/farmer-sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { getSession, signOut } from "@/lib/kizfarm/supabase-auth";
 import { getFarmerStatus } from "@/lib/kizfarm/supabase-data";
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 
 export default function FarmerLayout({
   children,
@@ -22,6 +23,11 @@ export default function FarmerLayout({
     }
   });
   const [checkingAccess, setCheckingAccess] = useState(true);
+  // Once an approved farmer has passed the check, moving between portal
+  // pages re-checks quietly in the background instead of blanking the whole
+  // screen with "Loading seller portal..." on every click.
+  const approvedOnce = useRef(false);
+  useSessionTimeout("/login", !checkingAccess);
 
   const toggleCollapsed = () => {
     setCollapsed((v) => {
@@ -56,7 +62,7 @@ export default function FarmerLayout({
     // - Farmer not approved -> /farmer/verify
     // - Approved -> allow dashboard routes
     async function checkStatus() {
-      setCheckingAccess(true);
+      if (!approvedOnce.current) setCheckingAccess(true);
       const session = await getSession();
       if (!session) {
         if (pathname !== "/login") router.replace("/login");
@@ -98,6 +104,7 @@ export default function FarmerLayout({
         }
 
         // Approved farmer shouldn't be stuck in onboarding routes.
+        approvedOnce.current = true;
         if (isBecome || isVerify) router.replace("/farmer/dashboard");
         setCheckingAccess(false);
       } catch {

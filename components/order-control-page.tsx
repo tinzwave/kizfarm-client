@@ -364,7 +364,17 @@ export default function OrderControlPage() {
       const buyerName = o.buyerId?.name?.toLowerCase() ?? "";
       const farmName = o.farmerId?.farmName?.toLowerCase() ?? "";
       const id = o._id.toLowerCase();
-      if (!buyerName.includes(q) && !farmName.includes(q) && !id.includes(q))
+      // The KFM-... order number is what buyers see on their receipts and
+      // screenshots, so it has to be searchable here too.
+      const ref = (o.masterOrderId ?? "").toLowerCase();
+      const amounts = [o.total, o.subtotal + (o.serviceFee || 0)].map((n) => String(n ?? ""));
+      if (
+        !buyerName.includes(q) &&
+        !farmName.includes(q) &&
+        !id.includes(q) &&
+        !ref.includes(q) &&
+        !amounts.some((a) => a === q.replace(/[₦,\s]/g, ""))
+      )
         return false;
     }
     return true;
@@ -1061,9 +1071,9 @@ export default function OrderControlPage() {
                   </div>
 
                   {/* Sidebar Cards */}
-                  <div className="col-span-4 space-y-4">
+                  <div className="col-span-4 min-w-0 space-y-4">
                     {/* Stakeholders */}
-                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm min-w-0">
                       <div className="px-5 py-4 border-b border-gray-100">
                         <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                           Stakeholders
@@ -1077,17 +1087,17 @@ export default function OrderControlPage() {
                               person
                             </span>
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-semibold text-slate-400 uppercase">
                               Buyer
                             </p>
-                            <h5 className="font-semibold text-slate-900 text-sm">
+                            <h5 className="font-semibold text-slate-900 text-sm break-words">
                               {selected.buyerId?.name ?? "—"}
                             </h5>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                               {selected.buyerId?.email ?? ""}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                               {selected.buyerId?.phone ?? ""}
                             </p>
                           </div>
@@ -1099,17 +1109,17 @@ export default function OrderControlPage() {
                               agriculture
                             </span>
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-semibold text-slate-400 uppercase">
                               Producer
                             </p>
-                            <h5 className="font-semibold text-slate-900 text-sm">
+                            <h5 className="font-semibold text-slate-900 text-sm break-words">
                               {selected.farmerId?.farmName ?? "—"}
                             </h5>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                               {selected.farmerId?.location ?? ""}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                               {selected.farmerId?.phone ?? ""}
                             </p>
                           </div>
@@ -1122,17 +1132,17 @@ export default function OrderControlPage() {
                                 local_shipping
                               </span>
                             </div>
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <p className="text-[10px] font-semibold text-slate-400 uppercase">
                                 Driver
                               </p>
-                              <h5 className="font-semibold text-slate-900 text-sm">
+                              <h5 className="font-semibold text-slate-900 text-sm break-words">
                                 {selected.driverId.name}
                               </h5>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                                 {selected.driverId.phone}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-slate-500 [overflow-wrap:anywhere]">
                                 {selected.driverId.vehicleType}
                               </p>
                             </div>

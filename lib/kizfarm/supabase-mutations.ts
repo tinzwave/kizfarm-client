@@ -3,7 +3,7 @@
 // (checkout, pay, cancel, confirm receipt, rate driver) go through the
 // RPCs built in the migration's Phase 4. Same response-shape shim as
 // supabase-data.ts, for the same reason: minimize churn in existing pages.
-import { createClient } from "./supabase-client";
+import { createClient, getVerifiedUser } from "./supabase-client";
 import { getAdminFarmerSuspensionEligibility, getAdminBuyerSuspensionEligibility } from "./supabase-data";
 
 function toAddress(a: any) {
@@ -42,7 +42,7 @@ export async function createAddress(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   if (input.isDefault) {
@@ -74,7 +74,7 @@ export async function updateAddress(
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   if (input.isDefault) {
@@ -355,7 +355,7 @@ export async function submitFarmerVerification(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   try {
@@ -423,7 +423,7 @@ export async function saveFarmerApplicationProgress(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Your session has expired. Please log in again." } };
 
   const files = [input.farmerImageFile, input.validIdImageFile, ...(input.farmImageSlots || [])].filter(
@@ -670,7 +670,7 @@ export async function uploadCourseCover(file: File): Promise<string> {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) throw new Error("Not authenticated");
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image file (JPG or PNG).");
   if (file.size > 5 * 1024 * 1024) throw new Error("Image must be under 5 MB.");
@@ -708,7 +708,7 @@ export async function createBuyerCourse(input: { title: string; description: str
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -879,7 +879,7 @@ export async function startChat(productId: string) {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: product, error: productError } = await supabase.from("products").select("id, user_id").eq("id", productId).single();
@@ -1010,7 +1010,7 @@ export async function createFarmerProduct(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: farmer } = await supabase.from("farmers").select("id").eq("user_id", user.id).single();
@@ -1064,7 +1064,7 @@ export async function adminCreateProductForFarmer(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: farmer, error: farmerError } = await supabase
@@ -1159,7 +1159,7 @@ export async function submitReview(productId: string, input: { rating: number; c
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
@@ -1187,7 +1187,7 @@ export async function saveCreatorProfile(input: { photo: string | null; bio: str
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { error } = await supabase
@@ -1206,7 +1206,7 @@ export async function saveCreatorBankDetails(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { error } = await supabase
@@ -1225,7 +1225,7 @@ export async function submitCourseReview(courseId: string, input: { rating: numb
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single();
@@ -1256,7 +1256,7 @@ export async function saveFarmerBankDetails(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { error } = await supabase
@@ -1436,7 +1436,7 @@ export async function updateMyFullProfile(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const profileUpdate: Record<string, unknown> = {};
@@ -1477,7 +1477,7 @@ export async function registerAsFarmer(input: {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: existing } = await supabase.from("farmers").select("id").eq("user_id", user.id).maybeSingle();
@@ -1504,7 +1504,7 @@ export async function addToWishlist(productId: string) {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { error } = await supabase
@@ -1560,7 +1560,7 @@ export async function removeFromWishlist(productId: string) {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { error } = await supabase

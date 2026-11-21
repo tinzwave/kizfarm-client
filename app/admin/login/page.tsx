@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/kizfarm/supabase-client";
 import { getCurrentProfile, isAdminProfile } from "@/lib/kizfarm/supabase-auth";
@@ -11,6 +11,14 @@ export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired") === "1") {
+      // Set after mount (not as initial state) so the server-rendered HTML
+      // and the first client render match.
+      Promise.resolve().then(() => setError("Your session has expired. Please log in again."));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -4,7 +4,7 @@
 // only need their fetch call swapped, not their rendering/interfaces.
 // New pages built from scratch should prefer plain Postgres field names
 // instead of extending this shim.
-import { createClient } from "./supabase-client";
+import { createClient, getVerifiedUser } from "./supabase-client";
 import { missingSteps } from "./farmer-application";
 
 // The `farmers` table is RLS-restricted to its owner + admin (it holds
@@ -109,7 +109,7 @@ export async function getFarmerStatus() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: true } as Response, payload: { ok: true, farmer: null, profileStatus: null } };
 
   const [farmerRes, profileRes] = await Promise.all([
@@ -219,7 +219,7 @@ export async function getMyFarmerProfile() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase.from("farmers").select("*").eq("user_id", user.id).maybeSingle();
@@ -270,7 +270,7 @@ export async function getBuyerDashboard() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const [productsRes, ordersRes, cartRes, orderCountRes, coursesRes] = await Promise.all([
@@ -366,7 +366,7 @@ export async function getFarmerDashboard() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: farmer } = await supabase.from("farmers").select("*").eq("user_id", user.id).single();
@@ -556,7 +556,7 @@ export async function getBuyerOrders() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -639,7 +639,7 @@ export async function getFarmerOrders() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: farmer } = await supabase.from("farmers").select("id").eq("user_id", user.id).single();
@@ -1223,7 +1223,7 @@ export async function getBuyerBrowseCourses() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -1243,7 +1243,7 @@ export async function getMyCreatedCourses() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -1260,7 +1260,7 @@ export async function getMySubscriptions(opts: { source?: string } = {}) {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   let query = supabase
@@ -1291,7 +1291,7 @@ export async function getCourseAccess(courseId: string, opts: { source?: string 
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   // Note: course_id alone already pins down a specific course (and therefore
@@ -1464,7 +1464,7 @@ export async function getConversations() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const [chatsRes, unreadRes] = await Promise.all([
@@ -1629,7 +1629,7 @@ function toFarmerProduct(p: any) {
 async function getOwnFarmer(supabase: ReturnType<typeof createClient>) {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { error: "Not authenticated" as const, farmer: null, userId: null };
   const { data: farmer } = await supabase.from("farmers").select("id").eq("user_id", user.id).single();
   if (!farmer) return { error: "Farmer record not found" as const, farmer: null, userId: user.id };
@@ -1707,7 +1707,7 @@ export async function getBuyerRefunds() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const [ledgerRes, profileRes] = await Promise.all([
@@ -1791,7 +1791,7 @@ export async function getFarmerBankDetails() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data, error } = await supabase
@@ -2189,7 +2189,7 @@ export async function getMyFullProfile() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
@@ -2229,7 +2229,7 @@ export async function getWishlist() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const { data: rows, error } = await supabase
@@ -2307,7 +2307,7 @@ export async function getBuyerRecentActivity() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const [ordersRes, refundsRes, chatsRes] = await Promise.all([
@@ -2374,7 +2374,7 @@ export async function getMyReferrals() {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated" } };
 
   const [profileRes, settingsRes, referralsRes, rewardsRes] = await Promise.all([
@@ -2512,7 +2512,7 @@ export async function getBuyerOpenOrders(opts: { productId?: string } = {}) {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return { res: { ok: false } as Response, payload: { error: "Not authenticated", orders: [] as BuyerOpenOrder[] } };
 
   let query = supabase

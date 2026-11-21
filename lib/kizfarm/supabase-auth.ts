@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient } from "./supabase-client";
+import { clearVerifiedUserCache, createClient, getVerifiedUser, sessionMsRemaining } from "./supabase-client";
 
 export type KizfarmProfile = {
   id: string;
@@ -44,34 +44,63 @@ export function redirectPathForRole(role: string | undefined | null) {
   return "/buyer/dashboard";
 }
 
+// Returns the local session, or null once it's past the 1-hour login limit
+// (signing it out so every page agrees the person is logged out).
 export async function getSession() {
   const supabase = createClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
+  if (session && sessionMsRemaining(session) <= 0) {
+    await signOut();
+    return null;
+  }
   return session;
 }
+
+// The signed-in person's profile. Cached briefly per user so that the home
+// page redirect, the layout guard and the page itself don't each refetch it
+// one after another on the same navigation (each fetch is a slow round-trip).
+const PROFILE_CACHE_MS = 60 * 1000;
+let profileCache: { userId: string; at: number; result: Promise<KizfarmProfile | null> } | null = null;
 
 export async function getCurrentProfile(): Promise<KizfarmProfile | null> {
   const supabase = createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getVerifiedUser(supabase);
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  if (profileCache && profileCache.userId === user.id && Date.now() - profileCache.at < PROFILE_CACHE_MS) {
+    return profileCache.result;
+  }
 
-  if (error || !data) return null;
-  return data as KizfarmProfile;
+  const entry = {
+    userId: user.id,
+    at: Date.now(),
+    result: (async () => {
+      const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      if (error || !data) return null;
+      return data as KizfarmProfile;
+    })(),
+  };
+  profileCache = entry;
+  entry.result.then((p) => {
+    if (!p && profileCache === entry) profileCache = null;
+  });
+  return entry.result;
+}
+
+// Call after the person edits their own profile so guards see the change.
+export function clearCurrentProfileCache() {
+  profileCache = null;
 }
 
 export async function signOut() {
+  profileCache = null;
+  clearVerifiedUserCache();
   const supabase = createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut().catch(() => {});
 }
 
 // Pending-email passthrough for the signup -> OTP -> login flow (unrelated

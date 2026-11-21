@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentProfile, getSession, isAdminProfile } from "@/lib/kizfarm/supabase-auth";
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 
 export default function AdminGuard({
   children,
@@ -11,6 +12,7 @@ export default function AdminGuard({
 }) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  useSessionTimeout("/admin/login", authorized === true);
 
   useEffect(() => {
     let cancelled = false;

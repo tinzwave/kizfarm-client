@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/lib/kizfarm/supabase-client";
+import { createClient, getVerifiedUser } from "@/lib/kizfarm/supabase-client";
 
 // Stored notifications (public.notifications), created by database
 // triggers whenever something happens to the user's orders, chats, courses
@@ -71,7 +71,7 @@ export function useNotifications({ limit = 50, countOnly = false }: { limit?: nu
     const supabase = createClient();
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getVerifiedUser(supabase);
     if (!user) {
       setLoading(false);
       return;
@@ -100,7 +100,7 @@ export function useNotifications({ limit = 50, countOnly = false }: { limit?: nu
       await load();
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await getVerifiedUser(supabase);
       if (!user || cancelled) return;
       channel = supabase
         // Unique per hook instance: the bell and the page both listen at once,

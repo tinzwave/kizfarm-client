@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentProfile, getSession, loginPathWithRedirect, signOut } from "@/lib/kizfarm/supabase-auth";
+import { useSessionTimeout } from "@/hooks/use-session-timeout";
 
 type AuthGuardProps = {
   children: React.ReactNode;
@@ -12,6 +13,7 @@ type AuthGuardProps = {
 export default function AuthGuard({ children, fallback }: AuthGuardProps) {
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
+  useSessionTimeout("/login", authorized === true);
 
   useEffect(() => {
     let cancelled = false;

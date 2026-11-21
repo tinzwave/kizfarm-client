@@ -93,7 +93,7 @@ export default function HomePage() {
         const profile = await getCurrentProfile();
         if (cancelled) return;
         if (profile) {
-          router.push(redirectPathForRole(profile.role));
+          router.replace(redirectPathForRole(profile.role));
           return;
         }
         await signOut();
@@ -236,20 +236,31 @@ export default function HomePage() {
       <section className="relative overflow-hidden min-h-[92vh] flex items-center">
         {/* Rotating cinematic video background */}
         <div className="absolute inset-0 bg-black">
-          {HERO_VIDEOS.map((src, i) => (
-            <video
-              key={src}
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-              className={`hero-video-zoom absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
-                i === activeHeroVideo ? "opacity-100" : "opacity-0"
-              }`}
-              src={src}
-            />
-          ))}
+          {/* Only the clip on screen (and the next one, so the switch is
+              seamless) is downloaded -- all three used to load at once,
+              ~37MB, starving the login/dashboard requests on mobile data. */}
+          {HERO_VIDEOS.map((src, i) => {
+            const isActive = i === activeHeroVideo;
+            const isNext = i === (activeHeroVideo + 1) % HERO_VIDEOS.length;
+            // Clips already shown keep their src (i < active), so cycling
+            // back to one doesn't download it again.
+            const shouldLoad = isActive || isNext || i < activeHeroVideo;
+            return (
+              <video
+                key={src}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload={isActive ? "auto" : isNext ? "metadata" : "none"}
+                poster={src.replace(/\.mp4$/, ".jpg")}
+                className={`hero-video-zoom absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out ${
+                  isActive ? "opacity-100" : "opacity-0"
+                }`}
+                src={shouldLoad ? src : undefined}
+              />
+            );
+          })}
           <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/25" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
         </div>
